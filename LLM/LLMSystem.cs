@@ -83,17 +83,6 @@ namespace AIToolkit.LLM
             }
         }
 
-        public static int CurrentTokenCost { get; private set; } = 0;
-
-        public static bool LongTermMemory
-        {
-            get => longTermMemory;
-            set
-            {
-                longTermMemory = value;
-            }
-        }
-
         public static BasePersona Bot { get => bot; set => ChangeBot(value); }
         public static BasePersona User { get => user; set => user = value; }
 
@@ -552,7 +541,7 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         public static string GetAwayString()
         {
-            if (History.CurrentSession.Messages.Count == 0 || !Bot.SenseOfTime)
+            if (History.CurrentSession.Messages.Count == 0 || !Bot.SenseOfTime || History.CurrentSession != History.Sessions.Last())
                 return string.Empty;
 
             var timespan = DateTime.Now - History.CurrentSession.Messages.Last().Date;
