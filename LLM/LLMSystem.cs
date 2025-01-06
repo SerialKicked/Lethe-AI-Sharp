@@ -305,25 +305,39 @@ namespace AIToolkit.LLM
             var rawprompt = new StringBuilder(SystemPrompt.GetSystemPromptRaw(Bot));
             var inserts = new Dictionary<int, string>();
             var searchmessage = string.IsNullOrWhiteSpace(newMessage) ? History.GetLastUserMessageContent() : newMessage;
-            if (WorldInfo && Bot.MyWorlds.Count > 0)
+            usedGuidInSession = [];
+            if (WorldInfo)
             {
-                _currentWorldEntries = [];
-                foreach (var world in Bot.MyWorlds)
+                if (Bot.MyWorlds.Count > 0)
                 {
-                    _currentWorldEntries.AddRange(world.FindEntries(History, searchmessage));
-                }
-                var entries = _currentWorldEntries.FindAll(e => e.Position == WEPosition.SystemPrompt);
-                if (entries.Count > 0)
-                {
-                    rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle);
+                    _currentWorldEntries = [];
+                    foreach (var world in Bot.MyWorlds)
+                    {
+                        _currentWorldEntries.AddRange(world.FindEntries(History, searchmessage));
+                    }
+                    var entries = _currentWorldEntries.FindAll(e => e.Position == WEPosition.SystemPrompt);
+                    if (entries.Count > 0)
+                    {
+                        rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle);
+                        foreach (var item in entries)
+                            rawprompt.AppendLinuxLine(item.Message);
+                    }
+                    entries = _currentWorldEntries.FindAll(e => e.Position == WEPosition.Chat);
                     foreach (var item in entries)
-                        rawprompt.AppendLinuxLine(item.Message);
+                    {
+                        if (!inserts.TryAdd(item.PositionIndex, item.Message))
+                            inserts[item.PositionIndex] += NewLine + item.Message;
+                    }
                 }
-                entries = _currentWorldEntries.FindAll(e => e.Position == WEPosition.Chat);
-                foreach (var item in entries)
+                // Check all sessions for sticky entries
+                foreach (var session in History.Sessions)
                 {
-                    if (!inserts.TryAdd(item.PositionIndex, item.Message))
-                        inserts[item.PositionIndex] += NewLine + item.Message;
+                    if (session.Sticky)
+                    {
+                        if (!inserts.TryAdd(5, session.GetRawMemory(!MarkdownMemoryFormating)))
+                            inserts[5] += NewLine + session.GetRawMemory(!MarkdownMemoryFormating);
+                    }
+                    usedGuidInSession.Add(session.Guid);
                 }
             }
             foreach (var ctxplug in ContextPlugins)
@@ -337,10 +351,10 @@ namespace AIToolkit.LLM
             systemPromptSize = GetTokenCount(sysprompt);
             tokencount += systemPromptSize;
             var memprompt = string.Empty;
-            usedGuidInSession = [];
             if (Bot.UseRAG && RAGSystem.Enabled)
             {
                 var search = await RAGSystem.Search(ReplaceMacros(searchmessage), MaxRAGEntries);
+                search.RemoveAll(search => usedGuidInSession.Contains(search.session.Guid));
                 memprompt = MemoriesToMessage(search);
                 if (!string.IsNullOrEmpty(memprompt))
                 {
