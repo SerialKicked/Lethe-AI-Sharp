@@ -464,6 +464,41 @@ namespace AIToolkit.LLM
         }
 
         /// <summary>
+        /// Starts the generation process for the bot (response to invisible system prompt).
+        /// </summary>
+        /// <param name="systemMessage">Message from sender</param>
+        /// <returns></returns>
+        public static async Task<string> QuickInferenceForSystemPrompt(string systemMessage, bool logSystemPrompt)
+        {
+            if (Status == SystemStatus.Busy)
+                return string.Empty;
+
+            var inputText = systemMessage;
+            StreamingTextProgress = string.Empty;
+            GenerationInput genparams = Sampler.GetCopy();
+            _LastGeneratedPrompt = await GenerateFullPrompt(AuthorRole.System, inputText);
+            if (ForceTemperature >= 0)
+                genparams.Temperature = ForceTemperature;
+            genparams.Max_context_length = MaxContextLength;
+            genparams.Max_length = MaxReplyLength;
+            genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
+            genparams.Prompt = _LastGeneratedPrompt;
+            if (!string.IsNullOrEmpty(systemMessage) && logSystemPrompt)
+                Bot.History.LogMessage(AuthorRole.System, systemMessage, User, Bot);
+
+            var oldst = status;
+            Status = SystemStatus.Busy;
+            var result = await Client.GenerateAsync(genparams);
+            Status = oldst;
+            string finalstr = string.Empty;
+            foreach (var item in result.Results)
+            {
+                finalstr += item.Text;
+            }
+            return string.IsNullOrEmpty(finalstr) ? string.Empty : finalstr;
+        }
+
+        /// <summary>
         /// Starts the generation process for the bot.
         /// </summary>
         /// <param name="MsgSender">Role of the sender</param>
