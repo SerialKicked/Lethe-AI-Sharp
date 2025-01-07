@@ -148,6 +148,7 @@ namespace AIToolkit.LLM
                     if (ctxplug.Enabled && ctxplug.ReplaceOutput(ReplaceMacros(response), History, out var editedresponse))
                         response = editedresponse;
                 }
+                Status = SystemStatus.Ready;
                 RaiseOnInferenceEnded(response);
             }
             else
@@ -486,15 +487,14 @@ namespace AIToolkit.LLM
             if (!string.IsNullOrEmpty(systemMessage) && logSystemPrompt)
                 Bot.History.LogMessage(AuthorRole.System, systemMessage, User, Bot);
 
-            var oldst = status;
             Status = SystemStatus.Busy;
             var result = await Client.GenerateAsync(genparams);
-            Status = oldst;
             string finalstr = string.Empty;
             foreach (var item in result.Results)
             {
                 finalstr += item.Text;
             }
+            Status = SystemStatus.Ready;
             return string.IsNullOrEmpty(finalstr) ? string.Empty : finalstr;
         }
 
