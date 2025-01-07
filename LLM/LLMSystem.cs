@@ -12,7 +12,7 @@ using System;
 
 namespace AIToolkit.LLM
 {
-    public enum SystemStatus { NotInit, Ready, Busy, Automated }
+    public enum SystemStatus { NotInit, Ready, Busy }
     public enum SystemPromptSection { MainPrompt, BotBio, UserBio, Scenario, Memory, ContextInfo }
 
     public class InsertPrompt(string prompt, AuthorRole role = AuthorRole.SysPrompt, int depth = 1)
@@ -104,7 +104,6 @@ namespace AIToolkit.LLM
         public static Chatlog History => Bot.History;
 
         private static SystemStatus status = SystemStatus.NotInit;
-        private static bool longTermMemory = true;
         private static int systemPromptSize = 0;
 
         public static readonly string NewLine = "\n";
@@ -150,8 +149,6 @@ namespace AIToolkit.LLM
                         response = editedresponse;
                 }
                 RaiseOnInferenceEnded(response);
-                if (Status != SystemStatus.Automated)
-                    Status = SystemStatus.Ready;
             }
             else
             {
@@ -466,9 +463,6 @@ namespace AIToolkit.LLM
             }
         }
 
-        public static void StartAutomation() => Status = SystemStatus.Automated;
-        public static void StopAutomation() => Status = SystemStatus.Ready;
-
         /// <summary>
         /// Starts the generation process for the bot.
         /// </summary>
@@ -479,13 +473,10 @@ namespace AIToolkit.LLM
         {
             if (Status == SystemStatus.Busy)
                 return;
-            if (Status != SystemStatus.Automated)
-                Status = SystemStatus.Busy;
-
             var inputText = userInput;
             var lastuserinput = string.IsNullOrEmpty(userInput) ? History.GetLastUserMessageContent() : userInput;
             var insertmessages = new List<string>();
-            if (!string.IsNullOrEmpty(lastuserinput) && Status != SystemStatus.Automated)
+            if (!string.IsNullOrEmpty(lastuserinput))
                 foreach (var ctxplug in ContextPlugins)
                 {
                     if (!ctxplug.Enabled)
