@@ -616,8 +616,9 @@ namespace AIToolkit.Files
             {
                 return (0, TimeSpan.Zero);
             }
+            var messagesCopy = CurrentSession.Messages.ToList(); // Create a copy of the collection
             var sb = new StringBuilder();
-            foreach (var message in CurrentSession.Messages)
+            foreach (var message in messagesCopy)
             {
                 sb.Append(LLMSystem.Instruct.FormatSingleMessage(message));
             }

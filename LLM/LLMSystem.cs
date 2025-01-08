@@ -261,7 +261,7 @@ namespace AIToolkit.LLM
             catch (Exception)
             {
                 //MessageBox.Show($"An error occured while counting tokens, estimate used instead. {ex.Message}");
-                return true; // or any default value you want to return in case of an error
+                return true;
             }
         }
 
@@ -334,8 +334,8 @@ namespace AIToolkit.LLM
                     {
                         if (!inserts.TryAdd(5, session.GetRawMemory(!MarkdownMemoryFormating)))
                             inserts[5] += NewLine + session.GetRawMemory(!MarkdownMemoryFormating);
+                        usedGuidInSession.Add(session.Guid);
                     }
-                    usedGuidInSession.Add(session.Guid);
                 }
             }
             foreach (var ctxplug in ContextPlugins)
@@ -508,6 +508,7 @@ namespace AIToolkit.LLM
         {
             if (Status == SystemStatus.Busy)
                 return;
+            Status = SystemStatus.Busy;
             var inputText = userInput;
             var lastuserinput = string.IsNullOrEmpty(userInput) ? History.GetLastUserMessageContent() : userInput;
             var insertmessages = new List<string>();
