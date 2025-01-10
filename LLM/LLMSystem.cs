@@ -632,8 +632,10 @@ namespace AIToolkit.LLM
         public static string TimeSpanToHumanString(TimeSpan span)
         {
             // Turn a time span into something clearly legible for a human
-            if (span.Days > 0)
+            if (span.Days > 1)
                 return span.Days.ToString() + " days";
+            else if (span.Days > 0)
+                return "1 day";
             else if (span.Hours > 0)
                 return span.Hours.ToString() + " hours";
             else if (span.Minutes > 0)
