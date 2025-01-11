@@ -51,7 +51,7 @@ namespace AIToolkit.LLM
 
         internal static Dictionary<string, BasePersona> LoadedPersonas = [];
 
-#pragma warning disable CA2211 // Non-constant fields should not be visible
+#pragma warning disable CA2211, IDE0079 // Non-constant fields should not be visible
         public static EventHandler<string>? OnFullPromptReady;
         /// <summary> Called during inference each time the LLM outputs a new token </summary>
         public static EventHandler<string>? OnInferenceStreamed;
@@ -59,9 +59,7 @@ namespace AIToolkit.LLM
         public static EventHandler<string>? OnInferenceEnded;
         /// <summary> Called when the system changes states (no init, busy, ready) </summary>
         public static EventHandler<SystemStatus>? OnStatusChanged;
-        public static BasicDelegateFunction? UI_RefreshChat = null;
-        public static UpdateMessageFunction? UI_ChangeMessage = null;
-#pragma warning restore CA2211 // Non-constant fields should not be visible
+#pragma warning restore CA2211, IDE0079 // Non-constant fields should not be visible
 
         private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(null, fullprompt);
         private static void RaiseOnStatusChange(SystemStatus newStatus) => OnStatusChanged?.Invoke(null, newStatus);
