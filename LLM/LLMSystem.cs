@@ -9,6 +9,7 @@ using Newtonsoft.Json.Linq;
 using System.Globalization;
 using static LLama.Common.ChatHistory;
 using System;
+using System.Threading.Tasks;
 
 namespace AIToolkit.LLM
 {
@@ -665,6 +666,11 @@ namespace AIToolkit.LLM
                 finalstr += item.Text;
             }
             return string.IsNullOrEmpty(finalstr) ? string.Empty : finalstr;
+        }
+
+        public static async Task<WebQueryFullResponse> WebSearch(string query)
+        {
+            return await Client.WebQueryAsync(new WebQuery() { q = query });
         }
 
     }
