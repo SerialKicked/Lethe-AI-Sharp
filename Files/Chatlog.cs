@@ -24,6 +24,8 @@ namespace AIToolkit.Files
         [JsonIgnore] public Guid Guid = Guid.NewGuid();
         public string Title { get; set; } = string.Empty;
         public string Summary { get; set; } = string.Empty;
+        public string[] Sentiments { get; set; } = [];
+        public string[] Associations { get; set; } = [];
 
         public float[] EmbedTitle { get; set; } = [];
         public float[] EmbedSummary { get; set; } = [];
@@ -35,6 +37,103 @@ namespace AIToolkit.Files
         /// </summary>
         public bool Sticky { get; set; } = false;
         public TimeSpan Duration => EndTime - StartTime;
+
+        public async Task<string[]> GenerateSentiment()
+        {
+            LLMSystem.NamesInPromptOverride = false;
+            var msgtxt = "You are an automated system designed to associate chat sessions and stories with a list of sentiments." + LLMSystem.NewLine +
+                LLMSystem.NewLine +
+                "# Character Information:" + LLMSystem.NewLine +
+                "## Name: {{char}}" + LLMSystem.NewLine +
+                "{{charbio}}" + LLMSystem.NewLine +
+                "## Name: {{user}}" + LLMSystem.NewLine +
+                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
+                "# Chat Session:" + LLMSystem.NewLine + LLMSystem.NewLine +
+                "" + LLMSystem.NewLine +
+                LLMSystem.NewLine +
+                "# Instruction:" + LLMSystem.NewLine +
+                "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of sentiments or moods {{char}} would associate with this chat. 1 to 4 words max." + LLMSystem.NewLine +
+                "Example: Happiness, Playfulness, Surprise";
+            var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
+            var tokencount = LLMSystem.GetTokenCount(msg);
+
+            var availtokens = LLMSystem.MaxContextLength - tokencount - 1024;
+            var docs = GetRawDialogs(availtokens, false);
+            msgtxt = "You are an automated system designed to associate chat sessions and stories with a list of sentiments." +
+                LLMSystem.NewLine +
+                "# Character Information:" + LLMSystem.NewLine +
+                "## Name: {{char}}" + LLMSystem.NewLine +
+                "{{charbio}}" + LLMSystem.NewLine +
+                "## Name: {{user}}" + LLMSystem.NewLine +
+                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
+                "# Chat Session:" + LLMSystem.NewLine + LLMSystem.NewLine +
+                docs + LLMSystem.NewLine +
+                LLMSystem.NewLine +
+                "# Instruction:" + LLMSystem.NewLine +
+                "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of sentiments or moods {{char}} would associate with this chat. 1 to 4 words max." + LLMSystem.NewLine +
+                "Example: Happiness, Playfulness, Surprise";
+            var prompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
+
+            var llmparams = LLMSystem.Sampler.GetCopy();
+            llmparams.Prompt = prompt + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
+            llmparams.Max_length = 1024;
+            llmparams.Max_context_length = LLMSystem.MaxContextLength;
+            llmparams.Grammar = string.Empty;
+            llmparams.Temperature = 0.5f;
+            var finalstr = await LLMSystem.SimpleQuery(llmparams);
+            LLMSystem.NamesInPromptOverride = null;
+            // convert the comma-separated list into an array
+            var res = finalstr.Split(',');
+
+            return res;
+        }
+
+        public async Task<string[]> GenerateKeywords()
+        {
+            LLMSystem.NamesInPromptOverride = false;
+            var msgtxt = "You are an automated system designed to associate chat sessions and stories with a list of relevant keywords." + LLMSystem.NewLine +
+                LLMSystem.NewLine +
+                "# Character Information:" + LLMSystem.NewLine +
+                "## Name: {{char}}" + LLMSystem.NewLine +
+                "{{charbio}}" + LLMSystem.NewLine +
+                "## Name: {{user}}" + LLMSystem.NewLine +
+                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
+                "# Chat Session:" + LLMSystem.NewLine + LLMSystem.NewLine +
+                "" + LLMSystem.NewLine +
+                LLMSystem.NewLine +
+                "# Instruction:" + LLMSystem.NewLine +
+                "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of keywords {{char}} would associate with this chat. 1 to 4 words max.";
+            var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
+            var tokencount = LLMSystem.GetTokenCount(msg);
+
+            var availtokens = LLMSystem.MaxContextLength - tokencount - 1024;
+            var docs = GetRawDialogs(availtokens, false);
+            msgtxt = "You are an automated system designed to associate chat sessions and stories with a list of relevant keywords." + LLMSystem.NewLine +
+                "# Character Information:" + LLMSystem.NewLine +
+                "## Name: {{char}}" + LLMSystem.NewLine +
+                "{{charbio}}" + LLMSystem.NewLine +
+                "## Name: {{user}}" + LLMSystem.NewLine +
+                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
+                "# Chat Session:" + LLMSystem.NewLine + LLMSystem.NewLine +
+                docs + LLMSystem.NewLine +
+                LLMSystem.NewLine +
+                "# Instruction:" + LLMSystem.NewLine +
+                "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of keywords {{char}} would associate with this chat. 1 to 4 words max.";
+            var prompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
+
+            var llmparams = LLMSystem.Sampler.GetCopy();
+            llmparams.Prompt = prompt + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
+            llmparams.Max_length = 1024;
+            llmparams.Max_context_length = LLMSystem.MaxContextLength;
+            llmparams.Grammar = string.Empty;
+            llmparams.Temperature = 0.5f;
+            var finalstr = await LLMSystem.SimpleQuery(llmparams);
+            LLMSystem.NamesInPromptOverride = null;
+            // convert the comma-separated list into an array
+            var res = finalstr.Split(',');
+
+            return res;
+        }
 
         public async Task<string> GenerateNewSummary()
         {
@@ -432,32 +531,6 @@ namespace AIToolkit.Files
         }
 
         /// <summary>
-        /// Move the current active chat to the session list and generate title, summary, and embeds for it.
-        /// </summary>
-        /// <returns></returns>
-        public async Task<ChatSession> CurrentChatToSession()
-        {
-            CurrentSession.StartTime = CurrentSession.Messages.First().Date;
-            // if the first message has a default date, try to find a message with a valid date
-            if (CurrentSession.StartTime == default)
-            {
-                foreach (var item in CurrentSession.Messages)
-                {
-                    if (item.Date != default)
-                    {
-                        CurrentSession.StartTime = item.Date;
-                        break;
-                    }
-                }
-            }
-            CurrentSession.EndTime = CurrentSession.Messages.Last().Date;
-            CurrentSession.Summary = await CurrentSession.GenerateNewSummary();
-            CurrentSession.Title = await ChatSession.GenerateNewTitle(CurrentSession.Summary);
-            await CurrentSession.GenerateEmbeds();
-            return CurrentSession;
-        }
-
-        /// <summary>
         /// Generate title, summary and embeddings for the selected session. Also fixes date issues if any.
         /// </summary>
         /// <param name="session"></param>
@@ -490,6 +563,8 @@ namespace AIToolkit.Files
             var sum = await session.GenerateNewSummary();
             session.Summary = sum;
             session.Title = await ChatSession.GenerateNewTitle(sum);
+            session.Sentiments = await session.GenerateSentiment();
+            session.Associations = await session.GenerateKeywords();
             await session.GenerateEmbeds();
             return session;
         }
@@ -511,7 +586,7 @@ namespace AIToolkit.Files
             // Save current session if it has enough messages otherwise just reset it
             if (archivePreviousSession && CurrentSession.Messages.Count > 2)
             {
-                var session = await CurrentChatToSession();
+                var session = await UpdateSession(CurrentSession);
                 // reset session ID
                 CurrentSessionID = -1;
                 // Create new session
