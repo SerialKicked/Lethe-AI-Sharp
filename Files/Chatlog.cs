@@ -210,7 +210,7 @@ namespace AIToolkit.Files
                 sum + LLMSystem.NewLine + 
                 LLMSystem.NewLine + 
                 "# Instruction:" + LLMSystem.NewLine + 
-                "Give a title to the summary above. This title should be a single sentence. Write only the title, nothinh else.";
+                "Give a title to the summary above. This title should be a single short and descriptive sentence. Write only the title, nothing else.";
             var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
             var res = msg + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
 
