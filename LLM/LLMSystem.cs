@@ -686,5 +686,18 @@ namespace AIToolkit.LLM
             return await Client.WebQueryAsync(new WebQuery() { q = query });
         }
 
+        public static async Task<byte[]> GenerateTTS(string input, string voiceID)
+        {
+            // female: "Tina", "super chariot of death", "super chariot in death"
+            // male: "Lor_ Merciless", "kobo", "chatty"
+            var ttsinput = new TextToSpeechInput()
+            {
+                Input = input,
+                Voice = voiceID,
+            };
+            var audioData = await Client.TextToSpeechAsync(ttsinput);
+            return audioData;
+        }
+
     }
 }

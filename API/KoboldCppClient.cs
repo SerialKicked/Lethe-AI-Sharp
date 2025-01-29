@@ -22,6 +22,7 @@ using Newtonsoft.Json;
 using System;
 using System.Net.Http.Headers;
 using System.Security.Policy;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace AIToolkit.API
@@ -535,6 +536,88 @@ namespace AIToolkit.API
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ServerBusyError>("Server is busy", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+
+        /// <summary>
+        /// Creates text-to-speech audio from input text.
+        /// </summary>
+        /// <param name="body">The input text and voice for TTS.</param>
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <returns>The generated audio as a byte array.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async Task<byte[]> TextToSpeechAsync(TextToSpeechInput body, CancellationToken cancellationToken = default)
+        {
+            if (body == null)
+                throw new ArgumentNullException(nameof(body));
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new HttpRequestMessage())
+                {
+                    var json_ = JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new StringContent(json_);
+                    content_.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = HttpMethod.Post;
+                    request_.Headers.Accept.Add(MediaTypeWithQualityHeaderValue.Parse("audio/wav"));
+
+                    var urlBuilder_ = new StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    urlBuilder_.Append("api/extra/tts");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new Uri(url_, UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new Dictionary<string, IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var responseStream = await response_.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                            using (var memoryStream = new MemoryStream())
+                            {
+                                await responseStream.CopyToAsync(memoryStream).ConfigureAwait(false);
+                                return memoryStream.ToArray();
+                            }
                         }
                         else
                         {
@@ -3698,6 +3781,15 @@ namespace AIToolkit.API
     }
 
     public class WebQueryFullResponse : List<WebQuerySingleResponse>;
+
+    public class TextToSpeechInput
+    {
+        [JsonProperty("input", Required = Required.Always)]
+        public string Input { get; set; }
+
+        [JsonProperty("voice", Required = Required.Always)]
+        public string Voice { get; set; }
+    }
 }
 
 #pragma warning restore  108
