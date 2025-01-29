@@ -58,7 +58,7 @@ namespace AIToolkit.LLM
         }
     }
 
-    public enum EmbedType { Title, Summary, Session, Document }
+    public enum EmbedType { Title, Summary, Session, Document, WorldInfo }
 
     /// <summary>
     /// Retrieval Augmented Generation System
@@ -103,7 +103,7 @@ namespace AIToolkit.LLM
                 return;
             ResetVectorDB();
             if (LLMSystem.History != null)
-                VectorizeChatlog(LLMSystem.History);
+                VectorizeChatBot(LLMSystem.Bot);
         }
 
         private static void ResetVectorDB()
@@ -187,12 +187,13 @@ namespace AIToolkit.LLM
             return tsk[0].EuclideanNormalization();
         }
 
-        public static void VectorizeChatlog(Chatlog log)
+        public static void VectorizeChatBot(BasePersona persona)
         {
             if (!Enabled)
                 return;
             ResetVectorDB();
-            if (log.Sessions.Count == 0)
+            var log = persona.History;
+            if (log.Sessions.Count == 0 && persona.MyWorlds.Count == 0)
                 return;
 
             var vectors = new List<float[]>();
@@ -217,6 +218,21 @@ namespace AIToolkit.LLM
                     currentID++;
                 }
             }
+
+            foreach (var world in persona.MyWorlds)
+            {
+                if (!world.DoEmbeds)
+                    continue;
+                foreach (var entry in world.Entries)
+                {
+                    if (!entry.Enabled || entry.EmbedSummary.Length == 0)
+                        continue;
+                    vectors.Add(entry.EmbedSummary);
+                    LookupDB[currentID] = (entry.Guid, EmbedType.WorldInfo);
+                    currentID++;
+                }
+            }   
+
             try
             {
                 VectorDB.AddItems(vectors);
@@ -228,20 +244,22 @@ namespace AIToolkit.LLM
             IsVectorDBLoaded = true;
         }
 
-        public static async Task<List<(Files.ChatSession session, EmbedType category, float distance)>> Search(string message, int count)
+        public static async Task<List<(IEmbed session, EmbedType category, float distance)>> Search(string message, int count)
         {
             if (!Enabled)
                 return [];
             if (!IsVectorDBLoaded || VectorDB == null || VectorDBCount == 0)
             {
                 ResetVectorDB();
-                VectorizeChatlog(LLMSystem.History);
+                VectorizeChatBot(LLMSystem.Bot);
             }
             var emb = await EmbeddingText(message);
             var subcount = count;
             // If we have both titles and summaries double result count to get a better picture
             if (UseSummaries && UseTitles)
                 subcount += count;
+            if (LLMSystem.WorldInfo)
+                subcount += 1;
             var res = Search(emb, subcount);
             if (UseSummaries && UseTitles)
             {
@@ -252,6 +270,7 @@ namespace AIToolkit.LLM
                     // if no item or item already in newlist, skip
                     if (item == null || newlist.Find(e => e.ID == item.ID) != null)
                         continue;
+
                     // find if other with same GUID
                     var copy = res.Find(e => e != item && e.ID == item.ID);
                     if (copy != null)
@@ -270,14 +289,23 @@ namespace AIToolkit.LLM
             if (res.Count > count)
                 res = res.GetRange(0, count);
             res.RemoveAll(e => e.Distance > DistanceCutOff);
-            var list = new List<(Files.ChatSession session, EmbedType category, float distance)>();
+            var list = new List<(IEmbed session, EmbedType category, float distance)>();
             foreach (var item in res)
             {
                 if (item == null)
                     continue;
-                var found = LLMSystem.History.GetSessionByID(item.ID);
-                if (found != null)
-                    list.Add((found, item.Category, item.Distance));
+                if (item.Category == EmbedType.WorldInfo)
+                {
+                    var found = LLMSystem.Bot.GetWIEntryByGUID(item.ID);
+                    if (found != null)
+                        list.Add((found, item.Category, item.Distance));
+                }
+                else
+                {
+                    var found = LLMSystem.History.GetSessionByID(item.ID);
+                    if (found != null)
+                        list.Add((found, item.Category, item.Distance));
+                }
             }
             return list;
         }

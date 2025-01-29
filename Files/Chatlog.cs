@@ -19,9 +19,9 @@ namespace AIToolkit.Files
         [JsonIgnore] public BasePersona? Sender => Role == AuthorRole.User? User : Role == AuthorRole.Assistant ? Bot : null;
     }
 
-    public class ChatSession : KeywordEntry
+    public class ChatSession : KeywordEntry, IEmbed
     {
-        [JsonIgnore] public Guid Guid = Guid.NewGuid();
+        [JsonIgnore] public Guid Guid { get; set; } = Guid.NewGuid();
         public string Title { get; set; } = string.Empty;
         public string Summary { get; set; } = string.Empty;
         public string[] Sentiments { get; set; } = [];
@@ -204,12 +204,12 @@ namespace AIToolkit.Files
         public static async Task<string> GenerateNewTitle(string sum)
         {
             LLMSystem.NamesInPromptOverride = false;
-            var msgtxt = "You are an automated system designed to give titles to summaries."+ LLMSystem.NewLine + 
-                LLMSystem.NewLine + 
+            var msgtxt = "You are an automated system designed to give titles to summaries." + LLMSystem.NewLine +
+                LLMSystem.NewLine +
                 "# Summary:" + LLMSystem.NewLine +
-                sum + LLMSystem.NewLine + 
-                LLMSystem.NewLine + 
-                "# Instruction:" + LLMSystem.NewLine + 
+                sum + LLMSystem.NewLine +
+                LLMSystem.NewLine +
+                "# Instruction:" + LLMSystem.NewLine +
                 "Give a title to the summary above. This title should be a single short and descriptive sentence. Write only the title, nothing else.";
             var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
             var res = msg + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);

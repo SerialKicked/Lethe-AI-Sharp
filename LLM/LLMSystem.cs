@@ -207,10 +207,10 @@ namespace AIToolkit.LLM
         {
             InvalidatePromptCache();
             _currentWorldEntries = [];
-            bot.EndSession(true);
+            bot.EndChat(backup: true);
             bot = newbot;
-            bot.BeginSession();
-            RAGSystem.VectorizeChatlog(History);
+            bot.BeginChat();
+            RAGSystem.VectorizeChatBot(Bot);
             // if first time interaction, display welcome message from bot
             if (History.Sessions.Count == 0)
             {
@@ -326,15 +326,20 @@ namespace AIToolkit.LLM
                             inserts[item.PositionIndex] += NewLine + item.Message;
                     }
                 }
-                // Check all sessions for sticky entries
-                foreach (var session in History.Sessions)
+                foreach (var item in _currentWorldEntries)
                 {
-                    if (session.Sticky)
-                    {
-                        if (!inserts.TryAdd(5, session.GetRawMemory(!MarkdownMemoryFormating)))
-                            inserts[5] += NewLine + session.GetRawMemory(!MarkdownMemoryFormating);
-                        usedGuidInSession.Add(session.Guid);
-                    }
+                    usedGuidInSession.Add(item.Guid);
+                }
+            }
+
+            // Check all sessions for sticky entries
+            foreach (var session in History.Sessions)
+            {
+                if (session.Sticky)
+                {
+                    if (!inserts.TryAdd(5, session.GetRawMemory(!MarkdownMemoryFormating)))
+                        inserts[5] += NewLine + session.GetRawMemory(!MarkdownMemoryFormating);
+                    usedGuidInSession.Add(session.Guid);
                 }
             }
             foreach (var ctxplug in ContextPlugins)
@@ -393,15 +398,23 @@ namespace AIToolkit.LLM
             }
         }
 
-        private static string MemoriesToMessage(List<(ChatSession session, EmbedType category, float distance)> memories)
+        private static string MemoriesToMessage(List<(IEmbed session, EmbedType category, float distance)> memories)
         {
             if (memories.Count == 0)
                 return string.Empty;
             var stbuild = new StringBuilder();
             stbuild.AppendLinuxLine("The message from {{user}} at the bottom triggered the following memories in {{char}}'s mind:");
-            foreach (var (session, _, _) in memories)
+            foreach (var (session, embedtype, _) in memories)
             {
-                stbuild.AppendLinuxLine(session.GetRawMemory(!MarkdownMemoryFormating));
+                if (embedtype == EmbedType.WorldInfo)
+                {
+                    var info = (session as WorldEntry)!;
+                    stbuild.AppendLinuxLine(info.Message);
+                }
+                else
+                {
+                    stbuild.AppendLinuxLine((session as ChatSession)!.GetRawMemory(!MarkdownMemoryFormating));
+                }
             }
             return stbuild.ToString();
         }

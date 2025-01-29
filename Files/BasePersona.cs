@@ -66,11 +66,11 @@ namespace AIToolkit.Files
 
         public BasePersona() { }
 
-        public virtual void BeginSession()
+        public virtual void BeginChat()
         {
         }
 
-        public virtual void EndSession(bool backup = false)
+        public virtual void EndChat(bool backup = false)
         {
         }
 
@@ -107,6 +107,19 @@ namespace AIToolkit.Files
             var f = path + UniqueName;
             if (File.Exists(f + ".json")) File.Delete(f + ".json");
             if (File.Exists(f + ".vec")) File.Delete(f + ".vec");
+        }
+
+        public WorldEntry? GetWIEntryByGUID(Guid id)
+        {
+            if (MyWorlds.Count == 0)
+                return null;
+            foreach (var world in MyWorlds)
+            {
+                var res = world.Entries.Find(e => e.Guid == id);
+                if (res != null)
+                    return res; 
+            }
+            return null;
         }
     }
 }

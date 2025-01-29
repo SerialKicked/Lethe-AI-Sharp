@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AIToolkit.LLM;
+using Newtonsoft.Json;
 
 namespace AIToolkit.Files
 {
@@ -51,14 +52,21 @@ namespace AIToolkit.Files
         }
     }
 
-    public class WorldEntry : KeywordEntry
+    public class WorldEntry : KeywordEntry, IEmbed
     {
+        [JsonIgnore] public Guid Guid { get; set; } = Guid.NewGuid();
         public string Name = string.Empty;
         public string Message = string.Empty;
         public int PositionIndex = 0;
         public int Duration = 1;
         public WEPosition Position = WEPosition.SystemPrompt;
         public int Priority = 100;
+        public float[] EmbedSummary { get; set; } = [];
+
+        public async Task EmbedText()
+        {
+            EmbedSummary = await RAGSystem.EmbeddingText(Message);
+        }
     }
 
     public class WorldInfo : BaseFile
@@ -71,6 +79,7 @@ namespace AIToolkit.Files
 
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public bool DoEmbeds { get; set; } = true;
         public int ScanDepth { get; set; } = 1;
         public List<WorldEntry> Entries { get; set; } = [];
         private readonly List<ActiveLink> activeEntries = [];
@@ -132,6 +141,20 @@ namespace AIToolkit.Files
         public void Reset()
         {
             activeEntries.Clear();
+        }
+
+        public async Task EmbedText()
+        {
+            if (!DoEmbeds)
+            {
+                foreach (var item in Entries)
+                    item.EmbedSummary = [];
+            }
+            else
+            {
+                foreach (var item in Entries)
+                    await item.EmbedText();
+            }
         }
     }
 }
