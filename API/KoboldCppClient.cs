@@ -38,6 +38,7 @@ namespace AIToolkit.API
 
         private System.Net.Http.HttpClient _httpClient;
         private System.Net.Http.HttpClient _TokenClient;
+        private System.Net.Http.HttpClient _TTSClient;
         private static System.Lazy<Newtonsoft.Json.JsonSerializerSettings> _settings = new System.Lazy<Newtonsoft.Json.JsonSerializerSettings>(CreateSerializerSettings, true);
         private Newtonsoft.Json.JsonSerializerSettings _instanceSettings;
 
@@ -52,6 +53,7 @@ namespace AIToolkit.API
             BaseUrl = "/";
             _httpClient = httpClient;
             _TokenClient = new HttpClient();
+            _TTSClient = new HttpClient();
             Initialize();
         }
 
@@ -570,8 +572,8 @@ namespace AIToolkit.API
             if (body == null)
                 throw new ArgumentNullException(nameof(body));
 
-            var client_ = _httpClient;
-            var disposeClient_ = false;
+            var client_ = new HttpClient();
+            var disposeClient_ = true;
             try
             {
                 using (var request_ = new HttpRequestMessage())

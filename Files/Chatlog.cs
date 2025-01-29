@@ -586,7 +586,7 @@ namespace AIToolkit.Files
             // Save current session if it has enough messages otherwise just reset it
             if (archivePreviousSession && CurrentSession.Messages.Count > 2)
             {
-                var session = await UpdateSession(CurrentSession);
+                await UpdateSession(CurrentSession);
                 // reset session ID
                 CurrentSessionID = -1;
                 // Create new session
