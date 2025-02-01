@@ -142,6 +142,19 @@ namespace AIToolkit.LLM
                 if (!string.IsNullOrEmpty(e.Data.token))
                     StreamingTextProgress += e.Data.token;
                 var response = StreamingTextProgress.Trim();
+                if (e.Data.finish_reason == "length")
+                {
+                    var removelist = Instruct.GetStoppingStrings(User, Bot);
+                    // look at response string for the stop string, if found, and not in first position of the string, remove the stop string and everything beyond.
+                    foreach (var tocheck in removelist)
+                    {
+                        var index = response.LastIndexOf(tocheck);
+                        if (index > 1)
+                        {
+                            response = response.Remove(index);
+                        }
+                    }
+                }
                 foreach (var ctxplug in ContextPlugins)
                 {
                     if (ctxplug.Enabled && ctxplug.ReplaceOutput(ReplaceMacros(response), History, out var editedresponse))
