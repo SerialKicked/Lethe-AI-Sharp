@@ -49,6 +49,7 @@ namespace AIToolkit.LLM
         public static bool WebBrowsingPlugin { get; set; } = false;
         public static bool MarkdownMemoryFormating { get; set; } = false;
         public static bool WorldInfo { get; set; } = true;
+        public static SessionHandling SessionHandling { get; set; } = SessionHandling.FitAll;
 
         internal static Dictionary<string, BasePersona> LoadedPersonas = [];
 
@@ -390,22 +391,41 @@ namespace AIToolkit.LLM
             else
                 tokencount += GetTokenCount(Instruct.GetResponseStart(Bot));
             var availtokens = (int)(MaxContextLength) - tokencount - MaxReplyLength;
-            var history = History.GetFormatedHistory(availtokens, Bot.SessionMemorySystem, inserts);
+            if (Bot.SessionMemorySystem)
+                availtokens -= ReservedSessionTokens;
 
+            var history = History.GetMessageHistory(SessionHandling, availtokens, inserts);
+
+            if (Bot.SessionMemorySystem && ReservedSessionTokens > 0)
+            {
+                var shistory = History.GetPreviousSummaries(ReservedSessionTokens - GetTokenCount(ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator);
+                if (!string.IsNullOrEmpty(shistory))
+                {
+                    rawprompt.AppendLinuxLine(NewLine + ReplaceMacros(SystemPrompt.SessionHistoryTitle) + NewLine);
+                    rawprompt.AppendLinuxLine(shistory);
+                    sysprompt = Instruct.BoSToken + Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, User, Bot, rawprompt.ToString().CleanupAndTrim());
+                }
+            }
+            string res = string.Empty;
             if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
             {
-                var res = !string.IsNullOrEmpty(memprompt) && RAGIndex == -1 ?
-                    sysprompt + NewLine + memprompt + history + msg + Instruct.GetUserStart(User) :
-                    sysprompt + NewLine + history + msg + Instruct.GetUserStart(User).TrimEnd();
-                return res;
+                res = !string.IsNullOrEmpty(memprompt) && RAGIndex == -1 ?
+                    sysprompt + memprompt + history + msg + Instruct.GetUserStart(User) :
+                    sysprompt + history + msg + Instruct.GetUserStart(User).TrimEnd();
             }
             else
             {
-                var res = !string.IsNullOrEmpty(memprompt) && RAGIndex == -1 ?
-                    sysprompt + NewLine + memprompt + history + msg + pluginmsg + Instruct.GetResponseStart(Bot) :
-                    sysprompt + NewLine + history + msg + pluginmsg + Instruct.GetResponseStart(Bot);
-                return res;
+                res = !string.IsNullOrEmpty(memprompt) && RAGIndex == -1 ?
+                    sysprompt + memprompt + history + msg + pluginmsg + Instruct.GetResponseStart(Bot) :
+                    sysprompt + history + msg + pluginmsg + Instruct.GetResponseStart(Bot);
             }
+            var final = GetTokenCount(res);
+            if (final > MaxContextLength + MaxReplyLength)
+            {
+                var diff = final - (MaxContextLength + MaxReplyLength);
+                logger?.LogWarning($"The prompt is {diff} tokens over the limit.");
+            }
+            return res;
         }
 
         private static string MemoriesToMessage(List<(IEmbed session, EmbedType category, float distance)> memories)

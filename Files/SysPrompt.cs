@@ -15,7 +15,9 @@ namespace AIToolkit.Files
         public string WorldInfoTitle { get; set; } = "# Important Memories";
         public string ScenarioTitle { get; set; } = "# Scenario";
         public string DialogsTitle { get; set; } = "# Writing Style";
-        public string CategorySeparator { get; set; } = "# ";
+        public string SessionHistoryTitle { get; set; } = "# Previous Sessions" + LLMSystem.NewLine + "Below is a list of previous chat sessions between {{user}} and {{char}}.";
+        public string CategorySeparator { get; set; } = "#";
+        public string SubCategorySeparator { get; set; } = "##";
 
         public string GetSystemPromptRaw(BasePersona character)
         {

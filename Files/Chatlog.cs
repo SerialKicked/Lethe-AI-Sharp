@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using AIToolkit.LLM;
 using AIToolkit.API;
+using System.Collections.Generic;
 
 namespace AIToolkit.Files
 {
@@ -16,9 +17,12 @@ namespace AIToolkit.Files
         public DateTime Date = date;
         public string CharID = chara;
         public string UserID = user;
-        [JsonIgnore] public BasePersona User => !string.IsNullOrEmpty(UserID) && LLMSystem.LoadedPersonas.TryGetValue(UserID, out var u) ? u : LLMSystem.User;
-        [JsonIgnore] public BasePersona Bot => !string.IsNullOrEmpty(CharID) && LLMSystem.LoadedPersonas.TryGetValue(CharID, out var c) ? c : LLMSystem.Bot;
-        [JsonIgnore] public BasePersona? Sender => Role == AuthorRole.User? User : Role == AuthorRole.Assistant ? Bot : null;
+        [JsonIgnore] public BasePersona User => 
+            !string.IsNullOrEmpty(UserID) && LLMSystem.LoadedPersonas.TryGetValue(UserID, out var u) ? u : LLMSystem.User;
+        [JsonIgnore] public BasePersona Bot => 
+            !string.IsNullOrEmpty(CharID) && LLMSystem.LoadedPersonas.TryGetValue(CharID, out var c) ? c : LLMSystem.Bot;
+        [JsonIgnore] public BasePersona? Sender => 
+            Role == AuthorRole.User? User : Role == AuthorRole.Assistant ? Bot : null;
     }
 
     public class ChatSession : KeywordEntry, IEmbed
@@ -40,6 +44,10 @@ namespace AIToolkit.Files
         public bool Sticky { get; set; } = false;
         public TimeSpan Duration => EndTime - StartTime;
 
+        /// <summary>
+        /// Mostly placeholder for when proper sentiment analysis is implemented
+        /// </summary>
+        /// <returns></returns>
         public async Task<string[]> GenerateSentiment()
         {
             LLMSystem.NamesInPromptOverride = false;
@@ -104,7 +112,7 @@ namespace AIToolkit.Files
                 "" + LLMSystem.NewLine +
                 LLMSystem.NewLine +
                 "# Instruction:" + LLMSystem.NewLine +
-                "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of keywords {{char}} would associate with this chat. 1 to 4 words max.";
+                "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of keywords {{char}} would associate with this chat. The list must be between 1 and 5 keywords long.";
             var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
             var tokencount = LLMSystem.GetTokenCount(msg);
 
@@ -120,7 +128,7 @@ namespace AIToolkit.Files
                 docs + LLMSystem.NewLine +
                 LLMSystem.NewLine +
                 "# Instruction:" + LLMSystem.NewLine +
-                "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of keywords {{char}} would associate with this chat. 1 to 4 words max.";
+                "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of keywords {{char}} would associate with this chat. The list must be between 1 and 5 keywords long.";
             var prompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
 
             var llmparams = LLMSystem.Sampler.GetCopy();
@@ -133,7 +141,6 @@ namespace AIToolkit.Files
             LLMSystem.NamesInPromptOverride = null;
             // convert the comma-separated list into an array
             var res = finalstr.Split(',');
-
             return res;
         }
 
@@ -347,7 +354,6 @@ namespace AIToolkit.Files
                     sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}, the following events took place from {LLMSystem.Bot.Name}'s perspective. {Summary.RemoveNewLines()}");
                 else
                     sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}, the following event took places from {LLMSystem.Bot.Name}'s perspective. {Summary.RemoveNewLines()}");
-
             }
 
             return sb.ToString();
@@ -369,6 +375,7 @@ namespace AIToolkit.Files
         public string Name { get; set; } = string.Empty;
         public int CurrentSessionID { get; set; } = -1;
         public readonly List<ChatSession> Sessions = [];
+        private int lastSessionID = -1;
 
         [JsonIgnore] public ChatSession CurrentSession => CurrentSessionID >= 0 && CurrentSessionID < Sessions.Count ? Sessions[CurrentSessionID] : Sessions.Last();
 
@@ -376,11 +383,39 @@ namespace AIToolkit.Files
 
         private void RaiseOnMessageAdded(SingleMessage message) => OnMessageAdded?.Invoke(this, message);
 
-        public string GetFormatedHistory(int maxTokens, bool useSessionSystem, Dictionary<int, string>? memories)
+        public string GetPreviousSummaries(int maxTokens, string sectionHeader = "##")
+        {
+            var res = new StringBuilder();
+            var tokensleft = maxTokens;
+            var entrydepth = lastSessionID - 1;
+            if (entrydepth < 0)
+                return string.Empty;
+
+            for (int i = entrydepth; i >= 0; i--)
+            {
+                var session = Sessions[i];
+                if (LLMSystem.usedGuidInSession.Contains(session.Guid) || string.IsNullOrWhiteSpace(session.Summary))
+                    continue;
+                var sb = new StringBuilder();
+                sb.AppendLinuxLine($"{sectionHeader} {session.Title}");
+                sb.AppendLinuxLine($"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}, the following events took places from {LLMSystem.Bot.Name}'s perspective: {session.Summary.RemoveNewLines()}");
+                var tks = LLMSystem.GetTokenCount(sb.ToString());
+                if (tks <= tokensleft)
+                {
+                    tokensleft -= tks;
+                    res.AppendLinuxLine(sb.ToString());
+                }
+                else
+                    break;
+                tokensleft = maxTokens - LLMSystem.GetTokenCount(res.ToString());
+            }
+            return res.ToString();
+        }
+
+        public string GetMessageHistory(SessionHandling sessionHandling, int maxTokens, Dictionary<int, string>? memories)
         {
             var sb = new StringBuilder();
-            var tokensleft = useSessionSystem ? maxTokens - LLMSystem.ReservedSessionTokens : maxTokens;
-            var availSessionMemTokens = useSessionSystem ? LLMSystem.ReservedSessionTokens : 0;
+            var tokensleft = maxTokens;
             var mems = memories ?? [];
             var entrydepth = 0;
 
@@ -398,89 +433,47 @@ namespace AIToolkit.Files
                 }
             }
 
-            // If we don't use the session system, we flatten the messages
-            if (!useSessionSystem)
+            // add all messages together in the same list
+            var messagelist = new List<(int, SingleMessage)>();
+            var curSessionID = CurrentSessionID == -1 ? Sessions.Count - 1 : CurrentSessionID;
+            // make a list of all messages
+            if (sessionHandling == SessionHandling.FitAll)
             {
-                // add all messages together in the same list
-                var messagelist = new List<SingleMessage>();
-                foreach (var item in Sessions)
-                    messagelist.AddRange(item.Messages);
-                // iterate through the messages in reverse order until we reach the token limit or end of messages
-                for (int i = messagelist.Count - 1; i >= 0; i--)
+                for (int i = 0; i <= curSessionID; i++)
                 {
-                    var msg = messagelist[i];
-                    var res = LLMSystem.Instruct.FormatSingleMessage(msg);
-                    var tks = LLMSystem.GetTokenCount(res);
-                    tokensleft -= tks;
-                    if (tokensleft <= 0)
-                        break;
-                    sb.Insert(0, res);
-                    // check if we need to add a memory
-                    InsertMemories();
-                    entrydepth++;
+                    foreach (var msg in Sessions[i].Messages)
+                    {
+                        messagelist.Add((i,msg));
+                    }
                 }
-                // return the result
-                return sb.ToString();
+            }
+            else
+            {
+                foreach (var msg in CurrentSession.Messages)
+                {
+                    messagelist.Add((curSessionID, msg));
+                }
             }
 
-            // If we use the session system, we iterate through the sessions
-            var actualSessionID = CurrentSessionID >= 0 && CurrentSessionID < Sessions.Count ? CurrentSessionID : Sessions.Count - 1;
-            var isfirst = true;
-            for (int i = actualSessionID; i >= 0; i--)
+            var oldest = int.MaxValue;
+            // iterate through the messages in reverse order until we reach the token limit or end of messages
+            for (int i = messagelist.Count - 1; i >= 0; i--)
             {
-                var session = Sessions[i];
-                if (LLMSystem.usedGuidInSession.Contains(session.Guid) && !isfirst)
-                    continue;
-                // If first session, or we have enough tokens left, we add the dialogs
-                if (isfirst || tokensleft > 0)
-                {
-                    var text = session.GetFormatedDialogs(tokensleft, ref entrydepth, mems);
-                    if (string.IsNullOrEmpty(text))
-                    {
-                        availSessionMemTokens += tokensleft;
-                        tokensleft = 0;
-                    }
-                    else
-                        sb.Insert(0, text);
-                }
-                else
-                {
-                    // We inserted all the dialogs, now we check if we can add the summary
-                    var summarytokencount = session.GetFormatedSummaryTokenCount(!LLMSystem.MarkdownMemoryFormating);
-                    // If summary can fit, add it.
-                    if (summarytokencount <= availSessionMemTokens)
-                    {
-                        availSessionMemTokens -= summarytokencount;
-                        sb.Insert(0, session.GetFormatedSummary(NaturalLanguage: !LLMSystem.MarkdownMemoryFormating));
-                        InsertMemories();
-                        entrydepth++;
-                    }
-                    else
-                    {
-                        availSessionMemTokens = 0;
-                    }
-                }
-                // check status
-                if (tokensleft > 0)
-                {
-                    var currenttokens = LLMSystem.GetTokenCount(sb.ToString());
-                    tokensleft = maxTokens - LLMSystem.ReservedSessionTokens - currenttokens;
-                }
-                isfirst = false;
-                if (tokensleft <= 0 && availSessionMemTokens <= 0)
+                var msg = messagelist[i];
+                oldest = Math.Min(oldest, msg.Item1);
+                var res = LLMSystem.Instruct.FormatSingleMessage(msg.Item2);
+                var tks = LLMSystem.GetTokenCount(res);
+                tokensleft -= tks;
+                if (tokensleft <= 0)
                     break;
+                sb.Insert(0, res);
+                // check if we need to add a memory
+                InsertMemories();
+                entrydepth++;
             }
+            lastSessionID = oldest;
+            // return the result
             return sb.ToString();
-        }
-
-        public static int GetTotalTokens(List<SingleMessage> messages)
-        {
-            var total = new StringBuilder();
-            foreach (var item in messages)
-            {
-                total.Append(LLMSystem.Instruct.FormatSingleMessage(item));
-            }
-            return LLMSystem.GetTokenCount(total.ToString());
         }
 
         public ChatSession? GetSessionByID(Guid id) => Sessions.FirstOrDefault(s => s.Guid == id);
