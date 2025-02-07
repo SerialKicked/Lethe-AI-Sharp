@@ -52,7 +52,7 @@ namespace AIToolkit.LLM
 
         internal static Dictionary<string, BasePersona> LoadedPersonas = [];
 
-#pragma warning disable CA2211, IDE0079 // Non-constant fields should not be visible
+#pragma warning disable CA2211 // Non-constant fields should not be visible
         public static EventHandler<string>? OnFullPromptReady;
         /// <summary> Called during inference each time the LLM outputs a new token </summary>
         public static EventHandler<string>? OnInferenceStreamed;
@@ -60,7 +60,7 @@ namespace AIToolkit.LLM
         public static EventHandler<string>? OnInferenceEnded;
         /// <summary> Called when the system changes states (no init, busy, ready) </summary>
         public static EventHandler<SystemStatus>? OnStatusChanged;
-#pragma warning restore CA2211, IDE0079 // Non-constant fields should not be visible
+#pragma warning restore CA2211 // Non-constant fields should not be visible
 
         private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(null, fullprompt);
         private static void RaiseOnStatusChange(SystemStatus newStatus) => OnStatusChanged?.Invoke(null, newStatus);
@@ -190,7 +190,7 @@ namespace AIToolkit.LLM
                .Replace("{{char}}", character.Name)
                .Replace("{{charbio}}", character.GetBio(user.Name))
                .Replace("{{examples}}", character.GetDialogExamples(user.Name))
-               .Replace("{{date}}", DateToHumanString(DateTime.Now))
+               .Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
                .Replace("{{time}}", DateTime.Now.ToShortTimeString())
                .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
                .Replace("{{scenario}}", string.IsNullOrWhiteSpace(ScenarioOverride) ? character.GetScenario(user.Name) : ScenarioOverride);
@@ -205,7 +205,7 @@ namespace AIToolkit.LLM
                .Replace("{{char}}", character.Name)
                .Replace("{{charbio}}", character.GetBio(userName))
                .Replace("{{examples}}", character.GetDialogExamples(userName))
-               .Replace("{{date}}", DateToHumanString(DateTime.Now))
+               .Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
                .Replace("{{time}}", DateTime.Now.ToShortTimeString())
                .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
                .Replace("{{scenario}}", string.IsNullOrWhiteSpace(ScenarioOverride) ? character.GetScenario(userName) : ScenarioOverride);
@@ -316,28 +316,25 @@ namespace AIToolkit.LLM
             var inserts = new Dictionary<int, string>();
             var searchmessage = string.IsNullOrWhiteSpace(newMessage) ? History.GetLastUserMessageContent() : newMessage;
             usedGuidInSession = [];
-            if (WorldInfo)
+            if (WorldInfo && Bot.MyWorlds.Count > 0)
             {
-                if (Bot.MyWorlds.Count > 0)
+                _currentWorldEntries = [];
+                foreach (var world in Bot.MyWorlds)
                 {
-                    _currentWorldEntries = [];
-                    foreach (var world in Bot.MyWorlds)
-                    {
-                        _currentWorldEntries.AddRange(world.FindEntries(History, searchmessage));
-                    }
-                    var entries = _currentWorldEntries.FindAll(e => e.Position == WEPosition.SystemPrompt);
-                    if (entries.Count > 0)
-                    {
-                        rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle);
-                        foreach (var item in entries)
-                            rawprompt.AppendLinuxLine(item.Message);
-                    }
-                    entries = _currentWorldEntries.FindAll(e => e.Position == WEPosition.Chat);
+                    _currentWorldEntries.AddRange(world.FindEntries(History, searchmessage));
+                }
+                var entries = _currentWorldEntries.FindAll(e => e.Position == WEPosition.SystemPrompt);
+                if (entries.Count > 0)
+                {
+                    rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle);
                     foreach (var item in entries)
-                    {
-                        if (!inserts.TryAdd(item.PositionIndex, item.Message))
-                            inserts[item.PositionIndex] += NewLine + item.Message;
-                    }
+                        rawprompt.AppendLinuxLine(item.Message);
+                }
+                entries = _currentWorldEntries.FindAll(e => e.Position == WEPosition.Chat);
+                foreach (var item in entries)
+                {
+                    if (!inserts.TryAdd(item.PositionIndex, item.Message))
+                        inserts[item.PositionIndex] += NewLine + item.Message;
                 }
                 foreach (var item in _currentWorldEntries)
                 {
@@ -348,10 +345,11 @@ namespace AIToolkit.LLM
             // Check all sessions for sticky entries
             foreach (var session in History.Sessions)
             {
-                if (session.Sticky)
+                if (session.Sticky && session != History.CurrentSession)
                 {
-                    if (!inserts.TryAdd(5, session.GetRawMemory(!MarkdownMemoryFormating)))
-                        inserts[5] += NewLine + session.GetRawMemory(!MarkdownMemoryFormating);
+                    var rawmem = session.GetRawMemory(!MarkdownMemoryFormating);
+                    if (!inserts.TryAdd(5, rawmem))
+                        inserts[5] += NewLine + rawmem;
                     usedGuidInSession.Add(session.Guid);
                 }
             }
@@ -366,7 +364,7 @@ namespace AIToolkit.LLM
             systemPromptSize = GetTokenCount(sysprompt);
             tokencount += systemPromptSize;
             var memprompt = string.Empty;
-            if (Bot.UseRAG && RAGSystem.Enabled)
+            if (RAGSystem.Enabled)
             {
                 var search = await RAGSystem.Search(ReplaceMacros(searchmessage), MaxRAGEntries);
                 search.RemoveAll(search => usedGuidInSession.Contains(search.session.Guid));
@@ -393,7 +391,6 @@ namespace AIToolkit.LLM
                 tokencount += GetTokenCount(Instruct.GetResponseStart(Bot));
             var availtokens = (int)(MaxContextLength) - tokencount - MaxReplyLength;
             var history = History.GetFormatedHistory(availtokens, Bot.SessionMemorySystem, inserts);
-
 
             if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
             {
@@ -615,7 +612,7 @@ namespace AIToolkit.LLM
                 return string.Empty;
 
             var msgtxt = (DateTime.Now.Date != History.CurrentSession.Messages.Last().Date.Date) || (timespan > new TimeSpan(12, 0, 0)) ? 
-                $"We're {DateTime.Now.DayOfWeek} {DateToHumanString(DateTime.Now)}." : string.Empty;
+                $"We're {DateTime.Now.DayOfWeek} {StringExtensions.DateToHumanString(DateTime.Now)}." : string.Empty;
             if (timespan.Days > 1)
                 msgtxt += $" Your last chat was {timespan.Days} days ago. " + "It is {{time}} now.";
             else if (timespan.Days == 1)
@@ -624,49 +621,6 @@ namespace AIToolkit.LLM
                 msgtxt += $" The last chat was about {timespan.Hours} hours ago. " + "It is {{time}} now.";
             msgtxt = "*" + msgtxt.Trim() + "* ";
             return ReplaceMacros(msgtxt);
-        }
-
-        public static string DateToHumanString(DateTime date)
-        {
-            static string GetDaySuffix(int day)
-            {
-                if (day >= 11 && day <= 13)
-                {
-                    return "th";
-                }
-
-                return (day % 10) switch
-                {
-                    1 => "st",
-                    2 => "nd",
-                    3 => "rd",
-                    _ => "th",
-                };
-            }
-
-            string daySuffix = GetDaySuffix(date.Day);
-            string formattedDate = date.ToString("MMMM d", CultureInfo.InvariantCulture) + daySuffix + ", " + date.Year.ToString(CultureInfo.InvariantCulture);
-            return formattedDate;
-        }
-
-        /// <summary>
-        /// Turn a time span into something clearly legible for a human
-        /// </summary>
-        /// <param name="date"></param>
-        /// <returns></returns>
-        public static string TimeSpanToHumanString(TimeSpan span)
-        {
-            // Turn a time span into something clearly legible for a human
-            if (span.Days > 1)
-                return span.Days.ToString() + " days";
-            else if (span.Days > 0)
-                return "1 day";
-            else if (span.Hours > 0)
-                return span.Hours.ToString() + " hours";
-            else if (span.Minutes > 0)
-                return span.Minutes.ToString() + " minutes";
-            else
-                return span.Seconds.ToString() + " seconds";
         }
 
         public static void RemoveLastMessage()

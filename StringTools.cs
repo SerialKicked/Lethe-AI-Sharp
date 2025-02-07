@@ -7,6 +7,7 @@ using AIToolkit.Files;
 using Newtonsoft.Json;
 using AIToolkit.API;
 using System.Text.RegularExpressions;
+using System.Globalization;
 
 namespace AIToolkit
 {
@@ -85,6 +86,49 @@ namespace AIToolkit
         {
             string pattern = @"<:(.*?):\d+>";
             return Regex.Replace(input, pattern, ":$1:");
+        }
+
+        public static string DateToHumanString(DateTime date)
+        {
+            static string GetDaySuffix(int day)
+            {
+                if (day >= 11 && day <= 13)
+                {
+                    return "th";
+                }
+
+                return (day % 10) switch
+                {
+                    1 => "st",
+                    2 => "nd",
+                    3 => "rd",
+                    _ => "th",
+                };
+            }
+
+            string daySuffix = GetDaySuffix(date.Day);
+            string formattedDate = date.ToString("MMMM d", CultureInfo.InvariantCulture) + daySuffix + ", " + date.Year.ToString(CultureInfo.InvariantCulture);
+            return formattedDate;
+        }
+
+        /// <summary>
+        /// Turn a time span into something clearly legible for a human
+        /// </summary>
+        /// <param name="date"></param>
+        /// <returns></returns>
+        public static string TimeSpanToHumanString(TimeSpan span)
+        {
+            // Turn a time span into something clearly legible for a human
+            if (span.Days > 1)
+                return span.Days.ToString() + " days";
+            else if (span.Days > 0)
+                return "1 day";
+            else if (span.Hours > 0)
+                return span.Hours.ToString() + " hours";
+            else if (span.Minutes > 0)
+                return span.Minutes.ToString() + " minutes";
+            else
+                return span.Seconds.ToString() + " seconds";
         }
 
     }

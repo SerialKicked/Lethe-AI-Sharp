@@ -6,6 +6,8 @@ using AIToolkit.API;
 
 namespace AIToolkit.Files
 {
+    public enum SessionHandling { CurrentOnly, FitAll }
+
     public class SingleMessage(AuthorRole role, DateTime date, string mess, string chara, string user)
     {
         [JsonIgnore] public Guid Guid = Guid.NewGuid();
@@ -146,8 +148,8 @@ namespace AIToolkit.Files
                 "## Name: {{user}}" + LLMSystem.NewLine +
                 "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
                 "# Chat Session:" + LLMSystem.NewLine +
-                "## Starting Date: " + LLMSystem.DateToHumanString(StartTime) + LLMSystem.NewLine +
-                "## Duration: " + LLMSystem.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine +
+                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
+                "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine +
                 "" + LLMSystem.NewLine +
                 LLMSystem.NewLine +
                 "# Instruction:" + LLMSystem.NewLine +
@@ -173,8 +175,8 @@ namespace AIToolkit.Files
                 "## Name: {{user}}" + LLMSystem.NewLine +
                 "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
                 "# Chat Session:" + LLMSystem.NewLine +
-                "## Starting Date: " + LLMSystem.DateToHumanString(StartTime) + LLMSystem.NewLine +
-                "## Duration: " + LLMSystem.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine +
+                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
+                "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine +
                 docs + LLMSystem.NewLine +
                 LLMSystem.NewLine +
                 "# Instruction:" + LLMSystem.NewLine +
@@ -311,18 +313,18 @@ namespace AIToolkit.Files
             {
                 sb.AppendLinuxLine("# " + tit);
                 if (StartTime.Date == EndTime.Date)
-                    sb.AppendLinuxLine("## Date: " + StartTime.DayOfWeek.ToString() + " " + LLMSystem.DateToHumanString(StartTime));
+                    sb.AppendLinuxLine("## Date: " + StartTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(StartTime));
                 else
-                    sb.AppendLinuxLine("## From " + StartTime.DayOfWeek.ToString() + " " + LLMSystem.DateToHumanString(StartTime) + " to " + EndTime.DayOfWeek.ToString() + " " + LLMSystem.DateToHumanString(EndTime));
+                    sb.AppendLinuxLine("## From " + StartTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(StartTime) + " to " + EndTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(EndTime));
                 sb.AppendLinuxLine("## Title: " + Title.Trim());
                 sb.AppendLinuxLine("## Summary: " + LLMSystem.NewLine + Summary.Replace("\n\n", " ").Trim() + LLMSystem.NewLine);
             }
             else
             {
                 if (StartTime.Date == EndTime.Date)
-                    sb.AppendLinuxLine($"{tit} on the {StartTime.DayOfWeek} {LLMSystem.DateToHumanString(StartTime)}: *{Title.Trim()}* {Summary.RemoveNewLines()}");
+                    sb.AppendLinuxLine($"{tit} on the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)}: *{Title.Trim()}* {Summary.RemoveNewLines()}");
                 else
-                    sb.AppendLinuxLine($"{tit} from the {StartTime.DayOfWeek} {LLMSystem.DateToHumanString(StartTime)}, to the {EndTime.DayOfWeek} {LLMSystem.DateToHumanString(EndTime)}: *{Title.Trim()}* {Summary.RemoveNewLines()}");
+                    sb.AppendLinuxLine($"{tit} from the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)}, to the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}: *{Title.Trim()}* {Summary.RemoveNewLines()}");
             }
             return sb.ToString();
         }
@@ -334,17 +336,17 @@ namespace AIToolkit.Files
             {
                 sb.AppendLinuxLine("# " + Title.Trim());
                 if (StartTime.Date == EndTime.Date)
-                    sb.AppendLinuxLine("## Date: " + StartTime.DayOfWeek.ToString() + " " + LLMSystem.DateToHumanString(StartTime));
+                    sb.AppendLinuxLine("## Date: " + StartTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(StartTime));
                 else
-                    sb.AppendLinuxLine("## From " + StartTime.DayOfWeek.ToString() + " " + LLMSystem.DateToHumanString(StartTime) + " to " + EndTime.DayOfWeek.ToString() + " " + LLMSystem.DateToHumanString(EndTime));
+                    sb.AppendLinuxLine("## From " + StartTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(StartTime) + " to " + EndTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(EndTime));
                 sb.AppendLinuxLine("## Memory: " + Summary.RemoveNewLines());
             }
             else
             {
                 if (StartTime.Date == EndTime.Date)
-                    sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {LLMSystem.DateToHumanString(StartTime)}, the following events took place from {LLMSystem.Bot.Name}'s perspective. {Summary.RemoveNewLines()}");
+                    sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}, the following events took place from {LLMSystem.Bot.Name}'s perspective. {Summary.RemoveNewLines()}");
                 else
-                    sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {LLMSystem.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {LLMSystem.DateToHumanString(EndTime)}, the following event took places from {LLMSystem.Bot.Name}'s perspective. {Summary.RemoveNewLines()}");
+                    sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}, the following event took places from {LLMSystem.Bot.Name}'s perspective. {Summary.RemoveNewLines()}");
 
             }
 

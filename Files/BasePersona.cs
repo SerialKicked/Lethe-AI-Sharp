@@ -31,8 +31,6 @@ namespace AIToolkit.Files
         public bool SessionMemorySystem { get; set; } = false;
         /// <summary> If set to true, this bot will stay informed about the spacing between user messages </summary>
         public bool SenseOfTime { get; set; } = false;
-        /// <summary> If set to true, this bot will use RAG to recall relevant memories </summary>
-        public bool UseRAG { get; set; } = false;
 
         [JsonIgnore] public List<WorldInfo> MyWorlds { get; protected set; } = [];
         [JsonIgnore] public Chatlog History { get; protected set; } = new();
