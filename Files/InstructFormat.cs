@@ -33,7 +33,9 @@ namespace AIToolkit.Files
         public string SysPromptEnd { get; set; } = string.Empty;
         public bool AddNamesToPrompt { get; set; } = true;
         public bool NewLinesBetweenMessages { get; set; } = false;
-        public string[] StopStrings { get; set; } = [];
+        public List<string> StopStrings { get; set; } = [];
+        public string ThinkingStart { get; set; } = string.Empty;
+        public string ThinkingEnd { get; set; } = string.Empty;
 
         [JsonIgnore] private bool RealAddNameToPrompt => LLMSystem.NamesInPromptOverride ?? AddNamesToPrompt;
 
@@ -146,6 +148,7 @@ namespace AIToolkit.Files
                 res.Add(UserEnd);
             if (!string.IsNullOrEmpty(StopSequence))
                 res.Add(StopSequence);
+            res.AddRange(StopStrings);
 
             // Remove duplicates from the list
             res = res.Distinct().ToList();
