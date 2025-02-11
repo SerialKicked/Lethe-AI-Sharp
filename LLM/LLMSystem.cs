@@ -53,15 +53,13 @@ namespace AIToolkit.LLM
 
         internal static Dictionary<string, BasePersona> LoadedPersonas = [];
 
-#pragma warning disable CA2211 // Non-constant fields should not be visible
-        public static EventHandler<string>? OnFullPromptReady;
+        public static event EventHandler<string>? OnFullPromptReady;
         /// <summary> Called during inference each time the LLM outputs a new token </summary>
-        public static EventHandler<string>? OnInferenceStreamed;
+        public static event EventHandler<string>? OnInferenceStreamed;
         /// <summary> Called once the inference has ended, returns the full string </summary>
-        public static EventHandler<string>? OnInferenceEnded;
+        public static event EventHandler<string>? OnInferenceEnded;
         /// <summary> Called when the system changes states (no init, busy, ready) </summary>
-        public static EventHandler<SystemStatus>? OnStatusChanged;
-#pragma warning restore CA2211 // Non-constant fields should not be visible
+        public static event EventHandler<SystemStatus>? OnStatusChanged;
 
         private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(null, fullprompt);
         private static void RaiseOnStatusChange(SystemStatus newStatus) => OnStatusChanged?.Invoke(null, newStatus);
@@ -112,7 +110,7 @@ namespace AIToolkit.LLM
         private static List<WorldEntry> _currentWorldEntries = [];
         private static string _LastGeneratedPrompt = string.Empty;
         private static readonly HttpClient _httpclient = new();
-        public static readonly KoboldCppClient Client = new(_httpclient);
+        private static readonly KoboldCppClient Client = new(_httpclient);
         private static int maxContextLength = 4096;
         private static InstructFormat instruct = new();
         internal static HashSet<Guid> usedGuidInSession = [];
@@ -507,9 +505,10 @@ namespace AIToolkit.LLM
         }
 
         /// <summary>
-        /// Starts the generation process for the bot (response to invisible system prompt).
+        /// Send a system message to the bot and wait for a response. Message log is optional.
         /// </summary>
         /// <param name="systemMessage">Message from sender</param>
+        /// <param name="logSystemPrompt">Log the message to the chat history</param>
         /// <returns></returns>
         public static async Task<string> QuickInferenceForSystemPrompt(string systemMessage, bool logSystemPrompt)
         {
@@ -590,35 +589,6 @@ namespace AIToolkit.LLM
         }
 
         /// <summary>
-        /// Returns a message prefix depending on the role. (generally the user/bot's name)
-        /// </summary>
-        /// <param name="role"></param>
-        /// <returns></returns>
-        public static string GetMessagePrefix(AuthorRole role)
-        {
-            return role switch
-            {
-                AuthorRole.System => "",
-                AuthorRole.SysPrompt => "",
-                AuthorRole.User => "**" + User.Name + ":** ",
-                AuthorRole.Assistant => "**" + Bot.Name + ":** ",
-                _ => "**Error:** ",
-            };
-        }
-
-        public static string GetMessagePrefix(SingleMessage message)
-        {
-            return message.Role switch
-            {
-                AuthorRole.System => "**SYSTEM:** ",
-                AuthorRole.SysPrompt => "**SYS PROMPT:** ",
-                AuthorRole.User => "**" + message.User.Name + ":** ",
-                AuthorRole.Assistant => "**" + message.Bot.Name + ":** ",
-                _ => "**Error:** ",
-            };
-        }
-
-        /// <summary>
         /// Returns an away string depending on the last chat's date.
         /// </summary>
         /// <returns></returns>
@@ -639,14 +609,8 @@ namespace AIToolkit.LLM
                 msgtxt += " The last chat happened yesterday. It is {{time}} now.";
             else
                 msgtxt += $" The last chat was about {timespan.Hours} hours ago. " + "It is {{time}} now.";
-            msgtxt = "*" + msgtxt.Trim() + "* ";
+            msgtxt = "*" + msgtxt.Trim() + "*" + NewLine;
             return ReplaceMacros(msgtxt);
-        }
-
-        public static void RemoveLastMessage()
-        {
-            LLMSystem.History.RemoveLast();
-            InvalidatePromptCache();
         }
 
         public static void InvalidatePromptCache()
