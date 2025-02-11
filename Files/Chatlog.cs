@@ -398,12 +398,12 @@ namespace AIToolkit.Files
                     continue;
                 var sb = new StringBuilder();
                 sb.AppendLinuxLine($"{sectionHeader} {session.Title}");
-                sb.AppendLinuxLine($"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}, the following events took places from {LLMSystem.Bot.Name}'s perspective: {session.Summary.RemoveNewLines()}");
+                sb.AppendLinuxLine($"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}, the following events took places from {LLMSystem.Bot.Name}'s perspective: {session.Summary.RemoveNewLines()}").AppendLinuxLine();
                 var tks = LLMSystem.GetTokenCount(sb.ToString());
                 if (tks <= tokensleft)
                 {
                     tokensleft -= tks;
-                    res.AppendLinuxLine(sb.ToString());
+                    res.Insert(0, sb.ToString());
                 }
                 else
                     break;
