@@ -312,7 +312,7 @@ namespace AIToolkit.LLM
 
         private static List<VectorSearchResult> Search(float[] message, int count)
         {
-            LLMSystem.logger?.LogInformation("LTM Size: {size} out of {logsize}", VectorDBCount.ToString(), LLMSystem.History.Sessions.Count.ToString());
+            LLMSystem.Logger?.LogInformation("LTM Size: {size} out of {logsize}", VectorDBCount.ToString(), LLMSystem.History.Sessions.Count.ToString());
             if (!IsVectorDBLoaded || VectorDBCount == 0)
                 return [];
             var found = VectorDB.KNNSearch(message, count);
@@ -320,7 +320,7 @@ namespace AIToolkit.LLM
             foreach (var item in found)
             {
                 res.Add(new VectorSearchResult(LookupDB[item.Id].ID, LookupDB[item.Id].embedType, item.Distance));
-                LLMSystem.logger?.LogInformation("LTM Found: {id} ({distance})", item.Id.ToString(), item.Distance.ToString());
+                LLMSystem.Logger?.LogInformation("LTM Found: {id} ({distance})", item.Id.ToString(), item.Distance.ToString());
             }
             res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
             return res;

@@ -45,10 +45,8 @@ namespace AIToolkit.Audio
             if (hasSound)
             {
                 // Save the recording to the specified file
-                using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
-                {
-                    memoryStream.CopyTo(fileStream);
-                }
+                using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
+                memoryStream.CopyTo(fileStream);
                 return true;
             }
             else

@@ -84,7 +84,11 @@ namespace AIToolkit.LLM
         public static BasePersona Bot { get => bot; set => ChangeBot(value); }
         public static BasePersona User { get => user; set => user = value; }
 
-        public static ILogger? logger = null;
+        public static ILogger? Logger
+        {
+            get => logger;
+            set => logger = value;
+        }
 
         // Default/Current Characters, Users, Instruct format, and inference parameters
         private static BasePersona bot = new() { IsUser = false, Name = "Bot", Bio = "You are an helpful AI assistant whose goal is to answer questions and complete tasks.", UniqueName = string.Empty };
@@ -113,6 +117,7 @@ namespace AIToolkit.LLM
         private static readonly KoboldCppClient Client = new(_httpclient);
         private static int maxContextLength = 4096;
         private static InstructFormat instruct = new();
+        private static ILogger? logger = null;
         internal static HashSet<Guid> usedGuidInSession = [];
 
         public static void Init()
@@ -380,8 +385,8 @@ namespace AIToolkit.LLM
                         if (!inserts.TryAdd(RAGIndex, memprompt))
                             inserts[RAGIndex] += NewLine + memprompt;
                     }
-                    foreach (var item in search)
-                        usedGuidInSession.Add(item.session.Guid);
+                    foreach (var (session, category, distance) in search)
+                        usedGuidInSession.Add(session.Guid);
                 }
             }
             if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
@@ -421,7 +426,7 @@ namespace AIToolkit.LLM
             if (final > MaxContextLength + MaxReplyLength)
             {
                 var diff = final - (MaxContextLength + MaxReplyLength);
-                logger?.LogWarning($"The prompt is {diff} tokens over the limit.");
+                logger?.LogWarning("The prompt is {Diff} tokens over the limit.", diff);
             }
             return res;
         }
