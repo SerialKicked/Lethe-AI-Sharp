@@ -10,18 +10,13 @@ using System.Globalization;
 using static LLama.Common.ChatHistory;
 using System;
 using System.Threading.Tasks;
+using Microsoft.VisualBasic;
+using System.Collections.ObjectModel;
 
 namespace AIToolkit.LLM
 {
     public enum SystemStatus { NotInit, Ready, Busy }
     public enum SystemPromptSection { MainPrompt, BotBio, UserBio, Scenario, Memory, ContextInfo }
-
-    public class InsertPrompt(string prompt, AuthorRole role = AuthorRole.SysPrompt, int depth = 1)
-    {
-        public AuthorRole Role = role;
-        public string Prompt = prompt;
-        public int Depth = depth;
-    }
 
     public delegate void BasicDelegateFunction();
     public delegate void UpdateMessageFunction(string update);
@@ -83,16 +78,11 @@ namespace AIToolkit.LLM
 
         public static BasePersona Bot { get => bot; set => ChangeBot(value); }
         public static BasePersona User { get => user; set => user = value; }
-
         public static ILogger? Logger
         {
             get => logger;
             set => logger = value;
         }
-
-        // Default/Current Characters, Users, Instruct format, and inference parameters
-        private static BasePersona bot = new() { IsUser = false, Name = "Bot", Bio = "You are an helpful AI assistant whose goal is to answer questions and complete tasks.", UniqueName = string.Empty };
-        private static BasePersona user = new() { IsUser = true, Name = "User", UniqueName = string.Empty };
         public static InstructFormat Instruct { 
             get => instruct; 
             set
@@ -105,20 +95,22 @@ namespace AIToolkit.LLM
         public static SystemPrompt SystemPrompt { get; set; } = new();
         public static Chatlog History => Bot.History;
 
+        public static readonly string NewLine = "\n";
+
         private static SystemStatus status = SystemStatus.NotInit;
         private static int systemPromptSize = 0;
-
-        public static readonly string NewLine = "\n";
         private static string StreamingTextProgress = string.Empty;
-
-        private static List<WorldEntry> _currentWorldEntries = [];
         private static string _LastGeneratedPrompt = string.Empty;
         private static readonly HttpClient _httpclient = new();
         private static readonly KoboldCppClient Client = new(_httpclient);
         private static int maxContextLength = 4096;
         private static InstructFormat instruct = new();
         private static ILogger? logger = null;
+        private static BasePersona bot = new() { IsUser = false, Name = "Bot", Bio = "You are an helpful AI assistant whose goal is to answer questions and complete tasks.", UniqueName = string.Empty };
+        private static BasePersona user = new() { IsUser = true, Name = "User", UniqueName = string.Empty };
+
         internal static HashSet<Guid> usedGuidInSession = [];
+        internal static PromptInserts dataInserts = [];
 
         public static void Init()
         {
@@ -223,7 +215,6 @@ namespace AIToolkit.LLM
         private static void ChangeBot(BasePersona newbot)
         {
             InvalidatePromptCache();
-            _currentWorldEntries = [];
             bot.EndChat(backup: true);
             bot = newbot;
             bot.BeginChat();
@@ -312,95 +303,79 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         private static async Task<string> GenerateFullPrompt(AuthorRole MsgSender, string newMessage, string? pluginMessage = null)
         {
+            // setup user message (+ optional plugin message) and count tokens used
             var msg = string.IsNullOrEmpty(newMessage) ? string.Empty : Instruct.FormatSinglePrompt(MsgSender, User, Bot, newMessage);
             var pluginmsg = string.IsNullOrEmpty(pluginMessage) ? string.Empty : Instruct.FormatSinglePrompt(AuthorRole.System, User, Bot, pluginMessage);
-            var tokencount = string.IsNullOrEmpty(msg) ? 0 :GetTokenCount(msg);
-            tokencount += string.IsNullOrEmpty(pluginmsg) ? 0 : GetTokenCount(pluginmsg);
+            var tokensused = string.IsNullOrEmpty(msg) ? 0 :GetTokenCount(msg);
+            tokensused += string.IsNullOrEmpty(pluginmsg) ? 0 : GetTokenCount(pluginmsg);
             var rawprompt = new StringBuilder(SystemPrompt.GetSystemPromptRaw(Bot));
-            var inserts = new Dictionary<int, string>();
             var searchmessage = string.IsNullOrWhiteSpace(newMessage) ? History.GetLastUserMessageContent() : newMessage;
-            usedGuidInSession = [];
+            // refresh the textual inserts
+            dataInserts.DecreaseDuration();
+            // Check for keyword-activated world info entries
             if (WorldInfo && Bot.MyWorlds.Count > 0)
             {
-                _currentWorldEntries = [];
+                var _currentWorldEntries = new List<WorldEntry>();
                 foreach (var world in Bot.MyWorlds)
                 {
                     _currentWorldEntries.AddRange(world.FindEntries(History, searchmessage));
                 }
-                var entries = _currentWorldEntries.FindAll(e => e.Position == WEPosition.SystemPrompt);
-                if (entries.Count > 0)
+                foreach (var entry in _currentWorldEntries)
                 {
-                    rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle);
-                    foreach (var item in entries)
-                        rawprompt.AppendLinuxLine(item.Message);
-                }
-                entries = _currentWorldEntries.FindAll(e => e.Position == WEPosition.Chat);
-                foreach (var item in entries)
-                {
-                    if (!inserts.TryAdd(item.PositionIndex, item.Message))
-                        inserts[item.PositionIndex] += NewLine + item.Message;
-                }
-                foreach (var item in _currentWorldEntries)
-                {
-                    usedGuidInSession.Add(item.Guid);
+                    dataInserts.AddInsert(new PromptInsert(entry.Guid, entry.Message, entry.Position == WEPosition.SystemPrompt ? -1 : entry.PositionIndex, entry.Duration));
                 }
             }
-
             // Check all sessions for sticky entries
             foreach (var session in History.Sessions)
             {
                 if (session.Sticky && session != History.CurrentSession)
                 {
                     var rawmem = session.GetRawMemory(!MarkdownMemoryFormating);
-                    if (!inserts.TryAdd(5, rawmem))
-                        inserts[5] += NewLine + rawmem;
-                    usedGuidInSession.Add(session.Guid);
+                    dataInserts.AddInsert(new PromptInsert(session.Guid, rawmem, RAGIndex , 1));
                 }
             }
+            // Check if the plugin has anything to add to system prompts
             foreach (var ctxplug in ContextPlugins)
             {
                 if (ctxplug.Enabled && ctxplug.AddToSystemPrompt(searchmessage, History, out var ctxinfo))
                     rawprompt.AppendLinuxLine(ctxinfo);
             }
 
-            var sysprompt = Instruct.BoSToken + Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, User, Bot, rawprompt.ToString().CleanupAndTrim());
-
-            systemPromptSize = GetTokenCount(sysprompt);
-            tokencount += systemPromptSize;
-            var memprompt = string.Empty;
+            usedGuidInSession = dataInserts.GetGuids();
+            // Check for RAG entries
             if (RAGSystem.Enabled)
             {
                 var search = await RAGSystem.Search(ReplaceMacros(searchmessage), MaxRAGEntries);
                 search.RemoveAll(search => usedGuidInSession.Contains(search.session.Guid));
-                memprompt = MemoriesToMessage(search);
-                if (!string.IsNullOrEmpty(memprompt))
-                {
-                    if (RAGIndex == -1)
-                    {
-                        memprompt = Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, User, Bot, memprompt);
-                        tokencount += GetTokenCount(memprompt);
-                    }
-                    else
-                    {
-                        if (!inserts.TryAdd(RAGIndex, memprompt))
-                            inserts[RAGIndex] += NewLine + memprompt;
-                    }
-                    foreach (var (session, category, distance) in search)
-                        usedGuidInSession.Add(session.Guid);
-                }
+                dataInserts.AddMemories(search);
             }
-            if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
-                tokencount += GetTokenCount(Instruct.GetResponseStart(User));
-            else
-                tokencount += GetTokenCount(Instruct.GetResponseStart(Bot));
-            var availtokens = (int)(MaxContextLength) - tokencount - MaxReplyLength;
-            if (Bot.SessionMemorySystem)
-                availtokens -= ReservedSessionTokens;
-
-            var history = History.GetMessageHistory(SessionHandling, availtokens, inserts);
-
-            if (Bot.SessionMemorySystem && ReservedSessionTokens > 0)
+            // Now add the system prompt entries we gathered
+            var syspromptentries = dataInserts.GetEntriesByPosition(-1);
+            if (syspromptentries.Count > 0)
             {
+                rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle);
+                foreach (var item in syspromptentries)
+                    rawprompt.AppendLinuxLine(item.Content);
+            }
+            // Prepare the full system prompt and count the tokens used
+            var sysprompt = Instruct.BoSToken + Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, User, Bot, rawprompt.ToString().CleanupAndTrim());
+            systemPromptSize = GetTokenCount(sysprompt);
+            tokensused += systemPromptSize;
+            // Prepare the bot's response tokens and count them
+            if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
+                tokensused += GetTokenCount(Instruct.GetResponseStart(User));
+            else
+                tokensused += GetTokenCount(Instruct.GetResponseStart(Bot));
+            var availtokens = (int)(MaxContextLength) - tokensused - MaxReplyLength;
+            // If we have a session memory system (and previous available sessions), reserve more tokens
+            if (Bot.SessionMemorySystem && History.Sessions.Count > 1)
+                availtokens -= ReservedSessionTokens;
+            // get the full, formated chat history complemented by the data inserts
+            var history = History.GetMessageHistory(SessionHandling, availtokens, dataInserts);
+
+            if (Bot.SessionMemorySystem && ReservedSessionTokens > 0 && History.Sessions.Count > 1)
+            {
+                usedGuidInSession = dataInserts.GetGuids();
                 var shistory = History.GetPreviousSummaries(ReservedSessionTokens - GetTokenCount(ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator);
                 if (!string.IsNullOrEmpty(shistory))
                 {
@@ -412,15 +387,11 @@ namespace AIToolkit.LLM
             string res = string.Empty;
             if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
             {
-                res = !string.IsNullOrEmpty(memprompt) && RAGIndex == -1 ?
-                    sysprompt + memprompt + history + msg + Instruct.GetUserStart(User) :
-                    sysprompt + history + msg + Instruct.GetUserStart(User).TrimEnd();
+                res = sysprompt + history + msg + Instruct.GetUserStart(User).TrimEnd();
             }
             else
             {
-                res = !string.IsNullOrEmpty(memprompt) && RAGIndex == -1 ?
-                    sysprompt + memprompt + history + msg + pluginmsg + Instruct.GetResponseStart(Bot) :
-                    sysprompt + history + msg + pluginmsg + Instruct.GetResponseStart(Bot);
+                res = sysprompt + history + msg + pluginmsg + Instruct.GetResponseStart(Bot);
             }
             var final = GetTokenCount(res);
             if (final > MaxContextLength + MaxReplyLength)
@@ -429,27 +400,6 @@ namespace AIToolkit.LLM
                 logger?.LogWarning("The prompt is {Diff} tokens over the limit.", diff);
             }
             return res;
-        }
-
-        private static string MemoriesToMessage(List<(IEmbed session, EmbedType category, float distance)> memories)
-        {
-            if (memories.Count == 0)
-                return string.Empty;
-            var stbuild = new StringBuilder();
-            stbuild.AppendLinuxLine("The message from {{user}} at the bottom triggered the following memories in {{char}}'s mind:");
-            foreach (var (session, embedtype, _) in memories)
-            {
-                if (embedtype == EmbedType.WorldInfo)
-                {
-                    var info = (session as WorldEntry)!;
-                    stbuild.AppendLinuxLine(info.Message);
-                }
-                else
-                {
-                    stbuild.AppendLinuxLine((session as ChatSession)!.GetRawMemory(!MarkdownMemoryFormating));
-                }
-            }
-            return stbuild.ToString();
         }
 
         public static async Task AddBotMessage()
@@ -621,6 +571,8 @@ namespace AIToolkit.LLM
         public static void InvalidatePromptCache()
         {
             _LastGeneratedPrompt = string.Empty;
+            dataInserts.Clear();
+            usedGuidInSession.Clear();
         }
 
         public static async Task<string> SimpleQuery(SamplerSettings llmparams)

@@ -21,6 +21,17 @@ namespace AIToolkit.Files
         public List<string> FirstMessage { get; set; } = [];
         /// <summary> Examples of dialogs from the character to get a more consistent tone </summary>
         public List<string> ExampleDialogs { get; set; } = [];
+        /// <summary>
+        /// A list of whims that the character may have. 
+        /// These are used to determine the character's mood at the start of a session (or after long AFK periods). 
+        /// They can be used to influence the character's responses to create a more dynamic conversation.
+        /// </summary>
+        public List<string> Whims { get; set; } = [];
+        /// <summary>
+        /// The chance for a whim to change during the session. A percentage chance that the whim will change after each message pair.
+        /// If set to 0, the whim will only change at the start of a session, or after a long AFK period.
+        /// </summary>
+        public float WhimChangeRate { get; set; } = 0.05f;
         /// <summary> Custom system prompt for this character </summary>
         public string SystemPrompt { get; set; } = string.Empty;
         /// <summary> WorldInfo applied to this character </summary>

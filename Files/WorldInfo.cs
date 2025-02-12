@@ -60,6 +60,7 @@ namespace AIToolkit.Files
         public int PositionIndex = 0;
         public int Duration = 1;
         public WEPosition Position = WEPosition.SystemPrompt;
+        public float TriggerChance = 1;
         public int Priority = 100;
         public float[] EmbedSummary { get; set; } = [];
 
@@ -100,7 +101,7 @@ namespace AIToolkit.Files
                 var entry = Entries[i];
                 if (!entry.Enabled || active.Any(a => a.RecordID == i))
                     continue;
-                if (entry.CheckKeywords(message))
+                if (entry.CheckKeywords(message) && entry.TriggerChance >= LLMSystem.RNG.NextDouble())
                     activeEntries.Add(new ActiveLink { RecordID = i, DurationLeft = entry.Duration });
             }
             return activeEntries.Select(a => Entries[a.RecordID]).ToList();

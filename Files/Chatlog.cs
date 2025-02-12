@@ -412,19 +412,20 @@ namespace AIToolkit.Files
             return res.ToString();
         }
 
-        public string GetMessageHistory(SessionHandling sessionHandling, int maxTokens, Dictionary<int, string>? memories)
+        public string GetMessageHistory(SessionHandling sessionHandling, int maxTokens, PromptInserts memories)
         {
             var sb = new StringBuilder();
             var tokensleft = maxTokens;
-            var mems = memories ?? [];
+            var mems = memories;
             var entrydepth = 0;
 
             /// <summary> Insert WorldInfo memories into the chatlog </summary>
             void InsertMemories()
             {
-                if (!mems.TryGetValue(entrydepth, out string? value) || string.IsNullOrEmpty(value))
+                var foundmemory = mems.GetContentByPosition(entrydepth);
+                if (string.IsNullOrEmpty(foundmemory))
                     return;
-                var formattedmemory = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, value);
+                var formattedmemory = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, foundmemory.CleanupAndTrim());
                 var tksmem = LLMSystem.GetTokenCount(formattedmemory);
                 if (tksmem <= tokensleft)
                 {
