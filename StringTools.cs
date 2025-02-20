@@ -62,7 +62,7 @@ namespace AIToolkit
                 }, RegexOptions.IgnoreCase);
             }
             // Clean up any multiple spaces that might have been created
-            return Regex.Replace(result, @"\s+", " ").Trim();
+            return result.Replace("  ", " ");
         }
 
         /// <summary>
