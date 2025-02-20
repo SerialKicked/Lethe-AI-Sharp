@@ -33,6 +33,38 @@ namespace AIToolkit
 
         public static string RemoveNewLines(this string text) => text.ToLinuxFormat().Replace("\n\n", " ").Replace('\n', ' ').Replace("  ", " ").Trim();
 
+
+        /// <summary>
+        /// Removes the occurences of what's in slop from text. Ignores case and only removes if there's a space before and after the word.
+        /// </summary>
+        /// <param name="text">text to scan</param>
+        /// <param name="slop">slop to remove</param>
+        /// <param name="removechance">chance to remove</param>
+        /// <returns></returns>
+        public static string RemoveSlop(this string text, string[] slop, float removechance)
+        {
+            // Claude Sonnet 3.5 code
+            var result = text;
+            foreach (var word in slop)
+            {
+                // Pattern now explicitly requires space/start/end boundaries around the word
+                string pattern = $@"(^|\s){Regex.Escape(word)}(\s|$)";
+                result = Regex.Replace(result, pattern, match =>
+                {
+                    // Preserve the space before/after when removing the word
+                    bool removeWord = LLMSystem.RNG.NextDouble() < removechance;
+                    if (!removeWord) return match.Value;
+                    
+                    // Keep one space unless we're at start/end of string
+                    bool isStart = match.Groups[1].Value == "";
+                    bool isEnd = match.Groups[2].Value == "";
+                    return (isStart ? "" : " ") + (isEnd ? "" : " ");
+                }, RegexOptions.IgnoreCase);
+            }
+            // Clean up any multiple spaces that might have been created
+            return Regex.Replace(result, @"\s+", " ").Trim();
+        }
+
         /// <summary>
         /// Tries to fix missing asterisks in the text
         /// </summary>
