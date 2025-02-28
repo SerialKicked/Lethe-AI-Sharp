@@ -16,7 +16,9 @@ namespace AIToolkit.Files
             "SystemStart", "SystemEnd",
             "UserStart", "UserEnd",
             "BotStart", "BotEnd",
+            "ThinkingStart", "ThinkingEnd",
             "BoSToken", "StopSequence",
+            "PrefillThinking",
             "AddNamesToPrompt",
             "NewLinesBetweenMessages",
             "StopStrings"
@@ -36,6 +38,7 @@ namespace AIToolkit.Files
         public List<string> StopStrings { get; set; } = [];
         public string ThinkingStart { get; set; } = string.Empty;
         public string ThinkingEnd { get; set; } = string.Empty;
+        public bool PrefillThinking { get; set; } = false;
 
         [JsonIgnore] private bool RealAddNameToPrompt => LLMSystem.NamesInPromptOverride ?? AddNamesToPrompt;
 

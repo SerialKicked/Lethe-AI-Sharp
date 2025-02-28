@@ -392,6 +392,8 @@ namespace AIToolkit.LLM
             else
             {
                 res = sysprompt + history + msg + pluginmsg + Instruct.GetResponseStart(Bot);
+                if (Instruct.PrefillThinking)
+                    res += Instruct.ThinkingStart;
             }
             var final = GetTokenCount(res);
             if (final > MaxContextLength + MaxReplyLength)
