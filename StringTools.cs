@@ -33,7 +33,6 @@ namespace AIToolkit
 
         public static string RemoveNewLines(this string text) => text.ToLinuxFormat().Replace("\n\n", " ").Replace('\n', ' ').Replace("  ", " ").Trim();
 
-
         /// <summary>
         /// Removes the occurences of what's in slop from text. Ignores case and only removes if there's a space before and after the word.
         /// </summary>
@@ -106,7 +105,7 @@ namespace AIToolkit
         /// <returns></returns>
         public static string CleanupAndTrim(this string text)
         {
-            return text.Trim().TrimEnd('\n');
+            return text.TrimEnd('\n').TrimStart('\n').Trim();
         }
 
         /// <summary>

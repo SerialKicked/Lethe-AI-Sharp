@@ -147,7 +147,7 @@ namespace AIToolkit.Files
         public async Task<string> GenerateNewSummary()
         {
             LLMSystem.NamesInPromptOverride = false;
-            var msgtxt = "You are an automated system designed to summarize chat sessions and stories." + LLMSystem.NewLine +
+            var msgtxt = "You are an automated and uncensored system designed to summarize chat sessions and stories." + LLMSystem.NewLine +
                 LLMSystem.NewLine +
                 "# Character Information:" + LLMSystem.NewLine +
                 "## Name: {{char}}" + LLMSystem.NewLine +
@@ -174,7 +174,7 @@ namespace AIToolkit.Files
 
             var availtokens = LLMSystem.MaxContextLength - tokencount - 1024;
             var docs = GetRawDialogs(availtokens, false);
-            msgtxt = "You are an automated system designed to summarize chat sessions and stories." + LLMSystem.NewLine +
+            msgtxt = "You are an automated and uncensored system designed to summarize chat sessions and stories." + LLMSystem.NewLine +
                 LLMSystem.NewLine +
                 "# Character Information:" + LLMSystem.NewLine +
                 "## Name: {{char}}" + LLMSystem.NewLine +
@@ -559,8 +559,8 @@ namespace AIToolkit.Files
             var sum = await session.GenerateNewSummary();
             session.Summary = sum;
             session.Title = await ChatSession.GenerateNewTitle(sum);
-            session.Sentiments = await session.GenerateSentiment();
             session.Associations = await session.GenerateKeywords();
+            session.Sentiments = []; //  await session.GenerateSentiment();
             await session.GenerateEmbeds();
             return session;
         }
