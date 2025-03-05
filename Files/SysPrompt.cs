@@ -23,15 +23,21 @@ namespace AIToolkit.Files
         {
             var selprompt = !string.IsNullOrEmpty(character.SystemPrompt) ? character.SystemPrompt : Prompt;
             var res = new StringBuilder(selprompt).AppendLinuxLine();
-            if ((!string.IsNullOrEmpty(character.Scenario) || !string.IsNullOrEmpty(LLMSystem.ScenarioOverride)) && !string.IsNullOrEmpty(ScenarioTitle))
+            if (character.SelfEditTokens > 0 && !string.IsNullOrWhiteSpace(character.SelfEditField))
             {
-                res.AppendLinuxLine().AppendLinuxLine(ScenarioTitle).AppendLinuxLine("{{scenario}}");
+                res.AppendLinuxLine().AppendLinuxLine($"{CategorySeparator} {character.Name}'s personal thoughts").AppendLinuxLine("{{selfedit}}");
             }
 
             if (character.ExampleDialogs.Count > 0 && !string.IsNullOrEmpty(DialogsTitle))
             {
                 res.AppendLinuxLine().AppendLinuxLine(DialogsTitle).AppendLinuxLine("{{examples}}");
             }
+
+            if ((!string.IsNullOrEmpty(character.Scenario) || !string.IsNullOrEmpty(LLMSystem.ScenarioOverride)) && !string.IsNullOrEmpty(ScenarioTitle))
+            {
+                res.AppendLinuxLine().AppendLinuxLine(ScenarioTitle).AppendLinuxLine("{{scenario}}");
+            }
+
 
             return res.ToString();
         }

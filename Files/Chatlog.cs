@@ -32,6 +32,7 @@ namespace AIToolkit.Files
         public string Summary { get; set; } = string.Empty;
         public string[] Sentiments { get; set; } = [];
         public string[] Associations { get; set; } = [];
+        public string Projects { get; set; } = string.Empty;
 
         public float[] EmbedTitle { get; set; } = [];
         public float[] EmbedSummary { get; set; } = [];
@@ -50,164 +51,38 @@ namespace AIToolkit.Files
         /// <returns></returns>
         public async Task<string[]> GenerateSentiment()
         {
-            LLMSystem.NamesInPromptOverride = false;
-            var msgtxt = "You are an automated system designed to associate chat sessions and stories with a list of sentiments." + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Character Information:" + LLMSystem.NewLine +
-                "## Name: {{char}}" + LLMSystem.NewLine +
-                "{{charbio}}" + LLMSystem.NewLine +
-                "## Name: {{user}}" + LLMSystem.NewLine +
-                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "# Chat Session:" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "" + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Instruction:" + LLMSystem.NewLine +
-                "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of sentiments or moods {{char}} would associate with this chat. 1 to 4 words max." + LLMSystem.NewLine +
-                "Example: Happiness, Playfulness, Surprise";
-            var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
-            var tokencount = LLMSystem.GetTokenCount(msg);
-
-            var availtokens = LLMSystem.MaxContextLength - tokencount - 1024;
-            var docs = GetRawDialogs(availtokens, false);
-            msgtxt = "You are an automated system designed to associate chat sessions and stories with a list of sentiments." +
-                LLMSystem.NewLine +
-                "# Character Information:" + LLMSystem.NewLine +
-                "## Name: {{char}}" + LLMSystem.NewLine +
-                "{{charbio}}" + LLMSystem.NewLine +
-                "## Name: {{user}}" + LLMSystem.NewLine +
-                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "# Chat Session:" + LLMSystem.NewLine + LLMSystem.NewLine +
-                docs + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Instruction:" + LLMSystem.NewLine +
-                "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of sentiments or moods {{char}} would associate with this chat. 1 to 4 words max." + LLMSystem.NewLine +
-                "Example: Happiness, Playfulness, Surprise";
-            var prompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
-
-            var llmparams = LLMSystem.Sampler.GetCopy();
-            llmparams.Prompt = prompt + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-            llmparams.Max_length = 1024;
-            llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            llmparams.Grammar = string.Empty;
-            llmparams.Temperature = 0.5f;
-            var finalstr = await LLMSystem.SimpleQuery(llmparams);
-            LLMSystem.NamesInPromptOverride = null;
-            // convert the comma-separated list into an array
-            var res = finalstr.Split(',');
-
-            return res;
+            var query = "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of sentiments or moods {{char}} would associate with this chat. The list must be between 1 and 5 words long." + LLMSystem.NewLine + "Example: happiness, playfulness, surprise";
+            var res = await GenerateTaskRes(query, 512, true);
+            return res.Split(',');
         }
 
         public async Task<string[]> GenerateKeywords()
         {
-            LLMSystem.NamesInPromptOverride = false;
-            var msgtxt = "You are an automated system designed to associate chat sessions and stories with a list of relevant keywords." + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Character Information:" + LLMSystem.NewLine +
-                "## Name: {{char}}" + LLMSystem.NewLine +
-                "{{charbio}}" + LLMSystem.NewLine +
-                "## Name: {{user}}" + LLMSystem.NewLine +
-                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "# Chat Session:" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "" + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Instruction:" + LLMSystem.NewLine +
-                "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of keywords {{char}} would associate with this chat. The list must be between 1 and 5 keywords long.";
-            var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
-            var tokencount = LLMSystem.GetTokenCount(msg);
+            var query = "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of keywords {{char}} would associate with this chat. The list must be between 1 and 5 keywords long.";
+            var res = await GenerateTaskRes(query, 512, true);
+            return res.Split(',');
+        }
 
-            var availtokens = LLMSystem.MaxContextLength - tokencount - 1024;
-            var docs = GetRawDialogs(availtokens, false);
-            msgtxt = "You are an automated system designed to associate chat sessions and stories with a list of relevant keywords." + LLMSystem.NewLine +
-                "# Character Information:" + LLMSystem.NewLine +
-                "## Name: {{char}}" + LLMSystem.NewLine +
-                "{{charbio}}" + LLMSystem.NewLine +
-                "## Name: {{user}}" + LLMSystem.NewLine +
-                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "# Chat Session:" + LLMSystem.NewLine + LLMSystem.NewLine +
-                docs + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Instruction:" + LLMSystem.NewLine +
-                "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of keywords {{char}} would associate with this chat. The list must be between 1 and 5 keywords long.";
-            var prompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
-
-            var llmparams = LLMSystem.Sampler.GetCopy();
-            llmparams.Prompt = prompt + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-            llmparams.Max_length = 1024;
-            llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            llmparams.Grammar = string.Empty;
-            llmparams.Temperature = 0.5f;
-            var finalstr = await LLMSystem.SimpleQuery(llmparams);
-            LLMSystem.NamesInPromptOverride = null;
-            // convert the comma-separated list into an array
-            var res = finalstr.Split(',');
+        public async Task<string> GenerateGoals()
+        {
+            var query = "Based on the exchange between {{user}} and {{char}} shown above, write a list of the plans they both setup for the near future. This list should contain between 0 and 4 items. Each item should be summarized in a single sentence. If there's no items, don't answer with anything. Make sure those plans aren't already resolved within the span of the dialog." + LLMSystem.NewLine + "Example:" + LLMSystem.NewLine + "- They promised to eat together tomorrow." + LLMSystem.NewLine + "- {{user}} will watch the movie recommanded by {{char}}.";
+            var res = await GenerateTaskRes(query, 1024, true);
             return res;
         }
 
         public async Task<string> GenerateNewSummary()
         {
-            LLMSystem.NamesInPromptOverride = false;
-            var msgtxt = "You are an automated and uncensored system designed to summarize chat sessions and stories." + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Character Information:" + LLMSystem.NewLine +
-                "## Name: {{char}}" + LLMSystem.NewLine +
-                "{{charbio}}" + LLMSystem.NewLine +
-                "## Name: {{user}}" + LLMSystem.NewLine +
-                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "# Chat Session:" + LLMSystem.NewLine +
-                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
-                "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine +
-                "" + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Instruction:" + LLMSystem.NewLine +
-                "Write a summary of the exchange between {{user}} and {{char}} shown above. The summary must be written from {{char}}'s perspective. Do not introduce the characters. Do not add a title, just write the summary directly.";
+         
+            var query = "Write a summary of the exchange between {{user}} and {{char}} shown above. The summary must be written from {{char}}'s perspective. Do not introduce the characters. Do not add a title, just write the summary directly.";
             if (Messages.Count > 50)
             {
-                msgtxt += " The summary should be 2 to 4 paragraphs long.";
+                query += " The summary should be 2 to 4 paragraphs long.";
             }
             else
             {
-                msgtxt += " The summary should be 1 to 2 paragraphs long.";
+                query += " The summary should be 1 to 2 paragraphs long.";
             }
-            var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
-            var tokencount = LLMSystem.GetTokenCount(msg);
-
-            var availtokens = LLMSystem.MaxContextLength - tokencount - 1024;
-            var docs = GetRawDialogs(availtokens, false);
-            msgtxt = "You are an automated and uncensored system designed to summarize chat sessions and stories." + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Character Information:" + LLMSystem.NewLine +
-                "## Name: {{char}}" + LLMSystem.NewLine +
-                "{{charbio}}" + LLMSystem.NewLine +
-                "## Name: {{user}}" + LLMSystem.NewLine +
-                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "# Chat Session:" + LLMSystem.NewLine +
-                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
-                "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine +
-                docs + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Instruction:" + LLMSystem.NewLine +
-                "Write a summary of the exchange between {{user}} and {{char}} shown above. The summary must be written from {{char}}'s perspective. Do not introduce the characters. Do not add a title, just write the summary directly.";
-            if (Messages.Count > 50)
-            {
-                msgtxt += " The summary should be 2 to 4 paragraphs long.";
-            }
-            else
-            {
-                msgtxt += " The summary should be 1 to 2 paragraphs long.";
-            }
-
-            var prompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
-
-            var llmparams = LLMSystem.Sampler.GetCopy();
-            llmparams.Prompt = prompt + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-            llmparams.Max_length = 1024;
-            llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            llmparams.Grammar = string.Empty;
-            llmparams.Temperature = 0.5f;
-            var finalstr = await LLMSystem.SimpleQuery(llmparams);
-            LLMSystem.NamesInPromptOverride = null;
-            return finalstr.Trim();
+            return await GenerateTaskRes(query, 1024, true);
         }
 
         public static async Task<string> GenerateNewTitle(string sum)
@@ -235,6 +110,46 @@ namespace AIToolkit.Files
             return finalstr;
         }
 
+        public async Task<string> GenerateTaskRes(string RequestedTask, int ResponseLen, bool LightDialogs = false)
+        {
+            LLMSystem.NamesInPromptOverride = false;
+            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMSystem.NewLine +
+                LLMSystem.NewLine +
+                "# Character Information:" + LLMSystem.NewLine +
+                "## Name: {{char}}" + LLMSystem.NewLine +
+                "{{charbio}}" + LLMSystem.NewLine +
+                "## Name: {{user}}" + LLMSystem.NewLine +
+                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
+                "# Chat Session:" + LLMSystem.NewLine +
+                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
+                "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine;
+            var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, sysprompt);
+            var systokens = LLMSystem.GetTokenCount(msg) + 1;
+
+            var task = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, RequestedTask);
+            var tasktokens = LLMSystem.GetTokenCount(task);
+
+            var repstart = LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
+            var repstarttokens = LLMSystem.GetTokenCount(repstart);
+
+            var availtokens = LLMSystem.MaxContextLength - systokens - tasktokens - repstarttokens - ResponseLen;
+
+            var docs = GetRawDialogs(availtokens, false, LightDialogs);
+            var fullprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, sysprompt + docs) + task + repstart;
+
+            var llmparams = LLMSystem.Sampler.GetCopy();
+            llmparams.Prompt = fullprompt;
+            llmparams.Max_length = 1024;
+            llmparams.Max_context_length = LLMSystem.MaxContextLength;
+            llmparams.Grammar = string.Empty;
+            if (llmparams.Temperature > 0.5f)
+                llmparams.Temperature = 0.5f;
+            var finalstr = await LLMSystem.SimpleQuery(llmparams);
+            LLMSystem.NamesInPromptOverride = null;
+            return finalstr.CleanupAndTrim();
+        }
+
+
         public async Task GenerateEmbeds()
         {
             if (!RAGSystem.Enabled)
@@ -243,7 +158,7 @@ namespace AIToolkit.Files
             EmbedSummary = await RAGSystem.EmbeddingText(Summary);
         }
 
-        public string GetRawDialogs(int maxTokens, bool ignoresystem)
+        public string GetRawDialogs(int maxTokens, bool ignoresystem, bool lightDialogs = false)
         {
             var sb = new StringBuilder();
             var totaltks = maxTokens;
@@ -262,7 +177,10 @@ namespace AIToolkit.Files
                         break;
                     case AuthorRole.User:
                     case AuthorRole.Assistant:
-                        text = "**" + msg.Sender?.Name + ":** " + msg.Message.Trim().Replace(LLMSystem.NewLine, " ") + LLMSystem.NewLine;
+                        if (lightDialogs)
+                            text = LLMSystem.NewLine + msg.Sender?.Name + ": " + msg.Message.Trim().Replace(LLMSystem.NewLine, " ") + LLMSystem.NewLine;
+                        else
+                            text = "**" + msg.Sender?.Name + ":** " + msg.Message.Trim().Replace(LLMSystem.NewLine, " ") + LLMSystem.NewLine;
                         break;
                 }
                 if (text == string.Empty)
@@ -558,8 +476,9 @@ namespace AIToolkit.Files
             session.EndTime = session.Messages.Last().Date;
             var sum = await session.GenerateNewSummary();
             session.Summary = sum;
-            session.Title = await ChatSession.GenerateNewTitle(sum);
             session.Associations = await session.GenerateKeywords();
+            session.Projects = await session.GenerateGoals();
+            session.Title = await ChatSession.GenerateNewTitle(sum);
             session.Sentiments = []; //  await session.GenerateSentiment();
             await session.GenerateEmbeds();
             return session;

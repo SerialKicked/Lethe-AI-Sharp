@@ -189,6 +189,7 @@ namespace AIToolkit.LLM
                .Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
                .Replace("{{time}}", DateTime.Now.ToShortTimeString())
                .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
+               .Replace("{{selfedit}}", character.SelfEditField)
                .Replace("{{scenario}}", string.IsNullOrWhiteSpace(ScenarioOverride) ? character.GetScenario(user.Name) : ScenarioOverride);
             return res.ToString();
         }
@@ -204,6 +205,7 @@ namespace AIToolkit.LLM
                .Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
                .Replace("{{time}}", DateTime.Now.ToShortTimeString())
                .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
+               .Replace("{{selfedit}}", character.SelfEditField)
                .Replace("{{scenario}}", string.IsNullOrWhiteSpace(ScenarioOverride) ? character.GetScenario(userName) : ScenarioOverride);
             return res.ToString();
         }
@@ -216,6 +218,8 @@ namespace AIToolkit.LLM
         {
             InvalidatePromptCache();
             bot.EndChat(backup: true);
+            if (!string.IsNullOrEmpty(bot.UniqueName))
+                (bot as IFile).SaveToFile("data/chars/" + bot.UniqueName + ".json");
             bot = newbot;
             bot.BeginChat();
             RAGSystem.VectorizeChatBot(Bot);

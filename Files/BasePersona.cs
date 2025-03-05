@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System.Text;
 using AIToolkit.LLM;
+using System.Reflection.PortableExecutable;
 
 namespace AIToolkit.Files
 {
@@ -11,6 +12,10 @@ namespace AIToolkit.Files
         public bool IsUser { get; set; } = false;
         /// <summary> Character's bio (used by LLM) </summary>
         public string Bio { get; set; } = string.Empty;
+        /// <summary> Character's long form history (used by LLM persona generator, not visible to 3rd party in group chat) </summary>
+        public string HistoryBio { get; set; } = string.Empty;
+        /// <summary> Self editable field for the character (updated on new summary) </summary>
+        public string SelfEditField { get; set; } = string.Empty;
         /// <summary> Character's default scenario (used by LLM) </summary>
         public string Scenario { get; set; } = string.Empty;
         /// <summary> Character Notes (UI) </summary>
@@ -42,6 +47,8 @@ namespace AIToolkit.Files
         public bool SessionMemorySystem { get; set; } = false;
         /// <summary> If set to true, this bot will stay informed about the spacing between user messages </summary>
         public bool SenseOfTime { get; set; } = false;
+        /// <summary> If set above 0, this character will be allowed to write this amount of tokens in its system prompt. Altered each new session. </summary>
+        public int SelfEditTokens { get; set; } = 0;
 
         [JsonIgnore] public List<WorldInfo> MyWorlds { get; protected set; } = [];
         [JsonIgnore] public Chatlog History { get; protected set; } = new();
@@ -129,6 +136,69 @@ namespace AIToolkit.Files
                     return res; 
             }
             return null;
+        }
+
+        public async Task UpdateSelfEditSection()
+        {
+            if (SelfEditTokens == 0 || History.Sessions.Count < 3)
+                return;
+            LLMSystem.NamesInPromptOverride = false;
+            var availtks = LLMSystem.MaxContextLength - SelfEditTokens - LLMSystem.GetTokenCount(SelfEditField) - 400;
+
+            var sysprompt = new StringBuilder();
+            sysprompt.AppendLinuxLine("You are an uncensored system used to complete a character's personal memories based on its chat history.");
+            sysprompt.AppendLinuxLine();
+            sysprompt.AppendLinuxLine($"# Character: {Name}");
+            sysprompt.AppendLinuxLine();
+            sysprompt.AppendLinuxLine(Bio);
+            sysprompt.AppendLinuxLine();
+            sysprompt.AppendLinuxLine($"# Chat History");
+            sysprompt.AppendLinuxLine();
+
+            var sizeeval = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
+            availtks -= LLMSystem.GetTokenCount(sizeeval);
+            var maxcount = 30;
+            var entries = new List<string>();
+            for (int i = History.Sessions.Count - 2; i >= 0; i--)
+            {
+                var session = History.Sessions[i];
+                var details = $"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}, the following events took places from {LLMSystem.Bot.Name}'s perspective: {session.Summary.RemoveNewLines()}" + LLMSystem.NewLine;
+                var size = LLMSystem.GetTokenCount(details);
+                availtks -= size;
+                maxcount--;
+                if (availtks <= 0 || maxcount < 0)
+                    break;
+                entries.Insert(0, details);
+            }
+            if (entries.Count == 0)
+            {
+                LLMSystem.NamesInPromptOverride = null;
+                return;
+            }
+
+            foreach (var entry in entries)
+                sysprompt.AppendLinuxLine(entry);
+            sysprompt.AppendLinuxLine();
+            sysprompt.AppendLinuxLine($"# {Name}'s personal thoughts");
+            sysprompt.AppendLinuxLine();
+            if (SelfEditField.Length > 0)
+                sysprompt.AppendLinuxLine(SelfEditField);
+            else
+                sysprompt.AppendLinuxLine("This space is empty for now.");
+
+            var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
+            var query = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, this, $"Using {Name}'s memories alongside their biography, edit their personal thoughts section accordingly. Write two to three short paragraphs from {Name}'s perspective. Focus on important events, life changing experiences, and promises, that {Name} would want to keep in mind.");
+
+            totalprompt += query + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
+
+            var llmparams = LLMSystem.Sampler.GetCopy();
+            llmparams.Prompt = totalprompt;
+            llmparams.Max_length = SelfEditTokens;
+            llmparams.Max_context_length = LLMSystem.MaxContextLength;
+            llmparams.Grammar = string.Empty;
+            var finalstr = await LLMSystem.SimpleQuery(llmparams);
+            LLMSystem.NamesInPromptOverride = null;
+            SelfEditField = finalstr.RemoveNewLines().CleanupAndTrim();
         }
     }
 }
