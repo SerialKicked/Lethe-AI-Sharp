@@ -23,6 +23,7 @@ namespace AIToolkit.LLM
 
     public static class LLMSystem
     {
+        public static string BackendUrl { get; set; } = "http://localhost:5001";
         public static int MaxRAGEntries { get; set; } = 3;
         public static int RAGIndex { get; set; } = 3;
         public static int ReservedSessionTokens { get; set; } = 2048;
@@ -115,7 +116,7 @@ namespace AIToolkit.LLM
         {
             if (Status != SystemStatus.NotInit)
                 return;
-            Client.BaseUrl = "http://localhost:5001";
+            Client.BaseUrl = BackendUrl;
             Client.ReadResponseAsString = true;
             Client.StreamingMessageReceived += Client_StreamingMessageReceived;
             // Load plugins
