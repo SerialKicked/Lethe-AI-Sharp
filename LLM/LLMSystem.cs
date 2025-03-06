@@ -453,6 +453,12 @@ namespace AIToolkit.LLM
             {
                 Status = SystemStatus.Busy;
                 StreamingTextProgress = string.Empty;
+                if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
+                {
+                    StreamingTextProgress = Instruct.ThinkingStart + Instruct.ThinkingForcedThought;
+                    RaiseOnInferenceStreamed(StreamingTextProgress);
+                }
+
                 GenerationInput genparams = Sampler.GetCopy();
                 if (ForceTemperature >= 0)
                     genparams.Temperature = ForceTemperature;
@@ -478,6 +484,8 @@ namespace AIToolkit.LLM
 
             var inputText = systemMessage;
             StreamingTextProgress = string.Empty;
+            if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
+                StreamingTextProgress = Instruct.ThinkingStart + Instruct.ThinkingForcedThought;
             GenerationInput genparams = Sampler.GetCopy();
             _LastGeneratedPrompt = await GenerateFullPrompt(AuthorRole.System, inputText);
             if (ForceTemperature >= 0)
@@ -534,6 +542,11 @@ namespace AIToolkit.LLM
             pluginmessage = pluginmessage.Trim('\n');
 
             StreamingTextProgress = string.Empty;
+            if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
+            {
+                StreamingTextProgress = Instruct.ThinkingStart + Instruct.ThinkingForcedThought;
+                RaiseOnInferenceStreamed(StreamingTextProgress);
+            }
             GenerationInput genparams = Sampler.GetCopy();
             _LastGeneratedPrompt = await GenerateFullPrompt(MsgSender, inputText, pluginmessage);
             if (ForceTemperature >= 0)
