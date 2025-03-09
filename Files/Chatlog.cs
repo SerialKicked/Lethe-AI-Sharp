@@ -101,10 +101,15 @@ namespace AIToolkit.Files
             var llmparams = LLMSystem.Sampler.GetCopy();
             llmparams.Prompt = res;
             llmparams.Max_length = 350;
-            llmparams.Temperature = 0.4f;
+            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+                llmparams.Max_length += 1024;
+            if (llmparams.Temperature > 0.5f)
+                llmparams.Temperature = 0.5f;
             llmparams.Max_context_length = LLMSystem.MaxContextLength;
             var finalstr = await LLMSystem.SimpleQuery(llmparams);
             // remove any " character from the finalstr
+            if (LLMSystem.Instruct.ThinkingStart != string.Empty)
+                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
             finalstr = finalstr.Replace("\"", "").Trim();
             LLMSystem.NamesInPromptOverride = null;
             return finalstr;
@@ -133,18 +138,24 @@ namespace AIToolkit.Files
             var repstarttokens = LLMSystem.GetTokenCount(repstart);
 
             var availtokens = LLMSystem.MaxContextLength - systokens - tasktokens - repstarttokens - ResponseLen;
+            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+                availtokens -= 1024;
 
             var docs = GetRawDialogs(availtokens, false, LightDialogs);
             var fullprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, sysprompt + docs) + task + repstart;
 
             var llmparams = LLMSystem.Sampler.GetCopy();
             llmparams.Prompt = fullprompt;
-            llmparams.Max_length = 1024;
+            llmparams.Max_length = string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart) ? ResponseLen : ResponseLen + 1024;
             llmparams.Max_context_length = LLMSystem.MaxContextLength;
             llmparams.Grammar = string.Empty;
             if (llmparams.Temperature > 0.5f)
                 llmparams.Temperature = 0.5f;
             var finalstr = await LLMSystem.SimpleQuery(llmparams);
+            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+            {
+                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+            }
             LLMSystem.NamesInPromptOverride = null;
             return finalstr.CleanupAndTrim();
         }
@@ -403,7 +414,17 @@ namespace AIToolkit.Files
         {
             if (Sessions.Count == 0)
                 Sessions.Add(new ChatSession());
-            var single = new SingleMessage(role, DateTime.Now, msg, bot.UniqueName, user.UniqueName);
+
+            // Remove thinking block if any
+            var stringfix = msg;
+            if (!string.IsNullOrEmpty(LLMSystem.Instruct.ThinkingStart) && stringfix.Contains(LLMSystem.Instruct.ThinkingStart) && stringfix.Contains(LLMSystem.Instruct.ThinkingEnd))
+            {
+                // remove everything before the thinking end tag (included)
+                var idx = stringfix.IndexOf(LLMSystem.Instruct.ThinkingEnd);
+                stringfix = stringfix.Substring(idx + LLMSystem.Instruct.ThinkingEnd.Length).CleanupAndTrim();
+            }
+
+            var single = new SingleMessage(role, DateTime.Now, stringfix, bot.UniqueName, user.UniqueName);
             CurrentSession.Messages.Add(single);
             RaiseOnMessageAdded(single);
             return single;

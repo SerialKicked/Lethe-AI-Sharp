@@ -20,6 +20,7 @@ namespace AIToolkit.Files
             "ThinkingStart", "ThinkingEnd",
             "ThinkingForcedThought",
             "PrefillThinking",
+            "ForceRAGToThinkingPrompt",
             "AddNamesToPrompt",
             "NewLinesBetweenMessages",
             "StopStrings"
@@ -41,6 +42,7 @@ namespace AIToolkit.Files
         public string ThinkingEnd { get; set; } = string.Empty;
         public string ThinkingForcedThought { get; set; } = string.Empty;
         public bool PrefillThinking { get; set; } = false;
+        public bool ForceRAGToThinkingPrompt { get; set; } = false;
 
         [JsonIgnore] private bool RealAddNameToPrompt => LLMSystem.NamesInPromptOverride ?? AddNamesToPrompt;
 
@@ -49,6 +51,12 @@ namespace AIToolkit.Files
             var res = LLMSystem.ReplaceMacros(BotStart);
             if (RealAddNameToPrompt)
                 res += bot.Name + ":";
+            if (PrefillThinking)
+            {
+                res += ThinkingStart;
+                if (!string.IsNullOrWhiteSpace(ThinkingForcedThought))
+                    res += PrefillThinking;
+            }
             return res;
         }
 

@@ -65,6 +65,51 @@ namespace AIToolkit
         }
 
         /// <summary>
+        /// Removes emphasis markers (*, **, ") around single words in text, and a bunch of other features to make R1 creative output look normal.
+        /// </summary>
+        /// <param name="text">The text to process</param>
+        /// <returns>Text with single word emphasis markers removed</returns>
+        public static string FixDeepseekRoleplayFormatting(this string text)
+        {
+            var input = text;
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            // Process tokens between ** ** (double asterisks)
+            string pattern = @"\*\*([^\s*]+?)(\p{P}?)\*\*";
+            input = Regex.Replace(input, pattern, "$1$2");
+
+            // Process tokens between * * (single asterisks)
+            pattern = @"\*([^\s*]+?)(\p{P}?)\*";
+            input = Regex.Replace(input, pattern, "$1$2");
+
+
+            // Process tokens between " " (quotes) - but only for single words
+            pattern = @"""([^\s""]+?)(\p{P}?)""";
+            input = Regex.Replace(input, pattern, "$1$2");
+
+            // And now, remove all " (quotes) now
+            input = input.Replace("\"", "");
+            input = input.Replace("“", "");
+            input = input.Replace("”", "");
+            input = input.Replace("**", "");
+
+            return input;
+        }
+
+        public static string RemoveThinkingBlocks(this string text, string thinkstart, string thinkend)
+        {
+            var workstring = text;
+            if (workstring.Contains(LLMSystem.Instruct.ThinkingEnd))
+            {
+                // remove everything before the thinking end tag (included)
+                var idx = workstring.IndexOf(LLMSystem.Instruct.ThinkingEnd);
+                workstring = workstring.Substring(idx + LLMSystem.Instruct.ThinkingEnd.Length).CleanupAndTrim();
+            }
+            return workstring;
+        }
+
+        /// <summary>
         /// Tries to fix missing asterisks in the text
         /// </summary>
         /// <param name="text"></param>

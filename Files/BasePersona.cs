@@ -122,7 +122,6 @@ namespace AIToolkit.Files
                 return;
             var f = path + UniqueName;
             if (File.Exists(f + ".json")) File.Delete(f + ".json");
-            if (File.Exists(f + ".vec")) File.Delete(f + ".vec");
         }
 
         public WorldEntry? GetWIEntryByGUID(Guid id)

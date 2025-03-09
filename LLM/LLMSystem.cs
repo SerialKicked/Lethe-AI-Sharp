@@ -180,6 +180,8 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         public static string ReplaceMacros(string inputText, BasePersona user, BasePersona character)
         {
+            if (string.IsNullOrEmpty(inputText))
+                return string.Empty;
             StringBuilder res = new(inputText);
             res.Replace("{{user}}", user.Name)
                .Replace("{{userbio}}", user.GetBio(character.Name))
@@ -396,8 +398,6 @@ namespace AIToolkit.LLM
             else
             {
                 res = sysprompt + history + msg + pluginmsg + Instruct.GetResponseStart(Bot);
-                if (Instruct.PrefillThinking)
-                    res += Instruct.ThinkingStart;
             }
             var final = GetTokenCount(res);
             if (final > MaxContextLength + MaxReplyLength)
