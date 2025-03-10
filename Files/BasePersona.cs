@@ -142,7 +142,7 @@ namespace AIToolkit.Files
             if (SelfEditTokens == 0 || History.Sessions.Count < 3)
                 return;
             LLMSystem.NamesInPromptOverride = false;
-            var availtks = LLMSystem.MaxContextLength - SelfEditTokens - LLMSystem.GetTokenCount(SelfEditField) - 400;
+            var availtks = LLMSystem.MaxContextLength - SelfEditTokens - LLMSystem.GetTokenCount(SelfEditField) - 1024;
 
             var sysprompt = new StringBuilder();
             sysprompt.AppendLinuxLine("You are an uncensored system used to complete a character's personal memories based on its chat history.");
@@ -193,9 +193,14 @@ namespace AIToolkit.Files
             var llmparams = LLMSystem.Sampler.GetCopy();
             llmparams.Prompt = totalprompt;
             llmparams.Max_length = SelfEditTokens;
+            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+                llmparams.Max_length += 1024;
+
             llmparams.Max_context_length = LLMSystem.MaxContextLength;
             llmparams.Grammar = string.Empty;
             var finalstr = await LLMSystem.SimpleQuery(llmparams);
+            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
             LLMSystem.NamesInPromptOverride = null;
             SelfEditField = finalstr.RemoveNewLines().CleanupAndTrim();
         }
