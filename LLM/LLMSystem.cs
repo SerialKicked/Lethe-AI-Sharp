@@ -419,7 +419,7 @@ namespace AIToolkit.LLM
         {
             if (Status == SystemStatus.Busy)
                 return;
-            await StartGeneration(AuthorRole.User, "");
+            await StartGeneration(AuthorRole.User, string.Empty);
         }
 
         /// <summary>

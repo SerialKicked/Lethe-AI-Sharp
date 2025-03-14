@@ -11,6 +11,16 @@ using System.Globalization;
 
 namespace AIToolkit
 {
+    using System;
+    using System.Text;
+
+    public class StringFix(bool removeAllBoldedText, bool fixQuotes, bool removeSingleWorldEmphasis, bool removeAllQuotes)
+    {
+        public bool RemoveAllBoldedText = removeAllBoldedText;
+        public bool RemoveAllQuotes = removeAllQuotes;
+        public bool FixQuotes = fixQuotes;
+        public bool RemoveSingleWorldEmphasis = removeSingleWorldEmphasis;
+    }
 
     public static class StringExtensions
     {
@@ -64,37 +74,54 @@ namespace AIToolkit
             return result.Replace("  ", " ");
         }
 
-        /// <summary>
-        /// Removes emphasis markers (*, **, ") around single words in text, and a bunch of other features to make R1 creative output look normal.
-        /// </summary>
-        /// <param name="text">The text to process</param>
-        /// <returns>Text with single word emphasis markers removed</returns>
-        public static string FixDeepseekRoleplayFormatting(this string text)
+        public static string FixRoleplayString(this string input, StringFix fix)
         {
-            var input = text;
             if (string.IsNullOrEmpty(input))
                 return input;
+            var workstring = input;
+            // Turn weird quotes into normal quotes
+            workstring = workstring.Replace("“", "\"");
+            workstring = workstring.Replace("”", "\"");
+            workstring = workstring.Replace("—", " - ");
+            if (fix.RemoveAllBoldedText)
+            {
+                // Remove all bolded text
+                workstring = workstring.Replace("**", "");
+            }
+            if (fix.RemoveAllQuotes)
+            {
+                workstring = workstring.Replace("\"", "");
+            }
 
-            // Process tokens between ** ** (double asterisks)
-            string pattern = @"\*\*([^\s*]+?)(\p{P}?)\*\*";
-            input = Regex.Replace(input, pattern, "$1$2");
+            if (fix.RemoveSingleWorldEmphasis)
+            {
+                // Process tokens between ** ** (double asterisks)
+                string pattern = @"\*\*([^\s*]+?)(\p{P}?)\*\*";
+                workstring = Regex.Replace(workstring, pattern, "$1$2");
 
-            // Process tokens between * * (single asterisks)
-            pattern = @"\*([^\s*]+?)(\p{P}?)\*";
-            input = Regex.Replace(input, pattern, "$1$2");
+                // Process tokens between * * (single asterisks)
+                pattern = @"\*([^\s*]+?)(\p{P}?)\*";
+                workstring = Regex.Replace(workstring, pattern, "$1$2");
+            }
 
+            if (fix.FixQuotes && !fix.RemoveAllQuotes)
+            {
+                // Remove asterisks if they are between quotes
+                workstring = Regex.Replace(workstring,
+                    "\"([^\"]*)\"",
+                    match => "\"" + match.Groups[1].Value.Replace("*", "") + "\"");
 
-            // Process tokens between " " (quotes) - but only for single words
-            pattern = @"""([^\s""]+?)(\p{P}?)""";
-            input = Regex.Replace(input, pattern, "$1$2");
-
-            // And now, remove all " (quotes) now
-            input = input.Replace("\"", "");
-            input = input.Replace("“", "");
-            input = input.Replace("”", "");
-            input = input.Replace("**", "");
-
-            return input;
+                // Remove asterisks just before and after quotes
+                workstring = workstring.Replace(" **\"", " \"");
+                workstring = workstring.Replace("\"** ", "\" ");
+                workstring = workstring.Replace("\n**\"", "\n\"");
+                workstring = workstring.Replace("\"**\n", "\"\n");
+                workstring = workstring.Replace(" *\"", " \"");
+                workstring = workstring.Replace("\"* ", "\" ");
+                workstring = workstring.Replace("\n*\"", "\n\"");
+                workstring = workstring.Replace("\"*\n", "\"\n");
+            }
+            return workstring;
         }
 
         public static string RemoveThinkingBlocks(this string text, string thinkstart, string thinkend)
@@ -104,7 +131,7 @@ namespace AIToolkit
             {
                 // remove everything before the thinking end tag (included)
                 var idx = workstring.IndexOf(LLMSystem.Instruct.ThinkingEnd);
-                workstring = workstring.Substring(idx + LLMSystem.Instruct.ThinkingEnd.Length).CleanupAndTrim();
+                workstring = workstring[(idx + LLMSystem.Instruct.ThinkingEnd.Length)..].CleanupAndTrim();
             }
             return workstring;
         }
