@@ -14,14 +14,15 @@ namespace AIToolkit
     using System;
     using System.Text;
 
-    public class StringFix(bool removeAllBoldedText, bool fixQuotes, bool removeSingleWorldEmphasis, bool removeAllQuotes, bool removeItalic, float RemoveItalicRatio)
+    public class StringFix(bool removeAllBoldedText, bool fixQuotes, bool removeSingleWorldEmphasis, bool removeAllQuotes, bool removeItalic, float removeItalicRatio, int removeItalicMaxWords)
     {
         public bool RemoveAllBoldedText = removeAllBoldedText;
         public bool RemoveAllQuotes = removeAllQuotes;
         public bool FixQuotes = fixQuotes;
         public bool RemoveSingleWorldEmphasis = removeSingleWorldEmphasis;
         public bool RemoveItalic = removeItalic;
-        public float RemoveItalicRatio = RemoveItalicRatio;
+        public float RemoveItalicRatio = removeItalicRatio;
+        public int RemoveItalicMaxWords = removeItalicMaxWords;
     }
 
     public static class StringExtensions
@@ -132,12 +133,18 @@ namespace AIToolkit
 
             if (fix.RemoveItalic && !streamed)
             {
+                // Doesn't work during streaming so only done at the end.
                 // find all occurences of *some text* and remove them all (asterisks included) according to the ratio
                 var matches = Regex.Matches(workstring, @"\*[^*]+\*");
                 foreach (Match match in matches)
                 {
                     if (LLMSystem.RNG.NextDouble() < fix.RemoveItalicRatio)
-                        workstring = workstring.Replace(match.Value, "");
+                    {
+                        // count words in the match
+                        var words = match.Value.Split(' ');
+                        if (words.Length <= fix.RemoveItalicMaxWords)
+                            workstring = workstring.Replace(match.Value, "");
+                    }
                 }
             }
             workstring = workstring.Replace("  ", " ").Trim();
