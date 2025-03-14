@@ -14,12 +14,14 @@ namespace AIToolkit
     using System;
     using System.Text;
 
-    public class StringFix(bool removeAllBoldedText, bool fixQuotes, bool removeSingleWorldEmphasis, bool removeAllQuotes)
+    public class StringFix(bool removeAllBoldedText, bool fixQuotes, bool removeSingleWorldEmphasis, bool removeAllQuotes, bool removeItalic, float RemoveItalicRatio)
     {
         public bool RemoveAllBoldedText = removeAllBoldedText;
         public bool RemoveAllQuotes = removeAllQuotes;
         public bool FixQuotes = fixQuotes;
         public bool RemoveSingleWorldEmphasis = removeSingleWorldEmphasis;
+        public bool RemoveItalic = removeItalic;
+        public float RemoveItalicRatio = RemoveItalicRatio;
     }
 
     public static class StringExtensions
@@ -74,7 +76,13 @@ namespace AIToolkit
             return result.Replace("  ", " ");
         }
 
-        public static string FixRoleplayString(this string input, StringFix fix)
+        /// <summary>
+        /// Advanced string filtering, generally used for roleplay text
+        /// </summary>
+        /// <param name="input"></param>
+        /// <param name="fix"></param>
+        /// <returns></returns>
+        public static string FixRoleplayString(this string input, StringFix fix, bool streamed = false)
         {
             if (string.IsNullOrEmpty(input))
                 return input;
@@ -121,6 +129,18 @@ namespace AIToolkit
                 workstring = workstring.Replace("\n*\"", "\n\"");
                 workstring = workstring.Replace("\"*\n", "\"\n");
             }
+
+            if (fix.RemoveItalic && !streamed)
+            {
+                // find all occurences of *some text* and remove them all (asterisks included) according to the ratio
+                var matches = Regex.Matches(workstring, @"\*[^*]+\*");
+                foreach (Match match in matches)
+                {
+                    if (LLMSystem.RNG.NextDouble() < fix.RemoveItalicRatio)
+                        workstring = workstring.Replace(match.Value, "");
+                }
+            }
+            workstring = workstring.Replace("  ", " ").Trim();
             return workstring;
         }
 
@@ -181,6 +201,20 @@ namespace AIToolkit
         }
 
         /// <summary>
+        /// Remove the last unfinished sentence (no period) from the text
+        /// </summary>
+        /// <param name="text"></param>
+        /// <returns></returns>
+        public static string RemoveUnfinishedSentence(this string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return text;
+            var workstring = text.Trim();
+            workstring = workstring[..workstring.LastIndexOf('.')] + ".";
+            return workstring;
+        }
+
+        /// <summary>
         /// Replaces Discord emojis with their text representation
         /// </summary>
         /// <param name="input"></param>
@@ -191,6 +225,11 @@ namespace AIToolkit
             return Regex.Replace(input, pattern, ":$1:");
         }
 
+        /// <summary>
+        /// Turn a date into a long string that is easily readable by a human
+        /// </summary>
+        /// <param name="date"></param>
+        /// <returns></returns>
         public static string DateToHumanString(DateTime date)
         {
             static string GetDaySuffix(int day)

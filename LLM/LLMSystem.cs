@@ -43,6 +43,7 @@ namespace AIToolkit.LLM
         public static string ScenarioOverride { get; set; } = string.Empty;
         public static bool? NamesInPromptOverride { get; set; } = null;
         public static bool MarkdownMemoryFormating { get; set; } = false;
+        public static bool StopGenerationOnFirstParagraph { get; set; } = false;
         public static bool WorldInfo { get; set; } = true;
         public static SessionHandling SessionHandling { get; set; } = SessionHandling.FitAll;
 

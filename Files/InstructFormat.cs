@@ -162,6 +162,8 @@ namespace AIToolkit.Files
             if (!string.IsNullOrEmpty(StopSequence))
                 res.Add(StopSequence);
             res.AddRange(StopStrings);
+            if (LLMSystem.StopGenerationOnFirstParagraph)
+                res.Add(LLMSystem.NewLine);
 
             // Remove duplicates from the list
             res = res.Distinct().ToList();
