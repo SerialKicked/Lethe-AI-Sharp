@@ -134,7 +134,7 @@ namespace AIToolkit.LLM
         private static void Client_StreamingMessageReceived(object? sender, TextStreamingEvenArg e)
         {
             // "null", "stop", "length"
-            if (e.Data.finish_reason != "null")
+            if (e.Data.finish_reason != "null" && e.Data.finish_reason != null)
             {
                 if (!string.IsNullOrEmpty(e.Data.token))
                     StreamingTextProgress += e.Data.token;
