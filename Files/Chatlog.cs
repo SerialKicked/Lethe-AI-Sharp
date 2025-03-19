@@ -73,8 +73,8 @@ namespace AIToolkit.Files
         public async Task<string> GenerateNewSummary()
         {
          
-            var query = "Write a summary of the exchange between {{user}} and {{char}} shown above. The summary must be written from {{char}}'s perspective. Do not introduce the characters. Do not add a title, just write the summary directly.";
-            if (Messages.Count > 50)
+            var query = "Identify the most important elements in the the exchange between {{user}} and {{char}} shown above and write a summary of this exchange. The summary must be written from {{char}}'s perspective. Do not introduce the characters. Do not add a title, just write the summary directly.";
+            if (Messages.Count > 30)
             {
                 query += " The summary should be 2 to 4 paragraphs long.";
             }
