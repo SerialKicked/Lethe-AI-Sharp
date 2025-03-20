@@ -156,7 +156,7 @@ namespace AIToolkit.Files
 
             var sizeeval = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
             availtks -= LLMSystem.GetTokenCount(sizeeval);
-            var maxcount = 30;
+            var maxcount = 50;
             var entries = new List<string>();
             for (int i = History.Sessions.Count - 2; i >= 0; i--)
             {
@@ -202,7 +202,7 @@ namespace AIToolkit.Files
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
             LLMSystem.NamesInPromptOverride = null;
-            SelfEditField = finalstr.RemoveNewLines().CleanupAndTrim();
+            SelfEditField = finalstr.RemoveUnfinishedSentence().RemoveNewLines().CleanupAndTrim();
         }
     }
 }

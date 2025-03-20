@@ -104,13 +104,23 @@ namespace AIToolkit
 
             if (fix.RemoveSingleWorldEmphasis)
             {
-                // Process tokens between ** ** (double asterisks)
-                string pattern = @"\*\*([^\s*]+?)(\p{P}?)\*\*";
-                workstring = Regex.Replace(workstring, pattern, "$1$2");
+                List<string> initlist = ["Grins", "Grin", "Mock-gasp", "Gasp", "Wink", "Winks", "Yawn", "Laughs", "Grins", "Winks", "Laughs", "Grinning", "Winking", "Laughing", "Smirks"];
+                List<string> excludedWords = [.. initlist];
+                foreach (var item in initlist)
+                {
+                    excludedWords.Add(item + ".");
+                    excludedWords.Add(item + ",");
+                }
 
-                // Process tokens between * * (single asterisks)
-                pattern = @"\*([^\s*]+?)(\p{P}?)\*";
-                workstring = Regex.Replace(workstring, pattern, "$1$2");
+                string excludedPattern = string.Join("|", excludedWords.Select(Regex.Escape));
+
+                // Process tokens between ** ** (double asterisks) - excluding specific words
+                string pattern = $@"\*\*(?!({excludedPattern})\b)([^\s*]+?)(\p{{P}}?)\*\*";
+                workstring = Regex.Replace(workstring, pattern, "$2$3", RegexOptions.IgnoreCase);
+
+                // Process tokens between * * (single asterisks) - excluding specific words
+                pattern = $@"\*(?!({excludedPattern})\b)([^\s*]+?)(\p{{P}}?)\*";
+                workstring = Regex.Replace(workstring, pattern, "$2$3", RegexOptions.IgnoreCase);
             }
 
             if (fix.FixQuotes && !fix.RemoveAllQuotes)
@@ -147,7 +157,7 @@ namespace AIToolkit
                     }
                 }
             }
-            workstring = workstring.Replace("  ", " ").Trim();
+            workstring = workstring.Replace("... ...", "... ").Replace("  ", " ").Trim();
             return workstring;
         }
 
