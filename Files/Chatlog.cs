@@ -9,7 +9,7 @@ namespace AIToolkit.Files
 {
     public enum SessionHandling { CurrentOnly, FitAll }
 
-    public class SingleMessage(AuthorRole role, DateTime date, string mess, string chara, string user)
+    public class SingleMessage(AuthorRole role, DateTime date, string mess, string chara, string user, bool hidden = false)
     {
         [JsonIgnore] public Guid Guid = Guid.NewGuid();
         public AuthorRole Role = role;
@@ -17,6 +17,7 @@ namespace AIToolkit.Files
         public DateTime Date = date;
         public string CharID = chara;
         public string UserID = user;
+        public bool Hidden = hidden;
         [JsonIgnore] public BasePersona User => 
             !string.IsNullOrEmpty(UserID) && LLMSystem.LoadedPersonas.TryGetValue(UserID, out var u) ? u : LLMSystem.User;
         [JsonIgnore] public BasePersona Bot => 
@@ -52,21 +53,21 @@ namespace AIToolkit.Files
         public async Task<string[]> GenerateSentiment()
         {
             var query = "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of sentiments or moods {{char}} would associate with this chat. The list must be between 1 and 5 words long." + LLMSystem.NewLine + "Example: happiness, playfulness, surprise";
-            var res = await GenerateTaskRes(query, 512, true);
+            var res = await GenerateTaskRes(query, 512, true, false);
             return res.Split(',');
         }
 
         public async Task<string[]> GenerateKeywords()
         {
             var query = "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of keywords {{char}} would associate with this chat. The list must be between 1 and 5 keywords long.";
-            var res = await GenerateTaskRes(query, 512, true);
+            var res = await GenerateTaskRes(query, 512, true, false);
             return res.Split(',');
         }
 
         public async Task<string> GenerateGoals()
         {
             var query = "Based on the exchange between {{user}} and {{char}} shown above, write a list of the plans they both setup for the near future. This list should contain between 0 and 4 items. Each item should be summarized in a single sentence. If there's no items, don't answer with anything. Make sure those plans aren't already resolved within the span of the dialog." + LLMSystem.NewLine + "Example:" + LLMSystem.NewLine + "- They promised to eat together tomorrow." + LLMSystem.NewLine + "- {{user}} will watch the movie recommanded by {{char}}.";
-            var res = await GenerateTaskRes(query, 1024, true);
+            var res = await GenerateTaskRes(query, 1024, true, false);
             return res;
         }
 
@@ -82,7 +83,7 @@ namespace AIToolkit.Files
             {
                 query += " The summary should be 1 to 2 paragraphs long.";
             }
-            return await GenerateTaskRes(query, 1024, true);
+            return await GenerateTaskRes(query, 1024, true, false);
         }
 
         public static async Task<string> GenerateNewTitle(string sum)
@@ -115,7 +116,7 @@ namespace AIToolkit.Files
             return finalstr;
         }
 
-        public async Task<string> GenerateTaskRes(string RequestedTask, int ResponseLen, bool LightDialogs = false)
+        public async Task<string> GenerateTaskRes(string requestedTask, int responseLen, bool lightDialogs = false, bool showHidden = false)
         {
             LLMSystem.NamesInPromptOverride = false;
             var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMSystem.NewLine +
@@ -131,22 +132,22 @@ namespace AIToolkit.Files
             var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, sysprompt);
             var systokens = LLMSystem.GetTokenCount(msg) + 1;
 
-            var task = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, RequestedTask);
+            var task = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, requestedTask);
             var tasktokens = LLMSystem.GetTokenCount(task);
 
             var repstart = LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
             var repstarttokens = LLMSystem.GetTokenCount(repstart);
 
-            var availtokens = LLMSystem.MaxContextLength - systokens - tasktokens - repstarttokens - ResponseLen;
+            var availtokens = LLMSystem.MaxContextLength - systokens - tasktokens - repstarttokens - responseLen;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 availtokens -= 1024;
 
-            var docs = GetRawDialogs(availtokens, false, LightDialogs);
+            var docs = GetRawDialogs(availtokens, false, lightDialogs, showHidden);
             var fullprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, sysprompt + docs) + task + repstart;
 
             var llmparams = LLMSystem.Sampler.GetCopy();
             llmparams.Prompt = fullprompt;
-            llmparams.Max_length = string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart) ? ResponseLen : ResponseLen + 1024;
+            llmparams.Max_length = string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart) ? responseLen : responseLen + 1024;
             llmparams.Max_context_length = LLMSystem.MaxContextLength;
             llmparams.Grammar = string.Empty;
             if (llmparams.Temperature > 0.5f)
@@ -160,7 +161,6 @@ namespace AIToolkit.Files
             return finalstr.CleanupAndTrim();
         }
 
-
         public async Task GenerateEmbeds()
         {
             if (!RAGSystem.Enabled)
@@ -169,7 +169,7 @@ namespace AIToolkit.Files
             EmbedSummary = await RAGSystem.EmbeddingText(Summary);
         }
 
-        public string GetRawDialogs(int maxTokens, bool ignoresystem, bool lightDialogs = false)
+        public string GetRawDialogs(int maxTokens, bool ignoresystem, bool lightDialogs = false, bool showHidden = false)
         {
             var sb = new StringBuilder();
             var totaltks = maxTokens;
@@ -177,6 +177,8 @@ namespace AIToolkit.Files
             for (int i = Messages.Count - 1; i >= 0; i--)
             {
                 var msg = Messages[i];
+                if (msg.Hidden && !showHidden)
+                    continue;
                 var text = string.Empty;
                 switch (msg.Role)
                 {
@@ -201,42 +203,6 @@ namespace AIToolkit.Files
                 if (totaltks <= 0)
                     return sb.ToString();
                 sb.Insert(0, text);
-            }
-            return sb.ToString();
-        }
-
-        public string GetFormatedDialogs(int maxTokens, ref int currentDepth, Dictionary<int, string>? memories)
-        {
-            var sb = new StringBuilder();
-            var totaltks = maxTokens;
-            var mems = memories ?? [];
-            var entrydepth = currentDepth;
-
-            void InsertMemories()
-            {
-                if (!mems.TryGetValue(entrydepth, out string? value) || string.IsNullOrEmpty(value))
-                    return;
-                var formattedmemory = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, value);
-                var tksmem = LLMSystem.GetTokenCount(formattedmemory);
-                if (tksmem <= totaltks)
-                {
-                    totaltks -= tksmem;
-                    sb.Insert(0, formattedmemory);
-                }
-            }
-
-            for (int i = Messages.Count - 1; i >= 0; i--)
-            {
-                var msg = Messages[i];
-                var res = LLMSystem.Instruct.FormatSingleMessage(msg);
-                var tks = LLMSystem.GetTokenCount(res);
-                totaltks -= tks;
-                if (totaltks <= 0)
-                    return sb.ToString();
-                sb.Insert(0, res);
-                InsertMemories();
-                entrydepth++;
-                currentDepth = entrydepth;
             }
             return sb.ToString();
         }
