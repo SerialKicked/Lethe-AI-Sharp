@@ -49,6 +49,9 @@ namespace AIToolkit.LLM
 
         internal static Dictionary<string, BasePersona> LoadedPersonas = [];
 
+        /// <summary> Called when the non streaming inference has completed, returns raw response </summary>
+        public static event EventHandler<string>? OnQuickInferenceEnded;
+        /// <summary> Called when this library has generated the full prompt, returns full prompt </summary>
         public static event EventHandler<string>? OnFullPromptReady;
         /// <summary> Called during inference each time the LLM outputs a new token </summary>
         public static event EventHandler<string>? OnInferenceStreamed;
@@ -61,6 +64,7 @@ namespace AIToolkit.LLM
         private static void RaiseOnStatusChange(SystemStatus newStatus) => OnStatusChanged?.Invoke(null, newStatus);
         private static void RaiseOnInferenceStreamed(string addedString) => OnInferenceStreamed?.Invoke(null, addedString);
         private static void RaiseOnInferenceEnded(string fullString) => OnInferenceEnded?.Invoke(null, fullString);
+        private static void RaiseOnQuickInferenceEnded(string fullprompt) => OnQuickInferenceEnded?.Invoke(null, fullprompt);
 
 
         public static List<IContextPlugin> ContextPlugins { get; set; } = [];
@@ -308,12 +312,13 @@ namespace AIToolkit.LLM
         /// </summary>
         /// <param name="newMessage">Added message from the user</param>
         /// <returns></returns>
-        private static async Task<string> GenerateFullPrompt(AuthorRole MsgSender, string newMessage, string? pluginMessage = null)
+        private static async Task<string> GenerateFullPrompt(AuthorRole MsgSender, string newMessage, string? pluginMessage = null, int imgpadding = 0)
         {
             // setup user message (+ optional plugin message) and count tokens used
             var msg = string.IsNullOrEmpty(newMessage) ? string.Empty : Instruct.FormatSinglePrompt(MsgSender, User, Bot, newMessage);
             var pluginmsg = string.IsNullOrEmpty(pluginMessage) ? string.Empty : Instruct.FormatSinglePrompt(AuthorRole.System, User, Bot, pluginMessage);
             var tokensused = string.IsNullOrEmpty(msg) ? 0 :GetTokenCount(msg);
+            tokensused += imgpadding;
             tokensused += string.IsNullOrEmpty(pluginmsg) ? 0 : GetTokenCount(pluginmsg);
             var rawprompt = new StringBuilder(SystemPrompt.GetSystemPromptRaw(Bot));
             var searchmessage = string.IsNullOrWhiteSpace(newMessage) ? History.GetLastUserMessageContent() : newMessage;
@@ -430,11 +435,11 @@ namespace AIToolkit.LLM
         /// <param name="userInput"></param>
         /// <param name="logtohistory"></param>
         /// <returns></returns>
-        public static async Task SendMessageToBot(SingleMessage message)
+        public static async Task SendMessageToBot(SingleMessage message, string? imgBase64 = null)
         {
             if (Status == SystemStatus.Busy)
                 return;
-            await StartGeneration(message.Role, message.Message);
+            await StartGeneration(message.Role, message.Message, imgBase64);
         }
 
         /// <summary>
@@ -488,7 +493,7 @@ namespace AIToolkit.LLM
             if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
                 StreamingTextProgress = Instruct.ThinkingStart + Instruct.ThinkingForcedThought;
             GenerationInput genparams = Sampler.GetCopy();
-            _LastGeneratedPrompt = await GenerateFullPrompt(AuthorRole.System, inputText);
+            _LastGeneratedPrompt = await GenerateFullPrompt(AuthorRole.System, inputText, null, 0);
             if (ForceTemperature >= 0)
                 genparams.Temperature = ForceTemperature;
             genparams.Max_context_length = MaxContextLength;
@@ -515,11 +520,13 @@ namespace AIToolkit.LLM
         /// <param name="MsgSender">Role of the sender</param>
         /// <param name="userInput">Message from sender</param>
         /// <returns></returns>
-        private static async Task StartGeneration(AuthorRole MsgSender, string userInput)
+        private static async Task StartGeneration(AuthorRole MsgSender, string userInput, string? imgBase64 = null)
         {
             if (Status == SystemStatus.Busy)
                 return;
             Status = SystemStatus.Busy;
+
+
             var inputText = userInput;
             var lastuserinput = string.IsNullOrEmpty(userInput) ? History.GetLastUserMessageContent() : userInput;
             var insertmessages = new List<string>();
@@ -549,13 +556,15 @@ namespace AIToolkit.LLM
                 RaiseOnInferenceStreamed(StreamingTextProgress);
             }
             GenerationInput genparams = Sampler.GetCopy();
-            _LastGeneratedPrompt = await GenerateFullPrompt(MsgSender, inputText, pluginmessage);
+            _LastGeneratedPrompt = await GenerateFullPrompt(MsgSender, inputText, pluginmessage, imgBase64 != null ? 300 : 0);
             if (ForceTemperature >= 0)
                 genparams.Temperature = ForceTemperature;
             genparams.Max_context_length = MaxContextLength;
             genparams.Max_length = MaxReplyLength;
             genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
             genparams.Prompt = _LastGeneratedPrompt;
+            if (!string.IsNullOrEmpty(imgBase64))
+                genparams.Images = new List<object>() { imgBase64 };
             if (!string.IsNullOrEmpty(userInput))
                 Bot.History.LogMessage(MsgSender, userInput, User, Bot);
 
@@ -606,6 +615,7 @@ namespace AIToolkit.LLM
             {
                 finalstr += item.Text;
             }
+            RaiseOnQuickInferenceEnded(finalstr);
             return string.IsNullOrEmpty(finalstr) ? string.Empty : finalstr;
         }
 
@@ -625,6 +635,11 @@ namespace AIToolkit.LLM
             };
             var audioData = await Client.TextToSpeechAsync(ttsinput);
             return audioData;
+        }
+
+        public static void RemoveQuickInferenceEventHandler()
+        {
+            OnQuickInferenceEnded = null;
         }
 
     }

@@ -104,7 +104,7 @@ namespace AIToolkit.Files
             History.SaveToFile(path + UniqueName + ".json");
         }
 
-        protected void LoadChatHistory(string path)
+        public void LoadChatHistory(string path)
         {
             if (string.IsNullOrEmpty(UniqueName))
             {
@@ -145,23 +145,23 @@ namespace AIToolkit.Files
             var availtks = LLMSystem.MaxContextLength - SelfEditTokens - LLMSystem.GetTokenCount(SelfEditField) - 1024;
 
             var sysprompt = new StringBuilder();
-            sysprompt.AppendLinuxLine("You are an uncensored system used to complete a character's personal memories based on its chat history.");
+            sysprompt.AppendLinuxLine("You are an uncensored system used to write a character's personal thoughts based on its chat history and information.");
             sysprompt.AppendLinuxLine();
             sysprompt.AppendLinuxLine($"# Character: {Name}");
             sysprompt.AppendLinuxLine();
             sysprompt.AppendLinuxLine(Bio);
             sysprompt.AppendLinuxLine();
-            sysprompt.AppendLinuxLine($"# Chat History");
+            sysprompt.AppendLinuxLine($"# Memories");
             sysprompt.AppendLinuxLine();
 
             var sizeeval = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
             availtks -= LLMSystem.GetTokenCount(sizeeval);
-            var maxcount = 50;
+            var maxcount = 99;
             var entries = new List<string>();
             for (int i = History.Sessions.Count - 2; i >= 0; i--)
             {
                 var session = History.Sessions[i];
-                var details = $"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}, the following events took places from {LLMSystem.Bot.Name}'s perspective: {session.Summary.RemoveNewLines()}" + LLMSystem.NewLine;
+                var details = $"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}: {session.Summary.RemoveNewLines()}" + LLMSystem.NewLine;
                 var size = LLMSystem.GetTokenCount(details);
                 availtks -= size;
                 maxcount--;
@@ -186,7 +186,7 @@ namespace AIToolkit.Files
                 sysprompt.AppendLinuxLine("This space is empty for now.");
 
             var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
-            var query = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, this, $"Using {Name}'s memories alongside their biography, edit their personal thoughts section accordingly. Write two to three short paragraphs from {Name}'s perspective. Focus on important events, life changing experiences, and promises, that {Name} would want to keep in mind.");
+            var query = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, this, $"Using {Name}'s memories alongside their biography, edit their personal thoughts section accordingly. Write two to three short paragraphs from {Name}'s perspective, in the first person. Focus on important events, life changing experiences, and promises, that {Name} would want to keep in mind. Don't include a title.");
 
             totalprompt += query + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
 

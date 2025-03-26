@@ -11,8 +11,6 @@ using System.Globalization;
 
 namespace AIToolkit
 {
-    using System;
-    using System.Text;
 
     public class StringFix(bool removeAllBoldedText, bool fixQuotes, bool removeSingleWorldEmphasis, bool removeAllQuotes, bool removeItalic, float removeItalicRatio, int removeItalicMaxWords)
     {
@@ -157,9 +155,11 @@ namespace AIToolkit
                     }
                 }
             }
+            // 
+            workstring = workstring.Replace("  ", " ");
             workstring = workstring.Replace("... ...", "... ");
-            workstring = workstring.Replace("  ", " ").Trim();
-            return workstring;
+            workstring = workstring.Replace("… …", "… ");
+            return workstring.CleanupAndTrim();
         }
 
         public static string RemoveThinkingBlocks(this string text, string thinkstart, string thinkend)
