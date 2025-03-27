@@ -229,7 +229,7 @@ namespace AIToolkit.Files
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
             LLMSystem.NamesInPromptOverride = null;
-            SelfEditField = finalstr.RemoveUnfinishedSentence().RemoveNewLines().CleanupAndTrim();
+            SelfEditField = finalstr.RemoveUnfinishedSentence().RemoveNewLines().CleanupAndTrim().RemoveTitle();
         }
 
         /// <summary> Update the character's attributes based on recent interactions. </summary>
@@ -253,6 +253,7 @@ namespace AIToolkit.Files
                 if (await ShouldUpdateAttribute(attribute))
                 {
                     var updatedContent = await UpdateAttributeContent(attribute);
+                    updatedContent = updatedContent.CleanupAndTrim().RemoveTitle();
                     if (!string.IsNullOrEmpty(updatedContent))
                     {
                         if (attribute.StabilityFactor > 0)
@@ -261,6 +262,7 @@ namespace AIToolkit.Files
                             var blendedContent = await BlendAttributeChanges(attribute.Name, attribute.Content, updatedContent);
                             if (!string.IsNullOrWhiteSpace(blendedContent))
                                 updatedContent = blendedContent;
+                            updatedContent = updatedContent.CleanupAndTrim().RemoveTitle();
                         }
                         attribute.Content = updatedContent;
                         attribute.LastUpdated = sessionCounter;

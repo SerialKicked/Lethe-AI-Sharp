@@ -174,6 +174,19 @@ namespace AIToolkit
             return workstring;
         }
 
+        public static string RemoveTitle(this string text)
+        {
+            var workstring = text.Trim().TrimStart('\n');
+            // If the string starts with a # remove the first line
+            if (workstring.StartsWith('#'))
+            {
+                var idx = workstring.IndexOf('\n');
+                if (idx > 0)
+                    return workstring[(idx + 1)..];
+            }
+            return text;
+        }
+
         public static string RemoveThinkingBlocks(this string text) => RemoveThinkingBlocks(text, LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
 
         /// <summary>
