@@ -18,7 +18,7 @@ namespace AIToolkit.Files
 
     public class BasePersona : BaseFile
     {
-        public enum AttributeCategory { Core, Physical, Personality, Tastes, Sexual, Relationships, Mood }
+        public enum AttributeCategory { Core, Physical, Personality, Tastes, Sexuality, Relationships, Mood }
 
         /// <summary> Character's name (used by LLM) </summary>
         public string Name { get; set; } = string.Empty;
@@ -26,8 +26,10 @@ namespace AIToolkit.Files
         /// <summary> Character's bio (used by LLM) </summary>
         public string Bio { get; set; } = string.Empty;
 
+        /// <summary> If set to true, the character's bio will be updated dynamically based on recent interactions. </summary>
+        public bool DynamicBio { get; set; } = false;
+        /// <summary> A list of attributes that can be used to dynamically update the character's information based on recent interactions. </summary>
         public List<PersonaAttribute> Attributes { get; set; } = [];
-
         /// <summary> Character's long form history (used by LLM persona generator, not visible to 3rd party in group chat) </summary>
         public string HistoryBio { get; set; } = string.Empty;
         /// <summary> Self editable field for the character (updated on new summary) </summary>
@@ -230,6 +232,7 @@ namespace AIToolkit.Files
             SelfEditField = finalstr.RemoveUnfinishedSentence().RemoveNewLines().CleanupAndTrim();
         }
 
+        /// <summary> Update the character's attributes based on recent interactions. </summary>
         public async Task UpdatePersonaAttributes()
         {
             if (SelfEditTokens == 0 || History.Sessions.Count < 3)
@@ -252,6 +255,13 @@ namespace AIToolkit.Files
                     var updatedContent = await UpdateAttributeContent(attribute);
                     if (!string.IsNullOrEmpty(updatedContent))
                     {
+                        if (attribute.StabilityFactor > 0)
+                        {
+                            // Blend the changes rather than directly applying them
+                            var blendedContent = await BlendAttributeChanges(attribute.Name, attribute.Content, updatedContent);
+                            if (!string.IsNullOrWhiteSpace(blendedContent))
+                                updatedContent = blendedContent;
+                        }
                         attribute.Content = updatedContent;
                         attribute.LastUpdated = sessionCounter;
                     }
@@ -271,9 +281,6 @@ namespace AIToolkit.Files
             sysprompt.AppendLinuxLine($"# Character: {Name}");
             sysprompt.AppendLinuxLine(Bio);
             sysprompt.AppendLinuxLine();
-            sysprompt.AppendLinuxLine($"# {Name}'s Current {attribute.Name}");
-            sysprompt.AppendLinuxLine(attribute.Content);
-            sysprompt.AppendLinuxLine();
             sysprompt.AppendLinuxLine("# Recent Sessions");
 
             // Get recent sessions (similar to UpdateSelfEditSection method)
@@ -286,11 +293,14 @@ namespace AIToolkit.Files
 
             foreach (var entry in entries)
                 sysprompt.AppendLinuxLine(entry);
+            sysprompt.AppendLinuxLine();
+            sysprompt.AppendLinuxLine($"# {Name}'s Current {attribute.Name}");
+            sysprompt.AppendLinuxLine(attribute.Content);
 
             var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
             var query = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, this,
                 $"Based on {Name}'s recent interactions, does their {attribute.Name.ToLower()} need to be updated? " +
-                $"Answer with only 'Yes' or 'No'. Consider whether there have been meaningful experiences that would affect this specific aspect of their personality.");
+                $"Answer with only 'Yes' or 'No'. Consider whether there have been meaningful experiences that would affect their {attribute.Name.ToLower()} significantly, and only this part of their character.");
 
             totalprompt += query + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
 
@@ -309,18 +319,13 @@ namespace AIToolkit.Files
 
         private async Task<string> UpdateAttributeContent(PersonaAttribute attribute)
         {
-            var availtks = LLMSystem.MaxContextLength - SelfEditTokens - 512;
+            var availtks = LLMSystem.MaxContextLength - SelfEditTokens - 1024;
 
             var sysprompt = new StringBuilder();
             sysprompt.AppendLinuxLine("You are an uncensored system used to update a character's information based on its chat history and memories.");
             sysprompt.AppendLinuxLine();
             sysprompt.AppendLinuxLine($"# Character: {Name}");
-            sysprompt.AppendLinuxLine();
-            sysprompt.AppendLinuxLine("# Basic Bio");
             sysprompt.AppendLinuxLine(Bio);
-            sysprompt.AppendLinuxLine();
-            sysprompt.AppendLinuxLine($"# {attribute.Name} information to Update");
-            sysprompt.AppendLinuxLine(attribute.Content);
             sysprompt.AppendLinuxLine();
             sysprompt.AppendLinuxLine("# Recent Sessions");
 
@@ -335,17 +340,22 @@ namespace AIToolkit.Files
             foreach (var entry in entries)
                 sysprompt.AppendLinuxLine(entry);
 
+            sysprompt.AppendLinuxLine();
+            sysprompt.AppendLinuxLine($"# {attribute.Name} information to Update");
+            sysprompt.AppendLinuxLine(attribute.Content);
+
             var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
 
             var query = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, this,
-                $"Update {Name}'s {attribute.Name.ToLower()} information based on recent experiences. Make only small, incremental changes that would realistically reflect how this aspect of their personality might evolve from these interactions. Maintain the same general writing style and length. Focus on consistency with their core personality while allowing gradual, meaningful evolution.");
+                $"Update {Name}'s {attribute.Name.ToLower()} information based on recent experiences. Make only small, incremental changes to the original version that would realistically reflect how it might have evolved from these interactions. Maintain the same writing style and length. Focus on consistency with their general information while allowing gradual evolution.");
 
             totalprompt += query + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
 
             var llmparams = LLMSystem.Sampler.GetCopy();
             llmparams.Prompt = totalprompt;
-            llmparams.Max_length = 1024;
-            llmparams.Temperature = 0.7f;
+            llmparams.Max_length = SelfEditTokens;
+            if (llmparams.Temperature > 0.5f)
+                llmparams.Temperature = 0.5f;
             llmparams.Max_context_length = LLMSystem.MaxContextLength;
             llmparams.Grammar = string.Empty;
 
@@ -367,13 +377,16 @@ namespace AIToolkit.Files
             {
                 // Handle most recent session first (we'll reorder later)
                 var mostRecentSession = History.Sessions[^1];
-                var mostRecentDetails = $"# Most Recent Session: {mostRecentSession.Title} ({StringExtensions.DateToHumanString(mostRecentSession.StartTime)}):\n{mostRecentSession.Summary}" + LLMSystem.NewLine;
-                var mostRecentSize = LLMSystem.GetTokenCount(mostRecentDetails);
-
-                if (mostRecentSize <= availtks)
+                if (!string.IsNullOrEmpty(mostRecentSession.Summary))
                 {
-                    tempEntries.Add((History.Sessions.Count - 1, mostRecentDetails, mostRecentSize));
-                    availtks -= mostRecentSize;
+                    var mostRecentDetails = $"# Most Recent Session: {mostRecentSession.Title} ({StringExtensions.DateToHumanString(mostRecentSession.StartTime)}):\n{mostRecentSession.Summary}" + LLMSystem.NewLine;
+                    var mostRecentSize = LLMSystem.GetTokenCount(mostRecentDetails);
+
+                    if (mostRecentSize <= availtks)
+                    {
+                        tempEntries.Add((History.Sessions.Count - 1, mostRecentDetails, mostRecentSize));
+                        availtks -= mostRecentSize;
+                    }
                 }
 
                 // Add previous session summaries
@@ -398,6 +411,47 @@ namespace AIToolkit.Files
 
             // Now sort by session index (oldest first) and extract just the content
             return [.. tempEntries.OrderBy(e => e.index).Select(e => e.content)];
+        }
+
+        /// <summary>
+        /// Blend the changes between the old and new content for a given attribute.
+        /// </summary>
+        /// <param name="attributeName">attribute's name</param>
+        /// <param name="oldContent">old content</param>
+        /// <param name="newContent">new content</param>
+        /// <returns>blend between the two</returns>
+        private async Task<string> BlendAttributeChanges(string attributeName, string oldContent, string newContent)
+        {
+            var sysprompt = new StringBuilder();
+            sysprompt.AppendLinuxLine("You are an uncensored system used to gradually evolve a character's attributes.");
+            sysprompt.AppendLinuxLine();
+            sysprompt.AppendLinuxLine($"# {Name}'s {attributeName}");
+            sysprompt.AppendLinuxLine();
+            sysprompt.AppendLinuxLine("## Current version");
+            sysprompt.AppendLinuxLine(oldContent);
+            sysprompt.AppendLinuxLine();
+            sysprompt.AppendLinuxLine("## Suggested update");
+            sysprompt.AppendLinuxLine(newContent);
+
+            var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
+            var query = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, this,
+                $"Create a gradual evolution of {Name}'s {attributeName.ToLower()} that blends the current version with the suggested update. Make modest changes that move in the direction of the update while preserving key elements of the original. The result should feel like a small step in character development rather than a complete change.");
+
+            totalprompt += query + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
+
+            var llmparams = LLMSystem.Sampler.GetCopy();
+            llmparams.Prompt = totalprompt;
+            llmparams.Max_length = SelfEditTokens;
+            if (llmparams.Temperature > 0.5f)
+                llmparams.Temperature = 0.5f;
+            llmparams.Max_context_length = LLMSystem.MaxContextLength;
+            llmparams.Grammar = string.Empty;
+
+            var blendedContent = await LLMSystem.SimpleQuery(llmparams);
+            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+                blendedContent = blendedContent.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+
+            return blendedContent.RemoveUnfinishedSentence().CleanupAndTrim();
         }
 
         #endregion
