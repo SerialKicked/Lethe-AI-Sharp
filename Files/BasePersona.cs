@@ -53,6 +53,8 @@ namespace AIToolkit.Files
 
         /// <summary> If set to true, the character's bio will be updated dynamically based on recent interactions. </summary>
         public bool DynamicBio { get; set; } = false;
+        /// <summary> How many do we go back when updating bio </summary>
+        public int DynamicBioHistoryDepth { get; set; } = 5;
         /// <summary> A list of attributes that can be used to dynamically update the character's information based on recent interactions. </summary>
         public List<PersonaAttribute> Attributes { get; set; } = [];
         /// <summary> Character's long form history (used by LLM persona generator, not visible to 3rd party in group chat) </summary>
@@ -431,7 +433,7 @@ namespace AIToolkit.Files
         {
             var tempEntries = new List<(int index, string content, int tokenCount)>();
             var availtks = availableTokens;
-            var maxcount = 8;
+            var maxcount = DynamicBioHistoryDepth;
 
             // First, collect all potential entries with their token counts and index
             if (History.Sessions.Count > 0)
