@@ -170,5 +170,12 @@ namespace AIToolkit.Files
 
             return res;
         }
+
+        public bool IsThinkingPrompt(string prompt)
+        {
+            if (string.IsNullOrEmpty(ThinkingStart) || string.IsNullOrEmpty(ThinkingEnd) || string.IsNullOrEmpty(prompt))
+                return false;
+            return prompt.Contains(LLMSystem.Instruct.ThinkingStart) && !prompt.Contains(LLMSystem.Instruct.ThinkingEnd);
+        }
     }
 }
