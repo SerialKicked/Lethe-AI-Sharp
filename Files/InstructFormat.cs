@@ -55,7 +55,7 @@ namespace AIToolkit.Files
             {
                 res += ThinkingStart;
                 if (!string.IsNullOrWhiteSpace(ThinkingForcedThought))
-                    res += PrefillThinking;
+                    res += ThinkingForcedThought;
             }
             return res;
         }
