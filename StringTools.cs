@@ -165,14 +165,16 @@ namespace AIToolkit
         public static string RemoveThinkingBlocks(this string text, string thinkstart, string thinkend)
         {
             var workstring = text;
-            if (workstring.Contains(LLMSystem.Instruct.ThinkingEnd))
+            if (!string.IsNullOrEmpty(thinkstart) && workstring.Contains(thinkend))
             {
                 // remove everything before the thinking end tag (included)
-                var idx = workstring.IndexOf(LLMSystem.Instruct.ThinkingEnd);
-                workstring = workstring[(idx + LLMSystem.Instruct.ThinkingEnd.Length)..].CleanupAndTrim();
+                var idx = workstring.IndexOf(thinkend);
+                workstring = workstring[(idx + thinkend.Length)..].CleanupAndTrim();
             }
             return workstring;
         }
+
+        public static string RemoveThinkingBlocks(this string text) => RemoveThinkingBlocks(text, LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
 
         /// <summary>
         /// Tries to fix missing asterisks in the text
