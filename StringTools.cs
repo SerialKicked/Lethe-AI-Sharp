@@ -230,7 +230,7 @@ namespace AIToolkit
         /// <returns></returns>
         public static string CleanupAndTrim(this string text)
         {
-            return text.TrimEnd('\n').TrimStart('\n').Trim();
+            return text.Trim().TrimEnd('\n').TrimStart('\n').Trim();
         }
 
         /// <summary>
