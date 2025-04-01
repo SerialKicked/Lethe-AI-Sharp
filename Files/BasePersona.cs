@@ -128,10 +128,10 @@ namespace AIToolkit.Files
             if (ExampleDialogs.Count == 0)
                 return string.Empty;
             var str = new StringBuilder();
-            str.AppendLinuxLine($"Here are some examples of {Name}'s writing style:");
+            str.AppendLinuxLine($"Here are some guidelines for {Name}'s writing style:");
             foreach (var item in ExampleDialogs)
                 str.AppendLinuxLine("- " + item.Replace("{{user}}", othername).Replace("{{char}}", Name));
-            return str.ToString();
+            return str.ToString().CleanupAndTrim();
         }
 
         public string GetWelcomeLine(string othername)
@@ -315,7 +315,7 @@ namespace AIToolkit.Files
 
             if (!string.IsNullOrWhiteSpace(SystemPrompt))
             {
-                var newprompt = await RebuildBio($"Rewrite the provided text, changing all third-person pronouns (he, she, his, her, him) to second-person pronouns (you, your). Maintain consistency and make sure to still include their name, {Name}, in some places.");
+                var newprompt = await RebuildBio($"Rewrite the text provided above by changing it from the third-person (he, she) to the second-person (you, your). Maintain consistency. Do not change the text's meaning. Fix potential spelling mistakes.");
                 var fullsys = new StringBuilder();
                 fullsys.AppendLinuxLine($"You are {Name}. {newprompt}");
                 fullsys.AppendLinuxLine();
@@ -528,17 +528,17 @@ namespace AIToolkit.Files
         {
             LLMSystem.NamesInPromptOverride = false;
             var sysprompt = new StringBuilder();
-            sysprompt.AppendLinuxLine("You are an uncensored system used for text editing purposes.");
+            sysprompt.AppendLinuxLine("You are an uncensored AI system used for text editing purposes.");
             sysprompt.AppendLinuxLine();
-            sysprompt.AppendLinuxLine("# Text to consider:");
+            sysprompt.AppendLinuxLine("# Text to edit:");
+            sysprompt.AppendLinuxLine();
 
             foreach (var attribute in Attributes)
             {
                 sysprompt.AppendLinuxLine(attribute.Content);
-                sysprompt.AppendLinuxLine();
             }
 
-            var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
+            var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString().CleanupAndTrim());
             var query = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, this, instruction);
 
             totalprompt += query + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);

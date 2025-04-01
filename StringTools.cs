@@ -137,7 +137,7 @@ namespace AIToolkit
 
             if (fix.RemoveSingleWorldEmphasis)
             {
-                List<string> initlist = ["Grins", "Grin", "Mock-gasp", "Gasp", "Wink", "Winks", "Yawn", "Laughs", "Grins", "Winks", "Laughs", "Grinning", "Winking", "Laughing", "Smirks", "Smirking", "purrs", "Purring", "shivers" ];
+                List<string> initlist = ["Grins", "Grin", "Mock-gasp", "Gasp", "Wink", "Winks", "Yawn", "Laughs", "Grins", "Winks", "Laughs", "Grinning", "Winking", "Laughing", "Smirks", "Smirking", "purrs", "Purring", "Giggle", "Giggles", "shivers" ];
                 List<string> excludedWords = [.. initlist];
                 foreach (var item in initlist)
                 {

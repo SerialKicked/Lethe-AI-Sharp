@@ -77,7 +77,7 @@ namespace AIToolkit.Files
          
             var query = (LLMSystem.Bot.FirstPersonSummary) ?
                 "Identify the most important elements in the the exchange between {{user}} and {{char}} shown above and write a summary of this exchange. The summary must be written from {{char}}'s perspective. Do not introduce the characters. Do not add a title, just write the summary directly." :
-                "Write a summary of the exchange between {{user}} and {{char}} shown above. Do not add a title, just write the summary directly.";
+                "Write a detailed summary of the exchange between {{user}} and {{char}} shown above. Do not add a title, just write the summary directly.";
             
             if (Messages.Count > 30)
             {
@@ -257,7 +257,7 @@ namespace AIToolkit.Files
                     }
                     else
                     {
-                        sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}, the following events took place: {Summary.RemoveNewLines()}");
+                        sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}: {Summary.RemoveNewLines()}");
                     }
                 }
                 else
@@ -268,7 +268,7 @@ namespace AIToolkit.Files
                     }
                     else
                     {
-                        sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}, the following events took place: {Summary.RemoveNewLines()}");
+                        sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}: {Summary.RemoveNewLines()}");
                     }
 
                 }
@@ -322,7 +322,7 @@ namespace AIToolkit.Files
                 }
                 else
                 {
-                    sb.AppendLinuxLine($"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}, the following events took place: {session.Summary.RemoveNewLines()}").AppendLinuxLine();
+                    sb.AppendLinuxLine($"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}: {session.Summary.RemoveNewLines()}").AppendLinuxLine();
                 }
                 var tks = LLMSystem.GetTokenCount(sb.ToString());
                 if (tks <= tokensleft)

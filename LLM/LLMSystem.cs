@@ -214,7 +214,7 @@ namespace AIToolkit.LLM
                .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
                .Replace("{{selfedit}}", character.SelfEditField)
                .Replace("{{scenario}}", string.IsNullOrWhiteSpace(ScenarioOverride) ? character.GetScenario(userName) : ScenarioOverride);
-            return res.ToString();
+            return res.ToString().CleanupAndTrim();
         }
 
         /// <summary>
