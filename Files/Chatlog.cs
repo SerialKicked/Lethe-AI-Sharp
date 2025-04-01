@@ -31,6 +31,7 @@ namespace AIToolkit.Files
         [JsonIgnore] public Guid Guid { get; set; } = Guid.NewGuid();
         public string Title { get; set; } = string.Empty;
         public string Summary { get; set; } = string.Empty;
+        public bool FirstPersonSummary { get; set; } = true;
         public string[] Sentiments { get; set; } = [];
         public string[] Associations { get; set; } = [];
         public string Projects { get; set; } = string.Empty;
@@ -74,7 +75,10 @@ namespace AIToolkit.Files
         public async Task<string> GenerateNewSummary()
         {
          
-            var query = "Identify the most important elements in the the exchange between {{user}} and {{char}} shown above and write a summary of this exchange. The summary must be written from {{char}}'s perspective. Do not introduce the characters. Do not add a title, just write the summary directly.";
+            var query = (LLMSystem.Bot.FirstPersonSummary) ?
+                "Identify the most important elements in the the exchange between {{user}} and {{char}} shown above and write a summary of this exchange. The summary must be written from {{char}}'s perspective. Do not introduce the characters. Do not add a title, just write the summary directly." :
+                "Write a summary of the exchange between {{user}} and {{char}} shown above. Do not add a title, just write the summary directly.";
+            
             if (Messages.Count > 30)
             {
                 query += " The summary should be 2 to 4 paragraphs long.";
@@ -246,9 +250,28 @@ namespace AIToolkit.Files
             else
             {
                 if (StartTime.Date == EndTime.Date)
-                    sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}, the following events took place from {LLMSystem.Bot.Name}'s perspective. {Summary.RemoveNewLines()}");
+                {
+                    if (FirstPersonSummary)
+                    {
+                        sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}, the following events took place from {LLMSystem.Bot.Name}'s perspective: {Summary.RemoveNewLines()}");
+                    }
+                    else
+                    {
+                        sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}, the following events took place: {Summary.RemoveNewLines()}");
+                    }
+                }
                 else
-                    sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}, the following event took places from {LLMSystem.Bot.Name}'s perspective. {Summary.RemoveNewLines()}");
+                {
+                    if (FirstPersonSummary)
+                    {
+                        sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}, the following events took place from {LLMSystem.Bot.Name}'s perspective: {Summary.RemoveNewLines()}");
+                    }
+                    else
+                    {
+                        sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}, the following events took place: {Summary.RemoveNewLines()}");
+                    }
+
+                }
             }
 
             return sb.ToString();
@@ -293,7 +316,14 @@ namespace AIToolkit.Files
                     continue;
                 var sb = new StringBuilder();
                 sb.AppendLinuxLine($"{sectionHeader} {session.Title}");
-                sb.AppendLinuxLine($"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}, the following events took places from {LLMSystem.Bot.Name}'s perspective: {session.Summary.RemoveNewLines()}").AppendLinuxLine();
+                if (session.FirstPersonSummary)
+                {
+                    sb.AppendLinuxLine($"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}, the following events took places from {LLMSystem.Bot.Name}'s perspective: {session.Summary.RemoveNewLines()}").AppendLinuxLine();
+                }
+                else
+                {
+                    sb.AppendLinuxLine($"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}, the following events took place: {session.Summary.RemoveNewLines()}").AppendLinuxLine();
+                }
                 var tks = LLMSystem.GetTokenCount(sb.ToString());
                 if (tks <= tokensleft)
                 {
@@ -463,6 +493,7 @@ namespace AIToolkit.Files
             session.EndTime = session.Messages.Last().Date;
             var sum = await session.GenerateNewSummary();
             session.Summary = sum;
+            session.FirstPersonSummary = LLMSystem.Bot.FirstPersonSummary;
             session.Associations = await session.GenerateKeywords();
             session.Projects = await session.GenerateGoals();
             session.Title = await ChatSession.GenerateNewTitle(sum);

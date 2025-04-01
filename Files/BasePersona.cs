@@ -92,6 +92,7 @@ namespace AIToolkit.Files
         public bool SessionMemorySystem { get; set; } = false;
         /// <summary> If set to true, this bot will stay informed about the spacing between user messages </summary>
         public bool SenseOfTime { get; set; } = false;
+        public bool FirstPersonSummary { get; set; } = true;
         /// <summary> If set above 0, this character will be allowed to write this amount of tokens in its system prompt. Altered each new session. </summary>
         public int SelfEditTokens { get; set; } = 0;
 
@@ -110,7 +111,7 @@ namespace AIToolkit.Files
                 {
                     str.AppendLinuxLine(attribute.Content);
                 }
-                return str.ToString().Replace("{{char}}", Name).Replace("{{user}}", othername);
+                return str.ToString().CleanupAndTrim().Replace("{{char}}", Name).Replace("{{user}}", othername);
             }
             else
             {
@@ -291,14 +292,14 @@ namespace AIToolkit.Files
                     continue;
 
                 // First check if update is needed
-                if (await ShouldUpdateAttribute(attribute))
+                if (!string.IsNullOrWhiteSpace(attribute.Content) || await ShouldUpdateAttribute(attribute))
                 {
                     var updatedContent = await UpdateAttributeContent(attribute);
                     updatedContent = updatedContent.CleanupAndTrim().RemoveTitle();
                     if (!string.IsNullOrEmpty(updatedContent))
                     {
                         attribute.RecordChange();
-                        if (attribute.StabilityFactor > 0)
+                        if (attribute.StabilityFactor > 0 && !string.IsNullOrWhiteSpace(attribute.Content))
                         {
                             // Blend the changes rather than directly applying them
                             var blendedContent = await BlendAttributeChanges(attribute.Name, attribute.Content, updatedContent);
@@ -403,7 +404,10 @@ namespace AIToolkit.Files
 
             sysprompt.AppendLinuxLine();
             sysprompt.AppendLinuxLine($"# {attribute.Name} information to update");
-            sysprompt.AppendLinuxLine(attribute.Content);
+            if (!string.IsNullOrWhiteSpace(attribute.Content))
+                sysprompt.AppendLinuxLine(attribute.Content);
+            else
+                sysprompt.AppendLinuxLine("No information about Emily's mood has been provided yet. First entry shouldn't be longer than a short paragraph.");
 
             var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
 

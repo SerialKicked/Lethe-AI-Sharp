@@ -42,6 +42,41 @@ namespace AIToolkit
                 .Replace("\r", "\\r");
         }
 
+        public static int CountSubstring(this string text, string substring)
+        {
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(substring))
+                return 0;
+
+            int count = 0;
+            int index = 0;
+
+            while ((index = text.IndexOf(substring, index, StringComparison.Ordinal)) != -1)
+            {
+                count++;
+                index += substring.Length;
+            }
+
+            return count;
+        }
+
+        public static string RemoveEverythingAfterLast(this string text, string substring)
+        {
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(substring))
+                return text;
+
+            // Find the first occurrence of the substring
+            int index = text.LastIndexOf(substring, StringComparison.Ordinal);
+
+            // If substring is found, return text before it
+            if (index != -1)
+            {
+                return text.Substring(0, index);
+            }
+
+            // If substring not found, return the original text
+            return text;
+        }
+
         public static string RemoveNewLines(this string text) => text.ToLinuxFormat().Replace("\n\n", " ").Replace('\n', ' ').Replace("  ", " ").Trim();
 
         /// <summary>
@@ -102,7 +137,7 @@ namespace AIToolkit
 
             if (fix.RemoveSingleWorldEmphasis)
             {
-                List<string> initlist = ["Grins", "Grin", "Mock-gasp", "Gasp", "Wink", "Winks", "Yawn", "Laughs", "Grins", "Winks", "Laughs", "Grinning", "Winking", "Laughing", "Smirks", "Smirking"];
+                List<string> initlist = ["Grins", "Grin", "Mock-gasp", "Gasp", "Wink", "Winks", "Yawn", "Laughs", "Grins", "Winks", "Laughs", "Grinning", "Winking", "Laughing", "Smirks", "Smirking", "purrs", "Purring", "shivers" ];
                 List<string> excludedWords = [.. initlist];
                 foreach (var item in initlist)
                 {
