@@ -15,7 +15,7 @@ namespace AIToolkit.API
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.1.0.0 (NJsonSchema v11.0.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public class KoboldCppClient 
     {
-        public bool ReadResponseAsString { get; set; }
+        public bool ReadResponseAsString { get; set; } = true;
 
         /// <summary>
         /// Maximum number of retry attempts for failed requests (0 = no retries)
@@ -93,6 +93,18 @@ namespace AIToolkit.API
 
         #region Core Internal Functions
 
+        /// <summary>
+        /// Sends a Post/Get request and returns the response
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="selectclient">HTTP CLient to use</param>
+        /// <param name="method">POST or GET method</param>
+        /// <param name="endpoint">API Endpoint to hit</param>
+        /// <param name="body">message to send for POST requests</param>
+        /// <param name="cancellationToken">cancel token thing</param>
+        /// <returns></returns>
+        /// <exception cref="ApiException"></exception>
+        /// <exception cref="ApiException{ServerBusyError}"></exception>
         private async Task<T> SendRequestAsync<T>(HttpClient selectclient, HttpMethod method, string endpoint,
             object body = null, CancellationToken cancellationToken = default)
         {
@@ -404,6 +416,12 @@ namespace AIToolkit.API
         public virtual async Task<KcppResponse> AbortAsync(GenkeyData body, CancellationToken cancellationToken = default)
         {
             return await SendRequestAsync<KcppResponse>(_httpClient, HttpMethod.Post, "api/extra/abort", body, cancellationToken: cancellationToken);
+        }
+
+        public KcppResponse AbortSync(GenkeyData body)
+        {
+            // Using a new task and ConfigureAwait(false) to avoid deadlocks
+            return Task.Run(() => AbortAsync(body)).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         #endregion

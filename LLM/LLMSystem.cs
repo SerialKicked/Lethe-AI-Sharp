@@ -273,7 +273,7 @@ namespace AIToolkit.LLM
             try
             {
                 var mparams = new GenkeyData() { };
-                var res = Client.AbortAsync(mparams).GetAwaiter().GetResult();
+                var res = Client.AbortSync(mparams);
                 if (res.Success)
                     Status = SystemStatus.Ready;
                 return res.Success;
