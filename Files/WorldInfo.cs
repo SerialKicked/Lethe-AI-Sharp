@@ -104,7 +104,7 @@ namespace AIToolkit.Files
                 if (entry.CheckKeywords(message) && entry.TriggerChance >= LLMSystem.RNG.NextDouble())
                     activeEntries.Add(new ActiveLink { RecordID = i, DurationLeft = entry.Duration });
             }
-            return activeEntries.Select(a => Entries[a.RecordID]).ToList();
+            return [.. activeEntries.Select(a => Entries[a.RecordID])];
         }
 
         /// <summary>

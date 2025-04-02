@@ -258,7 +258,7 @@ namespace AIToolkit.LLM
             try
             {
                 var mparams = new KcppPrompt() { Prompt = text };
-                var res = Client.TokencountAsync(mparams).GetAwaiter().GetResult();
+                var res = Client.TokencountSync(mparams);
                 return res.Value;
             }
             catch (Exception)
