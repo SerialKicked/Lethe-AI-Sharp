@@ -417,7 +417,7 @@ namespace AIToolkit.Files
             {
                 // remove everything before the thinking end tag (included)
                 var idx = stringfix.IndexOf(LLMSystem.Instruct.ThinkingEnd);
-                stringfix = stringfix.Substring(idx + LLMSystem.Instruct.ThinkingEnd.Length).CleanupAndTrim();
+                stringfix = stringfix[(idx + LLMSystem.Instruct.ThinkingEnd.Length)..].CleanupAndTrim();
             }
 
             var single = new SingleMessage(role, DateTime.Now, stringfix, bot.UniqueName, user.UniqueName);
@@ -556,7 +556,7 @@ namespace AIToolkit.Files
         {
             if (CurrentSession.Messages.Count == 0)
                 return;
-            List<SingleMessage> Messages = new(CurrentSession.Messages);
+            List<SingleMessage> Messages = [.. CurrentSession.Messages];
             Sessions.Clear();
 
             // Fix potential date problems

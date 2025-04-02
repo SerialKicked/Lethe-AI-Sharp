@@ -154,7 +154,7 @@ namespace AIToolkit.LLM
                         var index = response.LastIndexOf(tocheck);
                         if (index > 1)
                         {
-                            response = response.Remove(index);
+                            response = response[..index];
                         }
                     }
                 }
@@ -272,7 +272,7 @@ namespace AIToolkit.LLM
         {
             try
             {
-                var mparams = new Body3() { };
+                var mparams = new GenkeyData() { };
                 var res = Client.AbortAsync(mparams).GetAwaiter().GetResult();
                 if (res.Success)
                     Status = SystemStatus.Ready;
@@ -437,7 +437,7 @@ namespace AIToolkit.LLM
         /// <param name="userInput"></param>
         /// <param name="logtohistory"></param>
         /// <returns></returns>
-        public static async Task SendMessageToBot(SingleMessage message, string? imgBase64 = null)
+        public static async Task SendMessageToBot(SingleMessage message)
         {
             if (Status == SystemStatus.Busy)
                 return;
@@ -474,7 +474,7 @@ namespace AIToolkit.LLM
                 genparams.Max_length = MaxReplyLength;
                 genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
                 genparams.Prompt = _LastGeneratedPrompt;
-                genparams.Images = new List<string>(vlm_pictures);
+                genparams.Images = [..vlm_pictures];
                 RaiseOnFullPromptReady(genparams.Prompt);
                 await Client.GenerateTextStreamAsync(genparams);
             }
@@ -502,7 +502,7 @@ namespace AIToolkit.LLM
             genparams.Max_context_length = MaxContextLength;
             genparams.Max_length = MaxReplyLength;
             genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
-            genparams.Images = new List<string>(vlm_pictures);
+            genparams.Images = [.. vlm_pictures];
             genparams.Prompt = _LastGeneratedPrompt;
             if (!string.IsNullOrEmpty(systemMessage) && logSystemPrompt)
                 Bot.History.LogMessage(AuthorRole.System, systemMessage, User, Bot);
@@ -567,7 +567,7 @@ namespace AIToolkit.LLM
             genparams.Max_length = MaxReplyLength;
             genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
             genparams.Prompt = _LastGeneratedPrompt;
-            genparams.Images = new List<string>(vlm_pictures);
+            genparams.Images = [.. vlm_pictures];
             if (!string.IsNullOrEmpty(userInput))
                 Bot.History.LogMessage(MsgSender, userInput, User, Bot);
 

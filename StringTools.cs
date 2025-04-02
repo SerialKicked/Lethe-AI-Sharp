@@ -70,7 +70,7 @@ namespace AIToolkit
             // If substring is found, return text before it
             if (index != -1)
             {
-                return text.Substring(0, index);
+                return text[..index];
             }
 
             // If substring not found, return the original text

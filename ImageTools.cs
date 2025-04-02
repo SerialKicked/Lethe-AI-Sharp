@@ -43,7 +43,7 @@ namespace AIToolkit
             newHeight = Math.Max(1, newHeight);
 
             // Create a new bitmap with the calculated dimensions
-            Bitmap scaledImage = new Bitmap(newWidth, newHeight);
+            Bitmap scaledImage = new(newWidth, newHeight);
 
             // Draw the original image onto the new bitmap with scaling
             using (Graphics graphics = Graphics.FromImage(scaledImage))
@@ -105,15 +105,13 @@ namespace AIToolkit
 
                 try
                 {
-                    using (MemoryStream ms = new MemoryStream())
-                    {
-                        // Save the image to the memory stream in PNG format
-                        imageToUse.Save(ms, ImageFormat.Png);
-                        ms.Position = 0;
+                    using MemoryStream ms = new();
+                    // Save the image to the memory stream in PNG format
+                    imageToUse.Save(ms, ImageFormat.Png);
+                    ms.Position = 0;
 
-                        byte[] imageBytes = ms.ToArray();
-                        return Convert.ToBase64String(imageBytes);
-                    }
+                    byte[] imageBytes = ms.ToArray();
+                    return Convert.ToBase64String(imageBytes);
                 }
                 finally
                 {
@@ -140,17 +138,11 @@ namespace AIToolkit
         {
             try
             {
-                using (HttpClient httpClient = new HttpClient())
-                {
-                    byte[] imageBytes = await httpClient.GetByteArrayAsync(imageUrl);
-                    using (MemoryStream ms = new MemoryStream(imageBytes))
-                    {
-                        using (Image image = Image.FromStream(ms))
-                        {
-                            return ImageToBase64(image);
-                        }
-                    }
-                }
+                using HttpClient httpClient = new();
+                byte[] imageBytes = await httpClient.GetByteArrayAsync(imageUrl);
+                using MemoryStream ms = new(imageBytes);
+                using Image image = Image.FromStream(ms);
+                return ImageToBase64(image);
             }
             catch (Exception ex)
             {

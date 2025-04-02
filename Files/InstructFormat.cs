@@ -166,7 +166,7 @@ namespace AIToolkit.Files
                 res.Add(LLMSystem.NewLine);
 
             // Remove duplicates from the list
-            res = res.Distinct().ToList();
+            res = [.. res.Distinct()];
 
             return res;
         }

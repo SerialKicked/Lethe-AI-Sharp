@@ -24,6 +24,7 @@ using System.Net.Http.Headers;
 using System.Security.Policy;
 using System.Text;
 using System.Threading.Tasks;
+using System.Net.Http;
 
 namespace AIToolkit.API
 {
@@ -32,23 +33,49 @@ namespace AIToolkit.API
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.1.0.0 (NJsonSchema v11.0.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class KoboldCppClient 
     {
-        #pragma warning disable 8618
-        private string _baseUrl;
-        #pragma warning restore 8618
+        public bool ReadResponseAsString { get; set; }
 
-        private System.Net.Http.HttpClient _httpClient;
-        private System.Net.Http.HttpClient _TokenClient;
-        private System.Net.Http.HttpClient _TTSClient;
+        public string BaseUrl
+        {
+            get { return _baseUrl; }
+            set
+            {
+                _baseUrl = value;
+                if (!string.IsNullOrEmpty(_baseUrl) && !_baseUrl.EndsWith("/"))
+                    _baseUrl += '/';
+            }
+        }
+
+        public Newtonsoft.Json.JsonSerializerSettings JsonSerializerSettings { get { return _instanceSettings ?? _settings.Value; } }
+
+        public event EventHandler<TextStreamingEvenArg> StreamingMessageReceived;
+
+        protected struct ObjectResponseResult<T>
+        {
+            public ObjectResponseResult(T responseObject, string responseText)
+            {
+                this.Object = responseObject;
+                this.Text = responseText;
+            }
+
+            public T Object { get; }
+
+            public string Text { get; }
+        }
+
+        private string _baseUrl = string.Empty;
+
+        // Task-specific clients
+        private HttpClient _httpClient;
+        private HttpClient _TokenClient;
+        private HttpClient _TTSClient;
+
         private static System.Lazy<Newtonsoft.Json.JsonSerializerSettings> _settings = new System.Lazy<Newtonsoft.Json.JsonSerializerSettings>(CreateSerializerSettings, true);
         private Newtonsoft.Json.JsonSerializerSettings _instanceSettings;
 
-        public event EventHandler<TextStreamingEvenArg> StreamingMessageReceived;
         protected virtual void OnStreamingMessageReceived(TextStreamingEvenArg e) => StreamingMessageReceived?.Invoke(this, e);
 
-
-#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
-        public KoboldCppClient(System.Net.Http.HttpClient httpClient)
-    #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
+        public KoboldCppClient(HttpClient httpClient)
         {
             BaseUrl = "/";
             _httpClient = httpClient;
@@ -64,127 +91,15 @@ namespace AIToolkit.API
             return settings;
         }
 
-        public string BaseUrl
-        {
-            get { return _baseUrl; }
-            set
-            {
-                _baseUrl = value;
-                if (!string.IsNullOrEmpty(_baseUrl) && !_baseUrl.EndsWith("/"))
-                    _baseUrl += '/';
-            }
-        }
-
-        public Newtonsoft.Json.JsonSerializerSettings JsonSerializerSettings { get { return _instanceSettings ?? _settings.Value; } }
-
         static partial void UpdateJsonSerializerSettings(Newtonsoft.Json.JsonSerializerSettings settings);
 
         partial void Initialize();
 
-        partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, string url);
-        partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
-        partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
+        partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url);
+        partial void PrepareRequest(HttpClient client, HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
+        partial void ProcessResponse(HttpClient client, HttpResponseMessage response);
 
-        /// <summary>
-        /// Retrieve the current max context length setting value that horde sees
-        /// </summary>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<MaxContextLengthSetting> ContextLengthAsync()
-        {
-            return ContextLengthAsync(System.Threading.CancellationToken.None);
-        }
-
-        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        /// <summary>
-        /// Retrieve the current max context length setting value that horde sees
-        /// </summary>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<MaxContextLengthSetting> ContextLengthAsync(System.Threading.CancellationToken cancellationToken)
-        {
-            var client_ = _httpClient;
-            var disposeClient_ = false;
-            try
-            {
-                using (var request_ = new System.Net.Http.HttpRequestMessage())
-                {
-                    request_.Method = new System.Net.Http.HttpMethod("GET");
-                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
-
-                    var urlBuilder_ = new System.Text.StringBuilder();
-                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "api/v1/config/max_context_length"
-                    urlBuilder_.Append("api/v1/config/max_context_length");
-
-                    PrepareRequest(client_, request_, urlBuilder_);
-
-                    var url_ = urlBuilder_.ToString();
-                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
-
-                    PrepareRequest(client_, request_, url_);
-
-                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                    var disposeResponse_ = true;
-                    try
-                    {
-                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
-                        foreach (var item_ in response_.Headers)
-                            headers_[item_.Key] = item_.Value;
-                        if (response_.Content != null && response_.Content.Headers != null)
-                        {
-                            foreach (var item_ in response_.Content.Headers)
-                                headers_[item_.Key] = item_.Value;
-                        }
-
-                        ProcessResponse(client_, response_);
-
-                        var status_ = (int)response_.StatusCode;
-                        if (status_ == 200)
-                        {
-                            var objectResponse_ = await ReadObjectResponseAsync<MaxContextLengthSetting>(response_, headers_, cancellationToken).ConfigureAwait(false);
-                            if (objectResponse_.Object == null)
-                            {
-                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-                            }
-                            return objectResponse_.Object;
-                        }
-                        else
-                        {
-                            var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
-                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
-                        }
-                    }
-                    finally
-                    {
-                        if (disposeResponse_)
-                            response_.Dispose();
-                    }
-                }
-            }
-            finally
-            {
-                if (disposeClient_)
-                    client_.Dispose();
-            }
-        }
-
-        protected struct ObjectResponseResult<T>
-        {
-            public ObjectResponseResult(T responseObject, string responseText)
-            {
-                this.Object = responseObject;
-                this.Text = responseText;
-            }
-
-            public T Object { get; }
-
-            public string Text { get; }
-        }
-
-        public bool ReadResponseAsString { get; set; }
-
-        protected virtual async Task<ObjectResponseResult<T>> ReadObjectResponseAsync<T>(System.Net.Http.HttpResponseMessage response, System.Collections.Generic.IReadOnlyDictionary<string, System.Collections.Generic.IEnumerable<string>> headers, System.Threading.CancellationToken cancellationToken)
+        protected virtual async Task<ObjectResponseResult<T>> ReadObjectResponseAsync<T>(HttpResponseMessage response, IReadOnlyDictionary<string, IEnumerable<string>> headers, CancellationToken cancellationToken)
         {
             if (response == null || response.Content == null)
             {
@@ -281,9 +196,78 @@ namespace AIToolkit.API
             return result == null ? "" : result;
         }
 
-        public virtual Task<MaxContextLengthSetting> TrueMaxContextLengthAsync()
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Retrieve the current max context length setting value that horde sees
+        /// </summary>
+        /// <returns>Successful request</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async Task<MaxContextLengthSetting> ContextLengthAsync(CancellationToken cancellationToken = default)
         {
-            return TrueMaxContextLengthAsync(System.Threading.CancellationToken.None);
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "api/v1/config/max_context_length"
+                    urlBuilder_.Append("api/v1/config/max_context_length");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<MaxContextLengthSetting>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -295,7 +279,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<MaxContextLengthSetting> TrueMaxContextLengthAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<MaxContextLengthSetting> TrueMaxContextLengthAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -363,21 +347,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Generate text with a specified prompt
-        /// </summary>
-        /// <remarks>
-        /// Generates text given a prompt and generation settings.
-        /// <br/>
-        /// <br/>Unspecified values are set to defaults.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<GenerationOutput> GenerateAsync(GenerationInput body)
-        {
-            return GenerateAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Generate text with a specified prompt
@@ -389,7 +358,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<GenerationOutput> GenerateAsync(GenerationInput body, System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<GenerationOutput> GenerateAsync(GenerationInput body, CancellationToken cancellationToken = default)
         {
             if (body == null)
                 throw new System.ArgumentNullException("body");
@@ -473,9 +442,12 @@ namespace AIToolkit.API
             }
         }
 
-        public virtual Task<WebQueryFullResponse> WebQueryAsync(WebQuery body) => WebQueryAsync(body, System.Threading.CancellationToken.None);
-
-        public virtual async Task<WebQueryFullResponse> WebQueryAsync(WebQuery body, System.Threading.CancellationToken cancellationToken)
+        /// <summary>
+        /// Send a DuckDuckGo API web search query to the server
+        /// </summary>
+        /// <param name="body"></param>
+        /// <returns></returns>
+        public virtual async Task<WebQueryFullResponse> WebQueryAsync(WebQuery body, CancellationToken cancellationToken = default)
         {
             if (body == null)
                 throw new System.ArgumentNullException("body");
@@ -559,7 +531,6 @@ namespace AIToolkit.API
             }
         }
 
-
         /// <summary>
         /// Creates text-to-speech audio from input text.
         /// </summary>
@@ -641,19 +612,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Current KoboldAI United API version
-        /// </summary>
-        /// <remarks>
-        /// Returns the matching *KoboldAI* (United) version of the API that you are currently using. This is not the same as the KoboldCpp API version - this is used to feature match against KoboldAI United.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<KCBasicResult> VersionAsync()
-        {
-            return VersionAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Current KoboldAI United API version
@@ -663,7 +621,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<KCBasicResult> VersionAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<KCBasicResult> VersionAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -731,19 +689,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Retrieve the current model string.
-        /// </summary>
-        /// <remarks>
-        /// Gets the current model display name.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<KCBasicResult> ModelAsync()
-        {
-            return ModelAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Retrieve the current model string.
@@ -753,7 +698,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<KCBasicResult> ModelAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<KCBasicResult> ModelAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -821,19 +766,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Retrieve the KoboldCpp backend version
-        /// </summary>
-        /// <remarks>
-        /// Retrieve the KoboldCpp backend version
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<KCExtraResult> ExtraVersionAsync()
-        {
-            return ExtraVersionAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Retrieve the KoboldCpp backend version
@@ -843,7 +775,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<KCExtraResult> ExtraVersionAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<KCExtraResult> ExtraVersionAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -911,19 +843,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Retrieves the KoboldCpp preloaded story
-        /// </summary>
-        /// <remarks>
-        /// Retrieves the KoboldCpp preloaded story, --preloadstory configures a prepared story json save file to be hosted on the server, which frontends (such as KoboldAI Lite) can access over the API.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task PreloadstoryAsync()
-        {
-            return PreloadstoryAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Retrieves the KoboldCpp preloaded story
@@ -933,7 +852,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task PreloadstoryAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task PreloadstoryAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -996,19 +915,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Retrieve the KoboldCpp recent performance information
-        /// </summary>
-        /// <remarks>
-        /// Retrieve the KoboldCpp recent performance information
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<KcppPerf> PerfAsync()
-        {
-            return PerfAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Retrieve the KoboldCpp recent performance information
@@ -1018,7 +924,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<KcppPerf> PerfAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<KcppPerf> PerfAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -1127,124 +1033,6 @@ namespace AIToolkit.API
             }
         }
 
-        ///// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
-        ///// <summary>
-        ///// Generate text with a specified prompt. SSE streamed results.
-        ///// </summary>
-        ///// <remarks>
-        ///// Generates text given a prompt and generation settings, with SSE streaming.
-        ///// <br/>
-        ///// <br/>Unspecified values are set to defaults.
-        ///// <br/>
-        ///// <br/>SSE streaming establishes a persistent connection, returning ongoing process in the form of message events.
-        ///// <br/>
-        ///// <br/>``` 
-        ///// <br/>event: message
-        ///// <br/>data: {data}
-        ///// <br/>
-        ///// <br/>```
-        ///// </remarks>
-        ///// <returns>Successful request</returns>
-        ///// <exception cref="ApiException">A server side error occurred.</exception>
-        //public virtual async Task<GenerationOutput> StreamAsync(GenerationInput body, System.Threading.CancellationToken cancellationToken)
-        //{
-        //    if (body == null)
-        //        throw new System.ArgumentNullException("body");
-
-        //    var client_ = _httpClient;
-
-        //    var disposeClient_ = false;
-        //    try
-        //    {
-        //        using (var request_ = new System.Net.Http.HttpRequestMessage())
-        //        {
-        //            var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
-        //            var content_ = new System.Net.Http.StringContent(json_);
-        //            content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
-        //            request_.Content = content_;
-        //            request_.Method = new System.Net.Http.HttpMethod("POST");
-        //            request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
-
-        //            var urlBuilder_ = new System.Text.StringBuilder();
-        //            if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-        //            // Operation Path: "api/extra/generate/stream"
-        //            urlBuilder_.Append("api/extra/generate/stream");
-
-        //            PrepareRequest(client_, request_, urlBuilder_);
-
-        //            var url_ = urlBuilder_.ToString();
-        //            request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
-
-        //            PrepareRequest(client_, request_, url_);
-
-        //            var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        //            var disposeResponse_ = true;
-        //            try
-        //            {
-        //                var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
-        //                foreach (var item_ in response_.Headers)
-        //                    headers_[item_.Key] = item_.Value;
-        //                if (response_.Content != null && response_.Content.Headers != null)
-        //                {
-        //                    foreach (var item_ in response_.Content.Headers)
-        //                        headers_[item_.Key] = item_.Value;
-        //                }
-
-        //                ProcessResponse(client_, response_);
-
-        //                var status_ = (int)response_.StatusCode;
-        //                if (status_ == 200)
-        //                {
-        //                    var objectResponse_ = await ReadObjectResponseAsync<GenerationOutput>(response_, headers_, cancellationToken).ConfigureAwait(false);
-        //                    if (objectResponse_.Object == null)
-        //                    {
-        //                        throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-        //                    }
-        //                    return objectResponse_.Object;
-        //                }
-        //                else
-        //                if (status_ == 503)
-        //                {
-        //                    var objectResponse_ = await ReadObjectResponseAsync<ServerBusyError>(response_, headers_, cancellationToken).ConfigureAwait(false);
-        //                    if (objectResponse_.Object == null)
-        //                    {
-        //                        throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
-        //                    }
-        //                    throw new ApiException<ServerBusyError>("Server is busy", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
-        //                }
-        //                else
-        //                {
-        //                    var responseData_ = response_.Content == null ? null : await response_.Content.ReadAsStringAsync().ConfigureAwait(false);
-        //                    throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
-        //                }
-        //            }
-        //            finally
-        //            {
-        //                if (disposeResponse_)
-        //                    response_.Dispose();
-        //            }
-        //        }
-        //    }
-        //    finally
-        //    {
-        //        if (disposeClient_)
-        //            client_.Dispose();
-        //    }
-        //}
-
-        /// <summary>
-        /// Poll the incomplete results of the currently ongoing text generation.
-        /// </summary>
-        /// <remarks>
-        /// Poll the incomplete results of the currently ongoing text generation. Will not work when multiple requests are in queue.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<GenerationOutput> CheckGETAsync()
-        {
-            return CheckGETAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Poll the incomplete results of the currently ongoing text generation.
@@ -1254,7 +1042,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<GenerationOutput> CheckGETAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<GenerationOutput> CheckGETAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -1322,19 +1110,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Poll the incomplete results of the currently ongoing text generation. Supports multiuser mode.
-        /// </summary>
-        /// <remarks>
-        /// Poll the incomplete results of the currently ongoing text generation. A unique genkey previously submitted allows polling even in multiuser mode.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<GenerationOutput> CheckPOSTAsync(Body body)
-        {
-            return CheckPOSTAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Poll the incomplete results of the currently ongoing text generation. Supports multiuser mode.
@@ -1344,7 +1119,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<GenerationOutput> CheckPOSTAsync(Body body, System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<GenerationOutput> CheckPOSTAsync(GenkeyData body, CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -1416,19 +1191,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Counts the number of tokens in a string.
-        /// </summary>
-        /// <remarks>
-        /// Counts the number of tokens in a string.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<KcppValueResult> TokencountAsync(KcppPrompt body)
-        {
-            return TokencountAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Counts the number of tokens in a string.
@@ -1438,7 +1200,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<KcppValueResult> TokencountAsync(KcppPrompt body, System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<KcppValueResult> TokencountAsync(KcppPrompt body, CancellationToken cancellationToken = default)
         {
             if (body == null)
                 throw new System.ArgumentNullException("body");
@@ -1513,19 +1275,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Aborts the currently ongoing text generation.
-        /// </summary>
-        /// <remarks>
-        /// Aborts the currently ongoing text generation. Does not work when multiple requests are in queue.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<KcppResponse> AbortAsync(Body3 body)
-        {
-            return AbortAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Aborts the currently ongoing text generation.
@@ -1535,7 +1284,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<KcppResponse> AbortAsync(Body3 body, System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<KcppResponse> AbortAsync(GenkeyData body, CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -1607,19 +1356,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Uses Whisper to perform a Speech-To-Text transcription.
-        /// </summary>
-        /// <remarks>
-        /// Uses Whisper to perform a Speech-To-Text transcription.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<KcppValueResult> TranscribeAsync(KcppAudioData body)
-        {
-            return TranscribeAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Uses Whisper to perform a Speech-To-Text transcription.
@@ -1629,7 +1365,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<KcppValueResult> TranscribeAsync(KcppAudioData body, System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<KcppValueResult> TranscribeAsync(KcppAudioData body, CancellationToken cancellationToken = default)
         {
             if (body == null)
                 throw new System.ArgumentNullException("body");
@@ -1704,19 +1440,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Gets a list of image generation models
-        /// </summary>
-        /// <remarks>
-        /// Gets a list of image generation models. For koboldcpp, only one model will be returned. If no model is loaded, the list is empty.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task SdModelsAsync()
-        {
-            return SdModelsAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Gets a list of image generation models
@@ -1726,7 +1449,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task SdModelsAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task SdModelsAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -1789,19 +1512,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Gets configuration info for image generation
-        /// </summary>
-        /// <remarks>
-        /// Gets configuration info for image generation, used to get loaded model name in A1111.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task OptionsAsync()
-        {
-            return OptionsAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Gets configuration info for image generation
@@ -1811,7 +1521,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task OptionsAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task OptionsAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -1874,19 +1584,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Gets a list of supported samplers
-        /// </summary>
-        /// <remarks>
-        /// Gets a list of supported samplers.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task SamplersAsync()
-        {
-            return SamplersAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Gets a list of supported samplers
@@ -1896,7 +1593,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task SamplersAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task SamplersAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -1959,19 +1656,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Generates an image from a text prompt
-        /// </summary>
-        /// <remarks>
-        /// Generates an image from a text prompt, and returns a base64 encoded png.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<ImageResponse> Txt2imgAsync(KcppImagePrompt body)
-        {
-            return Txt2imgAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Generates an image from a text prompt
@@ -1981,7 +1665,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<ImageResponse> Txt2imgAsync(KcppImagePrompt body, System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<ImageResponse> Txt2imgAsync(KcppImagePrompt body, CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -2053,19 +1737,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Transforms an existing image into a new image
-        /// </summary>
-        /// <remarks>
-        /// Transforms an existing image into a new image, guided by a text prompt, and returns a base64 encoded png.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<Img2ImgResponse> Img2imgAsync(KcppImg2ImgQuery body)
-        {
-            return Img2imgAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Transforms an existing image into a new image
@@ -2075,7 +1746,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<Img2ImgResponse> Img2imgAsync(KcppImg2ImgQuery body, System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<Img2ImgResponse> Img2imgAsync(KcppImg2ImgQuery body, CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -2147,19 +1818,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Generates a short text caption describing an image
-        /// </summary>
-        /// <remarks>
-        /// Generates a short text caption describing an image.
-        /// </remarks>
-        /// <returns>Successful request</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task<CaptionedImageResponse> InterrogateAsync(KcppCaptionQuery body)
-        {
-            return InterrogateAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Generates a short text caption describing an image
@@ -2169,7 +1827,7 @@ namespace AIToolkit.API
         /// </remarks>
         /// <returns>Successful request</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task<CaptionedImageResponse> InterrogateAsync(KcppCaptionQuery body, System.Threading.CancellationToken cancellationToken)
+        public virtual async Task<CaptionedImageResponse> InterrogateAsync(KcppCaptionQuery body, CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -2241,22 +1899,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Generates text continuations given a prompt. Please refer to OpenAI documentation
-        /// </summary>
-        /// <remarks>
-        /// Generates text continuations given a prompt.
-        /// <br/>
-        /// <br/>This is an OpenAI compatibility endpoint.
-        /// <br/>
-        /// <br/> Please refer to OpenAI documentation at [https://platform.openai.com/docs/api-reference/completions](https://platform.openai.com/docs/api-reference/completions)
-        /// </remarks>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task CompletionsAsync()
-        {
-            return CompletionsAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Generates text continuations given a prompt. Please refer to OpenAI documentation
@@ -2269,7 +1911,7 @@ namespace AIToolkit.API
         /// <br/> Please refer to OpenAI documentation at [https://platform.openai.com/docs/api-reference/completions](https://platform.openai.com/docs/api-reference/completions)
         /// </remarks>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task CompletionsAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task CompletionsAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -2323,22 +1965,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Generates a response from a list of messages. Please refer to OpenAI documentation
-        /// </summary>
-        /// <remarks>
-        /// Given a list of messages comprising a conversation, the model will return a response.
-        /// <br/>
-        /// <br/> This is an OpenAI compatibility endpoint.
-        /// <br/>
-        /// <br/> Please refer to OpenAI documentation at [https://platform.openai.com/docs/api-reference/chat](https://platform.openai.com/docs/api-reference/chat)
-        /// </remarks>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task Completions2Async()
-        {
-            return Completions2Async(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Generates a response from a list of messages. Please refer to OpenAI documentation
@@ -2351,7 +1977,7 @@ namespace AIToolkit.API
         /// <br/> Please refer to OpenAI documentation at [https://platform.openai.com/docs/api-reference/chat](https://platform.openai.com/docs/api-reference/chat)
         /// </remarks>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task Completions2Async(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task Completions2Async(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -2405,22 +2031,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// List and describe the various models available in the API. Please refer to OpenAI documentation
-        /// </summary>
-        /// <remarks>
-        /// List and describe the various models available in the API.
-        /// <br/>
-        /// <br/> This is an OpenAI compatibility endpoint.
-        /// <br/>
-        /// <br/> Please refer to OpenAI documentation at [https://platform.openai.com/docs/api-reference/models](https://platform.openai.com/docs/api-reference/models)
-        /// </remarks>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task ModelsAsync()
-        {
-            return ModelsAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// List and describe the various models available in the API. Please refer to OpenAI documentation
@@ -2433,7 +2043,7 @@ namespace AIToolkit.API
         /// <br/> Please refer to OpenAI documentation at [https://platform.openai.com/docs/api-reference/models](https://platform.openai.com/docs/api-reference/models)
         /// </remarks>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task ModelsAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task ModelsAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -2486,22 +2096,6 @@ namespace AIToolkit.API
             }
         }
 
-        /// <summary>
-        /// Transcribes a wav file with speech to text using loaded Whisper model. Please refer to OpenAI documentation
-        /// </summary>
-        /// <remarks>
-        /// Transcribes a wav file with speech to text using loaded Whisper model.
-        /// <br/>
-        /// <br/> This is an OpenAI compatibility endpoint.
-        /// <br/>
-        /// <br/> Please refer to OpenAI documentation at [https://platform.openai.com/docs/api-reference/audio/createTranscription](https://platform.openai.com/docs/api-reference/audio/createTranscription)
-        /// </remarks>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual Task TranscriptionsAsync()
-        {
-            return TranscriptionsAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
         /// Transcribes a wav file with speech to text using loaded Whisper model. Please refer to OpenAI documentation
@@ -2514,7 +2108,7 @@ namespace AIToolkit.API
         /// <br/> Please refer to OpenAI documentation at [https://platform.openai.com/docs/api-reference/audio/createTranscription](https://platform.openai.com/docs/api-reference/audio/createTranscription)
         /// </remarks>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async Task TranscriptionsAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async Task TranscriptionsAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -2580,10 +2174,10 @@ namespace AIToolkit.API
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string Type { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -2625,10 +2219,10 @@ namespace AIToolkit.API
         [System.ComponentModel.DataAnnotations.Required]
         public BasicResultInner Result { get; set; } = new BasicResultInner();
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -2656,10 +2250,10 @@ namespace AIToolkit.API
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string Result { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -2723,7 +2317,7 @@ namespace AIToolkit.API
         /// </summary>
         [Newtonsoft.Json.JsonProperty("sampler_order", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         [System.ComponentModel.DataAnnotations.MinLength(6)]
-        public System.Collections.Generic.ICollection<int> Sampler_order { get; set; }
+        public ICollection<int> Sampler_order { get; set; }
 
         /// <summary>
         /// RNG seed to use for sampling. If not specified, the global RNG will be used.
@@ -2736,7 +2330,7 @@ namespace AIToolkit.API
         /// An array of string sequences where the API will stop generating further tokens. The returned text WILL contain the stop sequence.
         /// </summary>
         [Newtonsoft.Json.JsonProperty("stop_sequence", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.Collections.Generic.ICollection<string> Stop_sequence { get; set; }
+        public ICollection<string> Stop_sequence { get; set; }
 
         /// <summary>
         /// Temperature value.
@@ -2863,7 +2457,6 @@ namespace AIToolkit.API
         /// </summary>
         [Newtonsoft.Json.JsonProperty("images", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public List<string> Images { get; set; }
-//        public System.Collections.Generic.ICollection<object> Images { get; set; }
 
         /// <summary>
         /// KoboldCpp ONLY. If true, also removes detected stop_sequences from the output and truncates all text after them.
@@ -2887,7 +2480,7 @@ namespace AIToolkit.API
         /// An array of string sequences to remove from model vocab. All matching tokens with matching substrings are removed.
         /// </summary>
         [Newtonsoft.Json.JsonProperty("banned_tokens", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.Collections.Generic.ICollection<string> Banned_tokens { get; set; }
+        public ICollection<string> Banned_tokens { get; set; }
 
         /// <summary>
         /// KoboldCpp ONLY. An dictionary of key-value pairs, which indicate the token IDs (int) and logit bias (float) to apply for that token. Up to 16 value can be provided.
@@ -2920,7 +2513,7 @@ namespace AIToolkit.API
         /// An array of string sequence breakers for DRY.
         /// </summary>
         [Newtonsoft.Json.JsonProperty("dry_sequence_breakers", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.Collections.Generic.ICollection<string> Dry_sequence_breakers { get; set; }
+        public ICollection<string> Dry_sequence_breakers { get; set; }
 
         /// <summary>
         /// KoboldCpp ONLY. XTC threshold.
@@ -2936,10 +2529,10 @@ namespace AIToolkit.API
         [System.ComponentModel.DataAnnotations.Range(0D, double.MaxValue)]
         public double Xtc_probability { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -2968,12 +2561,12 @@ namespace AIToolkit.API
         /// </summary>
         [Newtonsoft.Json.JsonProperty("results", Required = Newtonsoft.Json.Required.Always)]
         [System.ComponentModel.DataAnnotations.Required]
-        public System.Collections.Generic.ICollection<GenerationResult> Results { get; set; } = new System.Collections.ObjectModel.Collection<GenerationResult>();
+        public ICollection<GenerationResult> Results { get; set; } = new System.Collections.ObjectModel.Collection<GenerationResult>();
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3004,10 +2597,10 @@ namespace AIToolkit.API
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string Text { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3034,10 +2627,10 @@ namespace AIToolkit.API
         [System.ComponentModel.DataAnnotations.Range(8, int.MaxValue)]
         public int Value { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3065,10 +2658,10 @@ namespace AIToolkit.API
         [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue)]
         public int Value { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3096,10 +2689,10 @@ namespace AIToolkit.API
         [System.ComponentModel.DataAnnotations.Required]
         public BasicError Detail { get; set; } = new BasicError();
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3126,10 +2719,10 @@ namespace AIToolkit.API
         [Newtonsoft.Json.JsonProperty("value", Required = Newtonsoft.Json.Required.Always)]
         public int Value { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3160,10 +2753,10 @@ namespace AIToolkit.API
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string Version { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3253,10 +2846,10 @@ namespace AIToolkit.API
         [Newtonsoft.Json.JsonProperty("idletime", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public double Idletime { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3278,7 +2871,7 @@ namespace AIToolkit.API
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.1.0.0 (NJsonSchema v11.0.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class Body
+    public partial class GenkeyData
     {
         /// <summary>
         /// A unique key used to identify this generation while it is in progress.
@@ -3286,10 +2879,10 @@ namespace AIToolkit.API
         [Newtonsoft.Json.JsonProperty("genkey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Genkey { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3301,13 +2894,12 @@ namespace AIToolkit.API
             return Newtonsoft.Json.JsonConvert.SerializeObject(this, new Newtonsoft.Json.JsonSerializerSettings());
 
         }
-        public static Body FromJson(string data)
+        public static GenkeyData FromJson(string data)
         {
 
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<Body>(data, new Newtonsoft.Json.JsonSerializerSettings());
+            return Newtonsoft.Json.JsonConvert.DeserializeObject<GenkeyData>(data, new Newtonsoft.Json.JsonSerializerSettings());
 
         }
-
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.1.0.0 (NJsonSchema v11.0.2.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -3319,10 +2911,10 @@ namespace AIToolkit.API
         [Newtonsoft.Json.JsonProperty("prompt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Prompt { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3343,38 +2935,6 @@ namespace AIToolkit.API
 
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.1.0.0 (NJsonSchema v11.0.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class Body3
-    {
-        /// <summary>
-        /// A unique key used to identify this generation while it is in progress.
-        /// </summary>
-        [Newtonsoft.Json.JsonProperty("genkey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Genkey { get; set; }
-
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
-
-        [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
-        {
-            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
-            set { _additionalProperties = value; }
-        }
-
-        public string ToJson()
-        {
-
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this, new Newtonsoft.Json.JsonSerializerSettings());
-
-        }
-        public static Body3 FromJson(string data)
-        {
-
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<Body3>(data, new Newtonsoft.Json.JsonSerializerSettings());
-
-        }
-
-    }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.1.0.0 (NJsonSchema v11.0.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class KcppAudioData
@@ -3385,10 +2945,10 @@ namespace AIToolkit.API
         [Newtonsoft.Json.JsonProperty("audio_data", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Audio_data { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3436,10 +2996,10 @@ namespace AIToolkit.API
         [Newtonsoft.Json.JsonProperty("sampler_name", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Sampler_name { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3491,12 +3051,12 @@ namespace AIToolkit.API
         public double Denoising_strength { get; set; }
 
         [Newtonsoft.Json.JsonProperty("init_images", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.Collections.Generic.ICollection<object> Init_images { get; set; }
+        public ICollection<object> Init_images { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3532,10 +3092,10 @@ namespace AIToolkit.API
         [Newtonsoft.Json.JsonProperty("model", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Model { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3565,10 +3125,10 @@ namespace AIToolkit.API
         [Newtonsoft.Json.JsonProperty("success", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public bool Success { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3610,10 +3170,10 @@ namespace AIToolkit.API
         [Newtonsoft.Json.JsonProperty("info", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Info { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3655,10 +3215,10 @@ namespace AIToolkit.API
         [Newtonsoft.Json.JsonProperty("info", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Info { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3688,10 +3248,10 @@ namespace AIToolkit.API
         [Newtonsoft.Json.JsonProperty("caption", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Caption { get; set; }
 
-        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+        private IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
-        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        public IDictionary<string, object> AdditionalProperties
         {
             get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
             set { _additionalProperties = value; }
@@ -3709,8 +3269,6 @@ namespace AIToolkit.API
         }
 
     }
-
-
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.1.0.0 (NJsonSchema v11.0.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class ApiException : System.Exception
