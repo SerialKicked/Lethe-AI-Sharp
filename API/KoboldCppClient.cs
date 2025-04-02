@@ -2862,7 +2862,8 @@ namespace AIToolkit.API
         /// KoboldCpp ONLY. If set, takes an array of base64 encoded strings, each one representing an image to be processed.
         /// </summary>
         [Newtonsoft.Json.JsonProperty("images", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.Collections.Generic.ICollection<object> Images { get; set; }
+        public List<string> Images { get; set; }
+//        public System.Collections.Generic.ICollection<object> Images { get; set; }
 
         /// <summary>
         /// KoboldCpp ONLY. If true, also removes detected stop_sequences from the output and truncates all text after them.

@@ -12,6 +12,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.VisualBasic;
 using System.Collections.ObjectModel;
+using System.Drawing;
 
 namespace AIToolkit.LLM
 {
@@ -66,7 +67,6 @@ namespace AIToolkit.LLM
         private static void RaiseOnInferenceEnded(string fullString) => OnInferenceEnded?.Invoke(null, fullString);
         private static void RaiseOnQuickInferenceEnded(string fullprompt) => OnQuickInferenceEnded?.Invoke(null, fullprompt);
 
-
         public static List<IContextPlugin> ContextPlugins { get; set; } = [];
 
         public static readonly Random RNG = new();
@@ -113,6 +113,8 @@ namespace AIToolkit.LLM
         private static ILogger? logger = null;
         private static BasePersona bot = new() { IsUser = false, Name = "Bot", Bio = "You are an helpful AI assistant whose goal is to answer questions and complete tasks.", UniqueName = string.Empty };
         private static BasePersona user = new() { IsUser = true, Name = "User", UniqueName = string.Empty };
+
+        private static List<string> vlm_pictures = [];
 
         internal static HashSet<Guid> usedGuidInSession = [];
         internal static PromptInserts dataInserts = [];
@@ -418,7 +420,7 @@ namespace AIToolkit.LLM
         {
             if (Status == SystemStatus.Busy)
                 return;
-            await StartGeneration(AuthorRole.Assistant, "");
+            await StartGeneration(AuthorRole.Assistant, string.Empty);
         }
 
         public static async Task ImpersonateUser()
@@ -439,7 +441,7 @@ namespace AIToolkit.LLM
         {
             if (Status == SystemStatus.Busy)
                 return;
-            await StartGeneration(message.Role, message.Message, imgBase64);
+            await StartGeneration(message.Role, message.Message);
         }
 
         /// <summary>
@@ -472,6 +474,7 @@ namespace AIToolkit.LLM
                 genparams.Max_length = MaxReplyLength;
                 genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
                 genparams.Prompt = _LastGeneratedPrompt;
+                genparams.Images = new List<string>(vlm_pictures);
                 RaiseOnFullPromptReady(genparams.Prompt);
                 await Client.GenerateTextStreamAsync(genparams);
             }
@@ -499,6 +502,7 @@ namespace AIToolkit.LLM
             genparams.Max_context_length = MaxContextLength;
             genparams.Max_length = MaxReplyLength;
             genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
+            genparams.Images = new List<string>(vlm_pictures);
             genparams.Prompt = _LastGeneratedPrompt;
             if (!string.IsNullOrEmpty(systemMessage) && logSystemPrompt)
                 Bot.History.LogMessage(AuthorRole.System, systemMessage, User, Bot);
@@ -520,7 +524,7 @@ namespace AIToolkit.LLM
         /// <param name="MsgSender">Role of the sender</param>
         /// <param name="userInput">Message from sender</param>
         /// <returns></returns>
-        private static async Task StartGeneration(AuthorRole MsgSender, string userInput, string? imgBase64 = null)
+        private static async Task StartGeneration(AuthorRole MsgSender, string userInput)
         {
             if (Status == SystemStatus.Busy)
                 return;
@@ -556,15 +560,14 @@ namespace AIToolkit.LLM
                 RaiseOnInferenceStreamed(StreamingTextProgress);
             }
             GenerationInput genparams = Sampler.GetCopy();
-            _LastGeneratedPrompt = await GenerateFullPrompt(MsgSender, inputText, pluginmessage, imgBase64 != null ? 300 : 0);
+            _LastGeneratedPrompt = await GenerateFullPrompt(MsgSender, inputText, pluginmessage, vlm_pictures.Count > 0 ? vlm_pictures.Count * 1024 : 0);
             if (ForceTemperature >= 0)
                 genparams.Temperature = ForceTemperature;
             genparams.Max_context_length = MaxContextLength;
             genparams.Max_length = MaxReplyLength;
             genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
             genparams.Prompt = _LastGeneratedPrompt;
-            if (!string.IsNullOrEmpty(imgBase64))
-                genparams.Images = new List<object>() { imgBase64 };
+            genparams.Images = new List<string>(vlm_pictures);
             if (!string.IsNullOrEmpty(userInput))
                 Bot.History.LogMessage(MsgSender, userInput, User, Bot);
 
@@ -641,6 +644,27 @@ namespace AIToolkit.LLM
         {
             OnQuickInferenceEnded = null;
         }
+
+        #region *** Visual Language Model Management ***
+
+        public static void VLM_ClearImages()
+        {
+            vlm_pictures = [];
+        }
+
+        public static void VLM_AddB64Image(string base64)
+        {
+            vlm_pictures.Add(base64);
+        }
+
+        public static void VLM_AddImage(Image image, int size = 1024)
+        {
+            var res = ImageUtils.ImageToBase64(image, size);
+            if (!string.IsNullOrEmpty(res))
+                vlm_pictures.Add(res);
+        }
+
+        #endregion
 
     }
 }
