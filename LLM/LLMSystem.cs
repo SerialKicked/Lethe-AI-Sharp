@@ -17,12 +17,12 @@ using System.Drawing;
 namespace AIToolkit.LLM
 {
     public enum SystemStatus { NotInit, Ready, Busy }
-    public enum SystemPromptSection { MainPrompt, BotBio, UserBio, Scenario, Memory, ContextInfo }
     public enum BackendAPI { KoboldAPI, OpenAI }
 
-    //public delegate void BasicDelegateFunction();
-    //public delegate void UpdateMessageFunction(string update);
-
+    /// <summary>
+    /// System to handle communications with language models. 
+    /// Handles the connection to the server and the generation of prompts. Manages the chat history, personas, inference settings, and instruction formats
+    /// </summary>
     public static class LLMSystem
     {
         /// <summary> URL of the backend server </summary>

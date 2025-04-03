@@ -62,9 +62,16 @@ namespace AIToolkit.LLM
 
     /// <summary>
     /// Retrieval Augmented Generation System
+    /// 
     /// </summary>
     public static class RAGSystem
     {
+        /// <summary> Called when the system embedded a session </summary>
+        public static event EventHandler<Files.ChatSession>? OnEmbedSession;
+
+        private static void RaidOnEmbedSession(Files.ChatSession session) => OnEmbedSession?.Invoke(null, session);
+
+
         /// <summary> Maximum number of entries to be retrieved with RAG </summary>
         public static int MaxRAGEntries { get; set; } = 3;
 
@@ -181,6 +188,7 @@ namespace AIToolkit.LLM
             foreach (var session in log.Sessions)
             {
                 await session.GenerateEmbeds();
+                RaidOnEmbedSession(session);
             }
         }
 
@@ -356,6 +364,11 @@ namespace AIToolkit.LLM
                 return;
             VectorDB.AddItems(x);
             IsVectorDBLoaded = true;
+        }
+
+        public static void RemoveEmbedEventHandler()
+        {
+            OnEmbedSession = null;
         }
     }
 }
