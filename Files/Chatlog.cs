@@ -327,7 +327,6 @@ namespace AIToolkit.Files
                 var tks = LLMSystem.GetTokenCount(sb.ToString());
                 if (tks <= tokensleft)
                 {
-                    tokensleft -= tks;
                     res.Insert(0, sb.ToString());
                 }
                 else

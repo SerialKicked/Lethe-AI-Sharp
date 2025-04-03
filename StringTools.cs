@@ -159,9 +159,7 @@ namespace AIToolkit
             if (fix.FixQuotes && !fix.RemoveAllQuotes)
             {
                 // Remove asterisks if they are between quotes
-                workstring = Regex.Replace(workstring,
-                    "\"([^\"]*)\"",
-                    match => "\"" + match.Groups[1].Value.Replace("*", "") + "\"");
+                workstring = Regex.Replace(workstring, "\"([^\"]*)\"", match => "\"" + match.Groups[1].Value.Replace("*", "") + "\"");
 
                 // Remove asterisks just before and after quotes
                 workstring = workstring.Replace(" **\"", " \"");

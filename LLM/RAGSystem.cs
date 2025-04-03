@@ -65,13 +65,31 @@ namespace AIToolkit.LLM
     /// </summary>
     public static class RAGSystem
     {
+        /// <summary> Maximum number of entries to be retrieved with RAG </summary>
+        public static int MaxRAGEntries { get; set; } = 3;
+
+        /// <summary> Index at which RAG entries will be inserted </summary>
+        public static int RAGIndex { get; set; } = 3;
+
+        /// <summary> Embedding size (depends on the embedding model) </summary>
         public static int EmbeddingSize { get; private set; } = 1024;
+
+        /// <summary> Use summaries' embeddings for RAG </summary>
         public static bool UseSummaries { get; set; } = true;
+
+        /// <summary> Use titles embeddings for RAG </summary>
         public static bool UseTitles { get; set; } = true;
+
+        /// <summary> M Value for the Vector Search (SmallWorld / HNSW.NET implementation) </summary>
         public static int MValue { get; set; } = 15;
+
+        /// <summary> Max distance for an entry to be retrieved (SmallWorld / HNSW.NET implementation) </summary>
         public static float DistanceCutOff { get; set; } = 0.2f;
+
+        /// <summary> Search method. Simple tends to be the most consistent method </summary>
         public static NeighbourSelectionHeuristic Heuristic { get; set; } = NeighbourSelectionHeuristic.SelectSimple;
 
+        /// <summary> Toggle RAG functionalities on/off </summary>
         public static bool Enabled
         {
             get => enabled;
@@ -92,10 +110,6 @@ namespace AIToolkit.LLM
         private static bool IsVectorDBLoaded = false;
 
         public static Dictionary<int, (Guid ID, EmbedType embedType)> LookupDB { get; private set; } = [];
-
-        public static void Init()
-        {
-        }
 
         public static void ApplySettings()
         {
@@ -163,7 +177,7 @@ namespace AIToolkit.LLM
             if (!Enabled)
                 return;
             _ = Embedder ?? LoadEmbedder();
-            // Embed all the messages in the chatlog except the 80 last ones
+            // Embed all the messages in the chatlog
             foreach (var session in log.Sessions)
             {
                 await session.GenerateEmbeds();
@@ -244,7 +258,7 @@ namespace AIToolkit.LLM
             IsVectorDBLoaded = true;
         }
 
-        public static async Task<List<(IEmbed session, EmbedType category, float distance)>> Search(string message, int count)
+        public static async Task<List<(IEmbed session, EmbedType category, float distance)>> Search(string message)
         {
             if (!Enabled)
                 return [];
@@ -254,10 +268,10 @@ namespace AIToolkit.LLM
                 VectorizeChatBot(LLMSystem.Bot);
             }
             var emb = await EmbeddingText(message);
-            var subcount = count;
+            var subcount = MaxRAGEntries;
             // If we have both titles and summaries double result count to get a better picture
             if (UseSummaries && UseTitles)
-                subcount += count;
+                subcount += MaxRAGEntries;
             if (LLMSystem.WorldInfo)
                 subcount += 1;
             var res = Search(emb, subcount);
@@ -286,8 +300,8 @@ namespace AIToolkit.LLM
                 res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
             }
             // Make sure we got the correct amount of results
-            if (res.Count > count)
-                res = res.GetRange(0, count);
+            if (res.Count > MaxRAGEntries)
+                res = res.GetRange(0, MaxRAGEntries);
             res.RemoveAll(e => e.Distance > DistanceCutOff);
             var list = new List<(IEmbed session, EmbedType category, float distance)>();
             foreach (var item in res)

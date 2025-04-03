@@ -18,17 +18,26 @@ namespace AIToolkit.LLM
 {
     public enum SystemStatus { NotInit, Ready, Busy }
     public enum SystemPromptSection { MainPrompt, BotBio, UserBio, Scenario, Memory, ContextInfo }
+    public enum BackendAPI { KoboldAPI, OpenAI }
 
-    public delegate void BasicDelegateFunction();
-    public delegate void UpdateMessageFunction(string update);
+    //public delegate void BasicDelegateFunction();
+    //public delegate void UpdateMessageFunction(string update);
 
     public static class LLMSystem
     {
+        /// <summary> URL of the backend server </summary>
         public static string BackendUrl { get; set; } = "http://localhost:5001";
-        public static int MaxRAGEntries { get; set; } = 3;
-        public static int RAGIndex { get; set; } = 3;
+
+        /// <summary> API of the backend server, KoboldAPI (text completion) and OpenAI (chat completion) are both handled </summary>
+        public static BackendAPI BackendAPI { get; set; } = BackendAPI.KoboldAPI;
+
+        /// <summary> Reserved token space for summaries of previous sessions (0 to disable) </summary>
         public static int ReservedSessionTokens { get; set; } = 2048;
+
+        /// <summary> Max length for the bot's reply. </summary>
         public static int MaxReplyLength { get; set; } = 512;
+
+        /// <summary> Total token context window the model can handle </summary>
         public static int MaxContextLength { 
             get => maxContextLength;
             set 
@@ -38,23 +47,41 @@ namespace AIToolkit.LLM
                 maxContextLength = value;
             }
         }
+
+        /// <summary> Name of the currently loaded model </summary>
         public static string CurrentModel { get; private set; } = string.Empty;
+
+        /// <summary> Name of the current backend </summary>
         public static string Backend { get; private set; } = string.Empty;
+
+        /// <summary> If >= 0 it'll override the selected sampler's temperature setting. </summary>
         public static double ForceTemperature { get; set; } = 0.7;
+
+        /// <summary> Overrides the scenario field of the currently loaded character </summary>
         public static string ScenarioOverride { get; set; } = string.Empty;
+
+        /// <summary> Override the Instruct Format setting deciding if character names should be inserted into the prompts (null to disable) </summary>
         public static bool? NamesInPromptOverride { get; set; } = null;
+
+        /// <summary> Should the prompt format the memories and RAG entries into markdown. Some models like it better than others. </summary>
         public static bool MarkdownMemoryFormating { get; set; } = false;
+
+        /// <summary> Should we stop the generation after the first paragraph? </summary>
         public static bool StopGenerationOnFirstParagraph { get; set; } = false;
+
+        /// <summary> Allow keyword-activated snippets to be inserted in the prompt (see WorldInfo and BasePersona) </summary>
         public static bool WorldInfo { get; set; } = true;
+
+        /// <summary> Should the prompt contains only the latest chat session or as much dialog as we can fit? </summary>
         public static SessionHandling SessionHandling { get; set; } = SessionHandling.FitAll;
 
         internal static Dictionary<string, BasePersona> LoadedPersonas = [];
 
-        /// <summary> Called when the non streaming inference has completed, returns raw response </summary>
+        /// <summary> Called when the non streaming inference has completed, returns the raw and complete response from the model </summary>
         public static event EventHandler<string>? OnQuickInferenceEnded;
         /// <summary> Called when this library has generated the full prompt, returns full prompt </summary>
         public static event EventHandler<string>? OnFullPromptReady;
-        /// <summary> Called during inference each time the LLM outputs a new token </summary>
+        /// <summary> Called during inference each time the LLM outputs a new token, returns the generated token </summary>
         public static event EventHandler<string>? OnInferenceStreamed;
         /// <summary> Called once the inference has ended, returns the full string </summary>
         public static event EventHandler<string>? OnInferenceEnded;
@@ -67,10 +94,12 @@ namespace AIToolkit.LLM
         private static void RaiseOnInferenceEnded(string fullString) => OnInferenceEnded?.Invoke(null, fullString);
         private static void RaiseOnQuickInferenceEnded(string fullprompt) => OnQuickInferenceEnded?.Invoke(null, fullprompt);
 
+        /// <summary> List of loaded plugins </summary>
         public static List<IContextPlugin> ContextPlugins { get; set; } = [];
 
-        public static readonly Random RNG = new();
-
+        /// <summary>
+        /// Current status of the system. NoInit = not initialized, Ready = ready to use, Busy = working or generating a response.
+        /// </summary>
         public static SystemStatus Status
         {
             get => status;
@@ -81,13 +110,23 @@ namespace AIToolkit.LLM
             }
         }
 
+        /// <summary> The currently loaded bot persona. You can change it here. </summary>
+        /// <seealso cref="BasePersona"/>"
         public static BasePersona Bot { get => bot; set => ChangeBot(value); }
+
+        /// <summary> The currently loaded user persona. You can change it here. </summary>
+        /// <seealso cref="BasePersona"/>"
         public static BasePersona User { get => user; set => user = value; }
+
+        /// <summary> Basic logging system to hook into </summary>
         public static ILogger? Logger
         {
             get => logger;
             set => logger = value;
         }
+
+        /// <summary> Instruction format (important for KoboldAPI as it determines how to format the text in a way the model understands) </summary>
+        /// <seealso cref="InstructFormat"/>"
         public static InstructFormat Instruct { 
             get => instruct; 
             set
@@ -96,10 +135,19 @@ namespace AIToolkit.LLM
                 InvalidatePromptCache();
             } 
         }
+
+        /// <summary> Inference settings (The Kobold API handles more settings than OpenAI one).</summary>
+        /// <seealso cref="SamplerSettings"/>
         public static SamplerSettings Sampler { get; set; } = new();
+
+        /// <summary> Customer system prompt that will be used. See SysPrompt </summary>
+        /// <seealso cref="SystemPrompt"/>"
         public static SystemPrompt SystemPrompt { get; set; } = new();
+
+        /// <summary> Shortcut to the chat history of the currently loaded bot. </summary>
         public static Chatlog History => Bot.History;
 
+        /// <summary> Language models use this character to mark a new line which is different than the one used on Windows.</summary>
         public static readonly string NewLine = "\n";
 
         private static SystemStatus status = SystemStatus.NotInit;
@@ -118,6 +166,7 @@ namespace AIToolkit.LLM
 
         internal static HashSet<Guid> usedGuidInSession = [];
         internal static PromptInserts dataInserts = [];
+        internal static readonly Random RNG = new();
 
         public static void Init()
         {
@@ -345,7 +394,7 @@ namespace AIToolkit.LLM
                 if (session.Sticky && session != History.CurrentSession)
                 {
                     var rawmem = session.GetRawMemory(!MarkdownMemoryFormating);
-                    dataInserts.AddInsert(new PromptInsert(session.Guid, rawmem, RAGIndex , 1));
+                    dataInserts.AddInsert(new PromptInsert(session.Guid, rawmem, RAGSystem.RAGIndex, 1));
                 }
             }
             // Check if the plugin has anything to add to system prompts
@@ -359,7 +408,7 @@ namespace AIToolkit.LLM
             // Check for RAG entries
             if (RAGSystem.Enabled)
             {
-                var search = await RAGSystem.Search(ReplaceMacros(searchmessage), MaxRAGEntries);
+                var search = await RAGSystem.Search(ReplaceMacros(searchmessage));
                 search.RemoveAll(search => usedGuidInSession.Contains(search.session.Guid));
                 dataInserts.AddMemories(search);
             }

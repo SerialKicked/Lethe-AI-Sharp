@@ -1,8 +1,8 @@
+#pragma warning disable IDE1006 // Naming Styles
 #pragma warning disable 8603 // Null returns
 #pragma warning disable 8604 // Disable "CS8604 Possible null reference argument for parameter"
 #pragma warning disable 8618 // Disable "CS8618 Non-nullable field is uninitialized"
 #pragma warning disable 8625 // Disable "CS8625 Cannot convert null literal to non-nullable reference type"
-#pragma warning disable 8765 // Disable "CS8765 Nullability of type of parameter doesn't match overridden member (possibly because of nullability attributes)."
 
 using Newtonsoft.Json;
 using System;
@@ -977,7 +977,7 @@ namespace AIToolkit.API
         public bool txt2img { get; set; }
         public bool vision { get; set; }
         public bool transcribe { get; set; }
-}
+    }
 
     public class KCBasicResult
     {
@@ -2090,14 +2090,9 @@ namespace AIToolkit.API
         }
     }
 
-    public class TextStreamingEvenArg : EventArgs
+    public class TextStreamingEvenArg(string data) : EventArgs
     {
-        public StreamingTokenResponse Data { get; }
-
-        public TextStreamingEvenArg(string data)
-        {
-            Data = StreamingTokenResponse.FromJson(data);
-        }
+        public StreamingTokenResponse Data { get; } = StreamingTokenResponse.FromJson(data);
     }
 
     public class WebQuery
@@ -2133,8 +2128,8 @@ namespace AIToolkit.API
     }
 }
 
+#pragma warning restore IDE1006 // Naming Styles
 #pragma warning restore 8603 // Null returns
 #pragma warning restore 8604 // Disable "CS8604 Possible null reference argument for parameter"
 #pragma warning restore 8618 // Disable "CS8618 Non-nullable field is uninitialized"
 #pragma warning restore 8625 // Disable "CS8625 Cannot convert null literal to non-nullable reference type"
-#pragma warning restore 8765 // Disable "CS8765 Nullability of type of parameter doesn't match overridden member (possibly because of nullability attributes)."
