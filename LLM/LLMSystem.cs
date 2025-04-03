@@ -88,8 +88,13 @@ namespace AIToolkit.LLM
         /// <summary> Called when the system changes states (no init, busy, ready) </summary>
         public static event EventHandler<SystemStatus>? OnStatusChanged;
 
+        /// <summary> Set to true if the backend supports text-to-speech </summary>
         public static bool SupportsTTS => _client?.SupportsTTS ?? false;
+
+        /// <summary> Set to true if the backend supports web search </summary>
         public static bool SupportsWebSearch => _client?.SupportsWebSearch ?? false;
+
+        /// <summary> Set to true if the backend supports vision </summary>
         public static bool SupportsVision => _client?.SupportsVision ?? false;
 
         private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(null, fullprompt);
@@ -176,7 +181,6 @@ namespace AIToolkit.LLM
         {
             if (Status != SystemStatus.NotInit)
                 return;
-
             // Create the appropriate client based on the selected backend
             var httpClient = new HttpClient();
             _client = BackendAPI switch
@@ -189,12 +193,6 @@ namespace AIToolkit.LLM
             _client.BaseUrl = BackendUrl;
             _client.TokenReceived += Client_StreamingMessageReceived;
             Status = SystemStatus.Ready;
-
-            //Client.BaseUrl = BackendUrl;
-            //Client.ReadResponseAsString = true;
-            //Client.StreamingMessageReceived += Client_StreamingMessageReceived;
-            //// Load plugins
-            //Status = SystemStatus.Ready;
         }
 
         public static void LoadPersona(List<BasePersona> toload)

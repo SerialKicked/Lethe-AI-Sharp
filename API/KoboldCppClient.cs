@@ -646,6 +646,7 @@ namespace AIToolkit.API
         /// <br/> Please refer to OpenAI documentation at [https://platform.openai.com/docs/api-reference/completions](https://platform.openai.com/docs/api-reference/completions)
         /// </remarks>
         /// <exception cref="ApiException">A server side error occurred.</exception>
+        [Obsolete("This method is deprecated by OpenAI API support. Use NewMethod instead.", false)]
         public virtual async Task CompletionsAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
@@ -706,6 +707,7 @@ namespace AIToolkit.API
         /// <br/> Please refer to OpenAI documentation at [https://platform.openai.com/docs/api-reference/chat](https://platform.openai.com/docs/api-reference/chat)
         /// </remarks>
         /// <exception cref="ApiException">A server side error occurred.</exception>
+        [Obsolete("This method is deprecated by OpenAI API support. Use NewMethod instead.", false)]
         public virtual async Task Completions2Async(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
@@ -766,6 +768,7 @@ namespace AIToolkit.API
         /// <br/> Please refer to OpenAI documentation at [https://platform.openai.com/docs/api-reference/models](https://platform.openai.com/docs/api-reference/models)
         /// </remarks>
         /// <exception cref="ApiException">A server side error occurred.</exception>
+        [Obsolete("This method is deprecated by OpenAI API support. Use NewMethod instead.", false)]
         public virtual async Task ModelsAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
@@ -826,6 +829,7 @@ namespace AIToolkit.API
         /// <br/> Please refer to OpenAI documentation at [https://platform.openai.com/docs/api-reference/audio/createTranscription](https://platform.openai.com/docs/api-reference/audio/createTranscription)
         /// </remarks>
         /// <exception cref="ApiException">A server side error occurred.</exception>
+        [Obsolete("This method is deprecated by OpenAI API support. Use NewMethod instead.", false)]
         public virtual async Task TranscriptionsAsync(CancellationToken cancellationToken = default)
         {
             var client_ = _httpClient;
