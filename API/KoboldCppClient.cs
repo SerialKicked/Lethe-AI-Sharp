@@ -251,7 +251,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<GenerationOutput> GenerateAsync(GenerationInput body, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<GenerationOutput>(_httpClient, HttpMethod.Post, "api/v1/generate", cancellationToken: cancellationToken);
+            return await SendRequestAsync<GenerationOutput>(_httpClient, HttpMethod.Post, "api/v1/generate", body, cancellationToken: cancellationToken);
         }
 
         /// <summary>
