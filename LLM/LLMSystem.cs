@@ -88,6 +88,10 @@ namespace AIToolkit.LLM
         /// <summary> Called when the system changes states (no init, busy, ready) </summary>
         public static event EventHandler<SystemStatus>? OnStatusChanged;
 
+        public static bool SupportsTTS => _client?.SupportsTTS ?? false;
+        public static bool SupportsWebSearch => _client?.SupportsWebSearch ?? false;
+        public static bool SupportsVision => _client?.SupportsVision ?? false;
+
         private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(null, fullprompt);
         private static void RaiseOnStatusChange(SystemStatus newStatus) => OnStatusChanged?.Invoke(null, newStatus);
         private static void RaiseOnInferenceStreamed(string addedString) => OnInferenceStreamed?.Invoke(null, addedString);
@@ -154,8 +158,6 @@ namespace AIToolkit.LLM
         private static int systemPromptSize = 0;
         private static string StreamingTextProgress = string.Empty;
         private static string _LastGeneratedPrompt = string.Empty;
-        private static readonly HttpClient _httpclient = new();
-        private static readonly KoboldCppClient Client = new(_httpclient);
         private static int maxContextLength = 4096;
         private static InstructFormat instruct = new();
         private static ILogger? logger = null;
@@ -163,6 +165,8 @@ namespace AIToolkit.LLM
         private static BasePersona user = new() { IsUser = true, Name = "User", UniqueName = string.Empty };
 
         private static List<string> vlm_pictures = [];
+
+        private static ILLMServiceClient? _client;
 
         internal static HashSet<Guid> usedGuidInSession = [];
         internal static PromptInserts dataInserts = [];
@@ -172,11 +176,25 @@ namespace AIToolkit.LLM
         {
             if (Status != SystemStatus.NotInit)
                 return;
-            Client.BaseUrl = BackendUrl;
-            Client.ReadResponseAsString = true;
-            Client.StreamingMessageReceived += Client_StreamingMessageReceived;
-            // Load plugins
+
+            // Create the appropriate client based on the selected backend
+            var httpClient = new HttpClient();
+            _client = BackendAPI switch
+            {
+                BackendAPI.KoboldAPI => new KoboldCppAdapter(httpClient),
+                BackendAPI.OpenAI => new OpenAIAdapter(httpClient),
+                _ => throw new NotSupportedException($"Backend {BackendAPI} is not supported")
+            };
+            // Subscribe to the TokenReceived event
+            _client.BaseUrl = BackendUrl;
+            _client.TokenReceived += Client_StreamingMessageReceived;
             Status = SystemStatus.Ready;
+
+            //Client.BaseUrl = BackendUrl;
+            //Client.ReadResponseAsString = true;
+            //Client.StreamingMessageReceived += Client_StreamingMessageReceived;
+            //// Load plugins
+            //Status = SystemStatus.Ready;
         }
 
         public static void LoadPersona(List<BasePersona> toload)
@@ -186,15 +204,15 @@ namespace AIToolkit.LLM
                 LoadedPersonas.Add(item.UniqueName, item);
         }
 
-        private static void Client_StreamingMessageReceived(object? sender, TextStreamingEvenArg e)
+        private static void Client_StreamingMessageReceived(object? sender, LLMTokenStreamingEventArgs e)
         {
             // "null", "stop", "length"
-            if (e.Data.finish_reason != "null" && e.Data.finish_reason != null)
+            if (e.IsComplete)
             {
-                if (!string.IsNullOrEmpty(e.Data.token))
-                    StreamingTextProgress += e.Data.token;
+                if (!string.IsNullOrEmpty(e.Token))
+                    StreamingTextProgress += e.Token;
                 var response = StreamingTextProgress.Trim();
-                if (e.Data.finish_reason == "length")
+                if (e.FinishReason == "length")
                 {
                     var removelist = Instruct.GetStoppingStrings(User, Bot);
                     // look at response string for the stop string, if found, and not in first position of the string, remove the stop string and everything beyond.
@@ -217,8 +235,8 @@ namespace AIToolkit.LLM
             }
             else
             {
-                StreamingTextProgress += e.Data.token;
-                RaiseOnInferenceStreamed(e.Data.token);
+                StreamingTextProgress += e.Token;
+                RaiseOnInferenceStreamed(e.Token);
             }
         }
 
@@ -300,37 +318,38 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         public static int GetTokenCount(string text)
         {
-            if (string.IsNullOrEmpty(text))
+            if (string.IsNullOrEmpty(text) || _client == null)
                 return 0;
             else if (text.Length > MaxContextLength * 10)
                 return text.Length / 5;
             try
             {
-                var mparams = new KcppPrompt() { Prompt = text };
-                var res = Client.TokencountSync(mparams);
-                return res.Value;
+                return _client.CountTokensSync(text);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                //MessageBox.Show($"An error occured while counting tokens, estimate used instead. {ex.Message}");
+                logger?.LogError(ex, "Failed to count tokens");
                 return text.Length / 5; // or any default value you want to return in case of an error
             }
         }
 
         public static bool CancelGeneration()
         {
+            if (_client == null)
+                return true;
             try
             {
                 var mparams = new GenkeyData() { };
-                var res = Client.AbortSync(mparams);
-                if (res.Success)
+                var success = _client.AbortGenerationSync();
+                if (success)
                     Status = SystemStatus.Ready;
-                return res.Success;
+                return success;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 //MessageBox.Show($"An error occured while counting tokens, estimate used instead. {ex.Message}");
-                return true;
+                logger?.LogError(ex, "Failed to cancel generation");
+                return false;
             }
         }
 
@@ -340,17 +359,18 @@ namespace AIToolkit.LLM
         public static async Task Connect()
         {
             Init();
+            if (_client == null)
+            {
+                MaxContextLength = 4096;
+                CurrentModel = "Nothing Loaded";
+                Backend = "No backend";
+                return;
+            }
             try
             {
-                var result = await Client.TrueMaxContextLengthAsync();
-                MaxContextLength = result.Value;
-                var info = await Client.ModelAsync();
-                var index = info.Result.IndexOf('/');
-                if (index > 0)
-                    info.Result = info.Result[(index + 1)..];
-                CurrentModel = info.Result;
-                var engine = await Client.ExtraVersionAsync();
-                Backend = engine.result + " " + engine.version;
+                MaxContextLength = await _client.GetMaxContextLength();
+                CurrentModel = await _client.GetModelInfo();
+                Backend = await _client.GetBackendInfo();
             }
             catch (Exception ex)
             {
@@ -499,7 +519,7 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         public static async Task RerollLastMessage()
         {
-            if (Status != SystemStatus.Ready || History.CurrentSession.Messages.Count == 0 || History.LastMessage()?.Role != AuthorRole.Assistant)
+            if (Status != SystemStatus.Ready || History.CurrentSession.Messages.Count == 0 || History.LastMessage()?.Role != AuthorRole.Assistant || _client == null)
                 return;
             History.RemoveLast();
             if (string.IsNullOrEmpty(_LastGeneratedPrompt))
@@ -525,7 +545,7 @@ namespace AIToolkit.LLM
                 genparams.Prompt = _LastGeneratedPrompt;
                 genparams.Images = [..vlm_pictures];
                 RaiseOnFullPromptReady(genparams.Prompt);
-                await Client.GenerateTextStreamAsync(genparams);
+                await _client.GenerateTextStreaming(genparams);
             }
         }
 
@@ -537,7 +557,7 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         public static async Task<string> QuickInferenceForSystemPrompt(string systemMessage, bool logSystemPrompt)
         {
-            if (Status == SystemStatus.Busy)
+            if (Status == SystemStatus.Busy || _client == null)
                 return string.Empty;
 
             var inputText = systemMessage;
@@ -557,14 +577,9 @@ namespace AIToolkit.LLM
                 Bot.History.LogMessage(AuthorRole.System, systemMessage, User, Bot);
 
             Status = SystemStatus.Busy;
-            var result = await Client.GenerateAsync(genparams);
-            string finalstr = string.Empty;
-            foreach (var item in result.Results)
-            {
-                finalstr += item.Text;
-            }
+            var result = await _client.GenerateText(genparams);
             Status = SystemStatus.Ready;
-            return string.IsNullOrEmpty(finalstr) ? string.Empty : finalstr;
+            return string.IsNullOrEmpty(result) ? string.Empty : result;
         }
 
         /// <summary>
@@ -575,7 +590,7 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         private static async Task StartGeneration(AuthorRole MsgSender, string userInput)
         {
-            if (Status == SystemStatus.Busy)
+            if (Status == SystemStatus.Busy || _client == null)
                 return;
             Status = SystemStatus.Busy;
 
@@ -621,7 +636,7 @@ namespace AIToolkit.LLM
                 Bot.History.LogMessage(MsgSender, userInput, User, Bot);
 
             RaiseOnFullPromptReady(genparams.Prompt);
-            await Client.GenerateTextStreamAsync(genparams);
+            await _client.GenerateTextStreaming(genparams);
         }
 
         /// <summary>
@@ -658,34 +673,40 @@ namespace AIToolkit.LLM
 
         public static async Task<string> SimpleQuery(SamplerSettings llmparams)
         {
+            if (_client == null)
+                return string.Empty;
             var oldst = status;
             Status = SystemStatus.Busy;
-            var result = await Client.GenerateAsync(llmparams);
+            var result = await _client.GenerateText(llmparams);
             Status = oldst;
-            string finalstr = string.Empty;
-            foreach (var item in result.Results)
-            {
-                finalstr += item.Text;
-            }
-            RaiseOnQuickInferenceEnded(finalstr);
-            return string.IsNullOrEmpty(finalstr) ? string.Empty : finalstr;
+            RaiseOnQuickInferenceEnded(result);
+            return string.IsNullOrEmpty(result) ? string.Empty : result;
         }
 
         public static async Task<WebQueryFullResponse> WebSearch(string query)
         {
-            return await Client.WebQueryAsync(new WebQuery() { q = query });
+            if (_client == null || !SupportsWebSearch)
+                return [];
+            var res = await _client.WebSearch(query);
+            var webres = JsonConvert.DeserializeObject<WebQueryFullResponse>(res);
+            if (webres is null)
+            {
+                logger?.LogError("Failed to parse web search response");
+                return [];
+            }
+            return webres;
         }
 
         public static async Task<byte[]> GenerateTTS(string input, string voiceID)
         {
             // female: "Tina", "super chariot of death", "super chariot in death"
             // male: "Lor_ Merciless", "kobo", "chatty"
-            var ttsinput = new TextToSpeechInput()
+            if (_client?.SupportsTTS != true)
             {
-                Input = input,
-                Voice = voiceID,
-            };
-            var audioData = await Client.TextToSpeechAsync(ttsinput);
+                logger?.LogError("TTS is not supported by the current backend.");
+                return [];
+            }
+            var audioData = await _client.TextToSpeech(input, voiceID);
             return audioData;
         }
 

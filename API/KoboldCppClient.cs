@@ -632,7 +632,7 @@ namespace AIToolkit.API
 
         #endregion
 
-        #region KoboldCpp API - Basic OpenAI Clone API
+        #region KoboldCpp API - Basic OpenAI Clone API (Deprecated in favor on OpenAICLient)
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -977,6 +977,9 @@ namespace AIToolkit.API
         public bool txt2img { get; set; }
         public bool vision { get; set; }
         public bool transcribe { get; set; }
+        public bool tts { get; set; }
+        public bool websearch { get; set; }
+        public bool embeddings { get; set; }
     }
 
     public class KCBasicResult
