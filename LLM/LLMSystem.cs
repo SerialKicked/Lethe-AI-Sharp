@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Microsoft.VisualBasic;
 using System.Collections.ObjectModel;
 using System.Drawing;
+using OpenAI.Chat;
 
 namespace AIToolkit.LLM
 {
@@ -26,10 +27,10 @@ namespace AIToolkit.LLM
     public static class LLMSystem
     {
         /// <summary> URL of the backend server </summary>
-        public static string BackendUrl { get; set; } = "http://localhost:5001";
+        public static string BackendUrl { get; set; } = "http://localhost:1234";
 
         /// <summary> API of the backend server, KoboldAPI (text completion) and OpenAI (chat completion) are both handled </summary>
-        public static BackendAPI BackendAPI { get; set; } = BackendAPI.KoboldAPI;
+        public static BackendAPI BackendAPI { get; set; } = BackendAPI.OpenAI;
 
         /// <summary> Reserved token space for summaries of previous sessions (0 to disable) </summary>
         public static int ReservedSessionTokens { get; set; } = 2048;
@@ -162,7 +163,8 @@ namespace AIToolkit.LLM
         private static SystemStatus status = SystemStatus.NotInit;
         private static int systemPromptSize = 0;
         private static string StreamingTextProgress = string.Empty;
-        private static string _LastGeneratedPrompt = string.Empty;
+        public static string _LastGeneratedPrompt = string.Empty;
+        private static List<OpenAI.Chat.Message> _LastGeneratedChat = [];
         private static int maxContextLength = 4096;
         private static InstructFormat instruct = new();
         private static ILogger? logger = null;
@@ -372,7 +374,7 @@ namespace AIToolkit.LLM
             }
             catch (Exception ex)
             {
-                throw new Exception("An error occured while connecting to the LLM server. " + ex.Message);
+                LLMSystem.Logger?.LogError(ex, "Failed to connect to LLM server: " +ex.Message);
             }
         }
 
@@ -520,7 +522,7 @@ namespace AIToolkit.LLM
             if (Status != SystemStatus.Ready || History.CurrentSession.Messages.Count == 0 || History.LastMessage()?.Role != AuthorRole.Assistant || _client == null)
                 return;
             History.RemoveLast();
-            if (string.IsNullOrEmpty(_LastGeneratedPrompt))
+            if (string.IsNullOrEmpty(_LastGeneratedPrompt) && _LastGeneratedChat.Count == 0)
             {
                 await StartGeneration(AuthorRole.Assistant, string.Empty);
             }
@@ -534,16 +536,40 @@ namespace AIToolkit.LLM
                     RaiseOnInferenceStreamed(StreamingTextProgress);
                 }
 
-                GenerationInput genparams = Sampler.GetCopy();
-                if (ForceTemperature >= 0)
-                    genparams.Temperature = ForceTemperature;
-                genparams.Max_context_length = MaxContextLength;
-                genparams.Max_length = MaxReplyLength;
-                genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
-                genparams.Prompt = _LastGeneratedPrompt;
-                genparams.Images = [..vlm_pictures];
-                RaiseOnFullPromptReady(genparams.Prompt);
-                await _client.GenerateTextStreaming(genparams);
+                switch (BackendAPI)
+                {
+                    case BackendAPI.KoboldAPI:
+                        {
+                            GenerationInput genparams = Sampler.GetCopy();
+                            if (ForceTemperature >= 0)
+                                genparams.Temperature = ForceTemperature;
+                            genparams.Max_context_length = MaxContextLength;
+                            genparams.Max_length = MaxReplyLength;
+                            genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
+                            genparams.Prompt = _LastGeneratedPrompt;
+                            genparams.Images = [.. vlm_pictures];
+                            RaiseOnFullPromptReady(genparams.Prompt);
+                            await _client.GenerateTextStreaming(genparams);
+                        }
+                        break;
+                    case BackendAPI.OpenAI:
+                        {
+                            var addnames = NamesInPromptOverride ?? Instruct.AddNamesToPrompt;
+                            var chatrq = new ChatRequest(_LastGeneratedChat,
+                                topP: Sampler.Top_p,
+                                frequencyPenalty: Sampler.Rep_pen,
+                                seed: Sampler.Sampler_seed != -1 ? Sampler.Sampler_seed : null,
+                                user: addnames ? User.Name : null,
+                                stops: [.. Instruct.GetStoppingStrings(User, Bot)],
+                                maxTokens: MaxReplyLength, 
+                                temperature: (ForceTemperature >= 0) ? ForceTemperature : Sampler.Temperature);
+                            await _client.GenerateTextStreaming(chatrq);
+                        }
+                        break;
+                    default:
+                        break;
+                }
+
             }
         }
 

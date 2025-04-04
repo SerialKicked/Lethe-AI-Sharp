@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+     <NeutralLanguage>en-US</NeutralLanguage>
+     <FileEncoding>utf-8</FileEncoding>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="HNSW" Version="25.3.56901" />
