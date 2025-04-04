@@ -375,7 +375,7 @@ namespace AIToolkit
             var estimate = wordTokens + specialCharCount - consecutiveNewlinesCount;
 
             // Round up and add a small safety margin
-            return text.Length / 4;
+            return (text.Length / 4) - consecutiveNewlinesCount;
         }
 
         private static int CountPattern(string text, string pattern)

@@ -390,6 +390,9 @@ namespace AIToolkit.LLM
             }
             catch (Exception ex)
             {
+                MaxContextLength = 4096;
+                CurrentModel = "Error";
+                Backend = "Error";
                 LLMSystem.Logger?.LogError(ex, "Failed to connect to LLM server: " +ex.Message);
             }
         }
