@@ -22,17 +22,16 @@ namespace AIToolkit.API
     public class OpenAI_APIClient
     {
         private OpenAIClient API { get; set; }
-        private HttpClient httpClient { get; set; }
+        private HttpClient _httpClient { get; set; }
 
         public event EventHandler<OpenTokenResponse>? StreamingMessageReceived;
         private void RaiseOnStreamingResponse(OpenTokenResponse e) => StreamingMessageReceived?.Invoke(this, e);
 
-        public OpenAI_APIClient()
+        public OpenAI_APIClient(HttpClient httpclient)
         {
-            httpClient = new HttpClient();
-            httpClient.BaseAddress = new Uri(LLMSystem.BackendUrl);
+            _httpClient = httpclient;
             var settings = new OpenAIClientSettings(LLMSystem.BackendUrl);
-            API = new OpenAIClient(new OpenAIAuthentication("123"), settings, httpClient);
+            API = new OpenAIClient(new OpenAIAuthentication("123"), settings, _httpClient);
         }
 
         public virtual async Task<List<Model>> GetModelList()

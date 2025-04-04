@@ -41,6 +41,7 @@ namespace AIToolkit.API
         string BaseUrl { get; set; }
 
         // Core operations every backend needs to support
+        Task<bool> CheckBackend();
         Task<int> GetMaxContextLength();
         Task<string> GetModelInfo();
         Task<string> GetBackendInfo();

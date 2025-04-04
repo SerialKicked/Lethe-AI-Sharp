@@ -15,9 +15,9 @@ namespace AIToolkit.API
 
         public OpenAIAdapter(HttpClient httpClient)
         {
-            _client = new OpenAI_APIClient();
             _httpClient = httpClient;
             _httpClient.BaseAddress = new Uri(LLMSystem.BackendUrl);
+            _client = new OpenAI_APIClient(_httpClient);
 
             //Hook into the OpenAI streaming event and adapt it to our interface's event
             _client.StreamingMessageReceived += (sender, e) =>
@@ -111,7 +111,20 @@ namespace AIToolkit.API
             throw new NotImplementedException();
         }
 
-        // Implement other methods...
+        public async Task<bool> CheckBackend()
+        {
+            try
+            {
+                var res = await _client.GetModelList();
+                return res != null;
+
+            }
+            catch (Exception)
+            {
+                // Handle the exception
+                return false;
+            }
+        }
 
         public bool SupportsStreaming => true;
         public bool SupportsTTS => false;  // Depends on your implementation

@@ -16,8 +16,8 @@ namespace AIToolkit.API
         public KoboldCppAdapter(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _client = new KoboldCppClient(httpClient);
             _httpClient.BaseAddress = new Uri(LLMSystem.BackendUrl);
+            _client = new KoboldCppClient(httpClient);
 
             // Hook into the KoboldCpp streaming event and adapt it to our interface's event
             _client.StreamingMessageReceived += (sender, e) =>
@@ -121,6 +121,21 @@ namespace AIToolkit.API
         public bool AbortGenerationSync()
         {
             return  _client.AbortSync(new GenkeyData()).Success;
+        }
+
+        public async Task<bool> CheckBackend()
+        {
+            try
+            {
+                var res = await _client.ExtraVersionAsync();
+                return res != null;
+
+            }
+            catch (Exception)
+            {
+                // Handle the exception
+                return false;
+            }
         }
 
         public bool SupportsStreaming => true;

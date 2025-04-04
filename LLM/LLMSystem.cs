@@ -27,10 +27,10 @@ namespace AIToolkit.LLM
     public static class LLMSystem
     {
         /// <summary> URL of the backend server </summary>
-        public static string BackendUrl { get; set; } = "http://localhost:1234";
+        public static string BackendUrl { get; set; } = "http://localhost:5001";
 
         /// <summary> API of the backend server, KoboldAPI (text completion) and OpenAI (chat completion) are both handled </summary>
-        public static BackendAPI BackendAPI { get; set; } = BackendAPI.OpenAI;
+        public static BackendAPI BackendAPI { get; set; } = BackendAPI.KoboldAPI;
 
         /// <summary> Reserved token space for summaries of previous sessions (0 to disable) </summary>
         public static int ReservedSessionTokens { get; set; } = 2048;
@@ -321,7 +321,7 @@ namespace AIToolkit.LLM
             if (string.IsNullOrEmpty(text) || _client == null)
                 return 0;
             else if (text.Length > MaxContextLength * 10)
-                return text.Length / 5;
+                return text.Length / 4;
             try
             {
                 return _client.CountTokensSync(text);
@@ -329,7 +329,7 @@ namespace AIToolkit.LLM
             catch (Exception ex)
             {
                 logger?.LogError(ex, "Failed to count tokens");
-                return text.Length / 5; // or any default value you want to return in case of an error
+                return text.Length / 4; // or any default value you want to return in case of an error
             }
         }
 
@@ -353,6 +353,21 @@ namespace AIToolkit.LLM
             }
         }
 
+        public static void Setup(string url, BackendAPI backend, string? key = null)
+        {
+            Status = SystemStatus.NotInit;
+            BackendUrl = url;
+            BackendAPI = backend;
+            Init();
+        }
+
+        public static async Task<bool> CheckBackend()
+        {
+            if (_client == null)
+                return false;
+            return await _client.CheckBackend();
+        }
+
         /// <summary>
         /// Connects to the LLM server and retrieves the needed info.
         /// </summary>
@@ -371,6 +386,7 @@ namespace AIToolkit.LLM
                 MaxContextLength = await _client.GetMaxContextLength();
                 CurrentModel = await _client.GetModelInfo();
                 Backend = await _client.GetBackendInfo();
+                Status = SystemStatus.Ready;
             }
             catch (Exception ex)
             {
