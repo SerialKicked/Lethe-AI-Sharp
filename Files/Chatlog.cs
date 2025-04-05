@@ -295,7 +295,20 @@ namespace AIToolkit.Files
         public readonly List<ChatSession> Sessions = [];
         private int lastSessionID = -1;
 
-        [JsonIgnore] public ChatSession CurrentSession => CurrentSessionID >= 0 && CurrentSessionID < Sessions.Count ? Sessions[CurrentSessionID] : Sessions.Last();
+        [JsonIgnore]
+        public ChatSession CurrentSession
+        {
+            get
+            {
+                if (Sessions.Count == 0)
+                {
+                    Sessions.Add(new ChatSession());
+                    CurrentSessionID = 0;
+                    return Sessions[0];
+                }
+                return CurrentSessionID >= 0 && CurrentSessionID < Sessions.Count ? Sessions[CurrentSessionID] : Sessions.Last();
+            }
+        }
 
         [JsonIgnore] public EventHandler<SingleMessage>? OnMessageAdded;
 

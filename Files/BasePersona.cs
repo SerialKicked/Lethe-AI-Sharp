@@ -407,7 +407,7 @@ namespace AIToolkit.Files
             if (!string.IsNullOrWhiteSpace(attribute.Content))
                 sysprompt.AppendLinuxLine(attribute.Content);
             else
-                sysprompt.AppendLinuxLine("No information about Emily's mood has been provided yet. First entry shouldn't be longer than a short paragraph.");
+                sysprompt.AppendLinuxLine("No information has been provided yet. First entry shouldn't be longer than a short paragraph.");
 
             var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
 

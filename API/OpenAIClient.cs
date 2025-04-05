@@ -51,7 +51,7 @@ namespace AIToolkit.API
 
         public virtual async Task<string> GetBackendInfo()
         {
-            return "OpenAI Compatible Backend";
+            return await Task.FromResult("OpenAI Compatible Backend");
         }
 
         public virtual async Task StreamChatCompletion(ChatRequest request, CancellationToken cancellationToken = default)

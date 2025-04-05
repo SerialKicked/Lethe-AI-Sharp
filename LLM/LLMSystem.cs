@@ -320,16 +320,16 @@ namespace AIToolkit.LLM
         {
             if (string.IsNullOrEmpty(text) || _client == null)
                 return 0;
-            else if (text.Length > MaxContextLength * 10)
-                return text.Length / 4;
+            else if (Status == SystemStatus.NotInit || text.Length > MaxContextLength * 10)
+                return StringExtensions.ApproxTokenCount(text);
             try
             {
                 return _client.CountTokensSync(text);
             }
             catch (Exception ex)
             {
-                logger?.LogError(ex, "Failed to count tokens");
-                return text.Length / 4; // or any default value you want to return in case of an error
+                logger?.LogError(ex, "Failed to count tokens. Falling back to failsafe");
+                return StringExtensions.ApproxTokenCount(text);
             }
         }
 
