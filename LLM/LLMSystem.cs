@@ -321,7 +321,7 @@ namespace AIToolkit.LLM
             if (string.IsNullOrEmpty(text) || _client == null)
                 return 0;
             else if (Status == SystemStatus.NotInit || text.Length > MaxContextLength * 10)
-                return StringExtensions.ApproxTokenCount(text);
+                return TokenTools.CountTokens(text);
             try
             {
                 return _client.CountTokensSync(text);
@@ -329,7 +329,7 @@ namespace AIToolkit.LLM
             catch (Exception ex)
             {
                 logger?.LogError(ex, "Failed to count tokens. Falling back to failsafe");
-                return StringExtensions.ApproxTokenCount(text);
+                return TokenTools.CountTokens(text);
             }
         }
 

@@ -339,56 +339,5 @@ namespace AIToolkit
                 return span.Seconds.ToString() + " seconds";
         }
 
-        /// <summary>
-        /// Estimates the number of tokens in a string using a character-based approximation.
-        /// </summary>
-        /// <param name="text">Text to count tokens for</param>
-        /// <returns>Estimated token count</returns>
-        public static int ApproxTokenCount(string text)
-        {
-            if (string.IsNullOrEmpty(text))
-                return 0;
-
-            // Count words and adjust for word length
-            var words = text.Split([' ', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
-            var wordTokens = words.Length;
-
-            foreach (var word in words)
-            {
-                // Longer words are typically broken into multiple tokens
-                if (word.Length >= 8)
-                    wordTokens += 1;  // Very short words are usually single tokens
-            }
-
-            // Count special characters (punctuation, symbols, etc.)
-            var specialCharCount = text.Count(c => !char.IsLetterOrDigit(c) && !char.IsWhiteSpace(c));
-
-            // Some common patterns like "\n\n" might be single tokens
-            var consecutiveNewlinesCount = CountPattern(text, "\n\n") + CountPattern(text, "\r\n\r\n");
-
-            // Calculate token estimate
-            // - Word tokens as calculated above
-            // - Most spaces are tokenized separately, but not always
-            // - Newlines and tabs are often separate tokens
-            // - Special characters are often separate tokens
-            // - Subtract duplicate counting for consecutive newlines
-            var estimate = wordTokens + specialCharCount - consecutiveNewlinesCount;
-
-            // Round up and add a small safety margin
-            return (text.Length / 4) - consecutiveNewlinesCount;
-        }
-
-        private static int CountPattern(string text, string pattern)
-        {
-            int count = 0;
-            int i = 0;
-            while ((i = text.IndexOf(pattern, i)) != -1)
-            {
-                count++;
-                i += pattern.Length;
-            }
-            return count;
-        }
-
     }
 }
