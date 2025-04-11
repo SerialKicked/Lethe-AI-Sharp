@@ -28,7 +28,7 @@ namespace AIToolkit.API
         /// <summary>
         /// Whether this is the final streaming event
         /// </summary>
-        public bool IsComplete => !string.IsNullOrEmpty(FinishReason) && FinishReason != "null" && !string.IsNullOrEmpty(FinishReason);
+        public bool IsComplete => !string.IsNullOrEmpty(FinishReason) && FinishReason != "null";
     }
 
     /// <summary>

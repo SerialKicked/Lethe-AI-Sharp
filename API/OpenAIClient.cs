@@ -30,6 +30,8 @@ namespace AIToolkit.API
         public OpenAI_APIClient(HttpClient httpclient)
         {
             _httpClient = httpclient;
+            _httpClient.DefaultRequestHeaders.ConnectionClose = false;
+            _httpClient.Timeout = TimeSpan.FromMinutes(2);
             var settings = new OpenAIClientSettings(LLMSystem.BackendUrl);
             API = new OpenAIClient(new OpenAIAuthentication("123"), settings, _httpClient);
         }
@@ -57,27 +59,39 @@ namespace AIToolkit.API
         public virtual async Task StreamChatCompletion(ChatRequest request, CancellationToken cancellationToken = default)
         {
             var cumulativeDelta = string.Empty;
-            await foreach (var partialResponse in API.ChatEndpoint.StreamCompletionEnumerableAsync(request, cancellationToken: cancellationToken))
+            try
             {
-                foreach (var choice in partialResponse.Choices.Where(choice => choice.Delta?.Content != null))
+                await foreach (var partialResponse in API.ChatEndpoint.StreamCompletionEnumerableAsync(request, cancellationToken: cancellationToken))
                 {
-                    cumulativeDelta += choice.Delta.Content;
-                    if (choice.FinishReason != null)
+                    foreach (var choice in partialResponse.Choices.Where(choice => choice.Delta?.Content != null))
                     {
-                        var x = 0;
+                        cumulativeDelta += choice.Delta.Content;
+                        if (choice.FinishReason != null)
+                        {
+                            var x = 0;
+                        }
+                        RaiseOnStreamingResponse(new OpenTokenResponse
+                        {
+                            Token = choice.Delta.Content,
+                            FinishReason = choice.FinishReason
+                        });
                     }
-                    RaiseOnStreamingResponse(new OpenTokenResponse
-                    {
-                        Token = choice.Delta.Content,
-                        FinishReason = choice.FinishReason
-                    });
                 }
+                RaiseOnStreamingResponse(new OpenTokenResponse
+                {
+                    Token = "",
+                    FinishReason = "stop"
+                });
             }
-            RaiseOnStreamingResponse(new OpenTokenResponse
+            catch (System.Text.Json.JsonException ex)
             {
-                Token = "",
-                FinishReason = "stop"
-            });
+                RaiseOnStreamingResponse(new OpenTokenResponse
+                {
+                    Token = $" [Error Streaming Message: {ex.Message}] " + LLMSystem.NewLine + LLMSystem.NewLine + "This is likely an issue with the chat template used by this model. It doesn't support some of w(AI)fu's features. You can either edit the chat template in the backend, use a different model, or use a text completion backend like KoboldCpp.",
+                    FinishReason = "error"
+                });
+            }
+
             LLMSystem.Logger?.LogInformation($"[OpenAI API] Final response: {cumulativeDelta}");
         }
 

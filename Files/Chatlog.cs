@@ -33,9 +33,7 @@ namespace AIToolkit.Files
 
         public Message ToChatCompletion()
         {
-            if (LLMSystem.NamesInPromptOverride == true)
-                return new Message(TokenTools.InternalRoleToChatRole(Role), Message, Sender?.Name);
-            return new Message(TokenTools.InternalRoleToChatRole(Role), Message, null);
+            return new Message(TokenTools.InternalRoleToChatRole(Role), Message, LLMSystem.NamesInPromptOverride ?? LLMSystem.Instruct.AddNamesToPrompt ? Sender?.Name : null);
         }
     }
 

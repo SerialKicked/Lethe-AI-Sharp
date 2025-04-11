@@ -33,6 +33,8 @@ namespace AIToolkit.LLM
         /// <summary> API of the backend server, KoboldAPI (text completion) and OpenAI (chat completion) are both handled </summary>
         public static BackendAPI BackendAPI { get; set; } = BackendAPI.KoboldAPI;
 
+        public static string OpenAIKey { get; set; } = "123";
+
         /// <summary> Reserved token space for summaries of previous sessions (0 to disable) </summary>
         public static int ReservedSessionTokens { get; set; } = 2048;
 
@@ -359,6 +361,7 @@ namespace AIToolkit.LLM
             Status = SystemStatus.NotInit;
             BackendUrl = url;
             BackendAPI = backend;
+            OpenAIKey = key ?? "123";
             Init();
         }
 
@@ -436,7 +439,7 @@ namespace AIToolkit.LLM
                 }
             }
 
-            return rawprompt.ToString().CleanupAndTrim();
+            return ReplaceMacros(rawprompt.ToString()).CleanupAndTrim();
         }
 
         /// <summary>
@@ -521,7 +524,7 @@ namespace AIToolkit.LLM
             // join all the things together
             var chatrq = new ChatRequest(history,
                 topP: Sampler.Top_p,
-                frequencyPenalty: Sampler.Rep_pen,
+                frequencyPenalty: Sampler.Rep_pen - 1,
                 seed: Sampler.Sampler_seed != -1 ? Sampler.Sampler_seed : null,
                 user: NamesInPromptOverride ?? Instruct.AddNamesToPrompt ? User.Name : null,
                 stops: [.. Instruct.GetStoppingStrings(User, Bot)],
@@ -748,7 +751,7 @@ namespace AIToolkit.LLM
 
             if (_client.CompletionType == CompletionType.Chat)
             {
-                var newchat = await GenerateFullChatPrompt(AuthorRole.System, inputText, null, 0);
+                var newchat = await GenerateFullChatPrompt(MsgSender, inputText, null, 0);
                 _LastGeneratedChat = [.. newchat.Messages];
                 if (!string.IsNullOrEmpty(userInput))
                     Bot.History.LogMessage(MsgSender, userInput, User, Bot);
@@ -806,13 +809,14 @@ namespace AIToolkit.LLM
         public static void InvalidatePromptCache()
         {
             _LastGeneratedPrompt = string.Empty;
+            _LastGeneratedChat = [];
             dataInserts.Clear();
             usedGuidInSession.Clear();
         }
 
         public static async Task<string> SimpleQuery(SamplerSettings llmparams)
         {
-            if (_client == null)
+            if (_client?.CompletionType != CompletionType.Text)
                 return string.Empty;
             var oldst = status;
             Status = SystemStatus.Busy;
