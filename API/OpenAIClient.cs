@@ -59,6 +59,7 @@ namespace AIToolkit.API
         public virtual async Task StreamChatCompletion(ChatRequest request, CancellationToken cancellationToken = default)
         {
             var cumulativeDelta = string.Empty;
+            var nostopfix = true; // some backends don't return "stop" at the end of completion. It handles this case.
             try
             {
                 await foreach (var partialResponse in API.ChatEndpoint.StreamCompletionEnumerableAsync(request, cancellationToken: cancellationToken))
@@ -66,9 +67,9 @@ namespace AIToolkit.API
                     foreach (var choice in partialResponse.Choices.Where(choice => choice.Delta?.Content != null))
                     {
                         cumulativeDelta += choice.Delta.Content;
-                        if (choice.FinishReason != null)
+                        if (!string.IsNullOrEmpty(choice.FinishReason))
                         {
-                            var x = 0;
+                            nostopfix = false;
                         }
                         RaiseOnStreamingResponse(new OpenTokenResponse
                         {
@@ -77,17 +78,20 @@ namespace AIToolkit.API
                         });
                     }
                 }
-                RaiseOnStreamingResponse(new OpenTokenResponse
+                if (nostopfix)
                 {
-                    Token = "",
-                    FinishReason = "stop"
-                });
+                    RaiseOnStreamingResponse(new OpenTokenResponse
+                    {
+                        Token = "",
+                        FinishReason = "stop"
+                    });
+                }
             }
             catch (System.Text.Json.JsonException ex)
             {
                 RaiseOnStreamingResponse(new OpenTokenResponse
                 {
-                    Token = $" [Error Streaming Message: {ex.Message}] " + LLMSystem.NewLine + LLMSystem.NewLine + "This is likely an issue with the chat template used by this model. It doesn't support some of w(AI)fu's features. You can either edit the chat template in the backend, use a different model, or use a text completion backend like KoboldCpp.",
+                    Token = $" [Error Streaming Message: {ex.Message}] " + LLMSystem.NewLine + LLMSystem.NewLine + "This is likely an issue with the Jinja chat template used by this model. It might not support some of w(AI)fu's features or it can just be incorrect." + LLMSystem.NewLine + LLMSystem.NewLine + "You can either:" + LLMSystem.NewLine + "- Edit the Jinja chat template in your backend." + LLMSystem.NewLine + "- Use a different model." + LLMSystem.NewLine + "- Use a text completion backend like KoboldCpp.",
                     FinishReason = "error"
                 });
             }
