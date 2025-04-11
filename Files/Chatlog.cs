@@ -318,6 +318,13 @@ namespace AIToolkit.Files
         {
             var res = new StringBuilder();
             var tokensleft = maxTokens;
+            if (lastSessionID == -1 && Sessions.Count >= 2)
+            {
+                if (CurrentSessionID != -1 && CurrentSessionID != Sessions.Count -1)
+                    lastSessionID = CurrentSessionID - 1;
+                else
+                    lastSessionID = Sessions.Count - 1;
+            }
             var entrydepth = lastSessionID - 1;
             if (entrydepth < 0)
                 return string.Empty;

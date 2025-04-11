@@ -26,7 +26,7 @@ namespace AIToolkit
             }
             else
             {
-                Encoding = GptEncoding.GetEncoding("r50k_base");
+                Encoding = GptEncoding.GetEncoding("cl100k_base");
             }
         }
 

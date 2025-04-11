@@ -398,22 +398,63 @@ namespace AIToolkit.LLM
         }
 
         /// <summary>
-        /// Generates a full prompt for the LLM to use
+        /// Generates the system prompt content.
         /// </summary>
-        /// <param name="newMessage">Added message from the user</param>
+        /// <param name="MsgSender"></param>
+        /// <param name="newMessage"></param>
         /// <returns></returns>
-        private static async Task<string> GenerateFullPrompt(AuthorRole MsgSender, string newMessage, string? pluginMessage = null, int imgpadding = 0)
+        private static string GenerateSystemPromptContent(AuthorRole MsgSender, string newMessage)
         {
-            // setup user message (+ optional plugin message) and count tokens used
-            var msg = string.IsNullOrEmpty(newMessage) ? string.Empty : Instruct.FormatSinglePrompt(MsgSender, User, Bot, newMessage);
-            var pluginmsg = string.IsNullOrEmpty(pluginMessage) ? string.Empty : Instruct.FormatSinglePrompt(AuthorRole.System, User, Bot, pluginMessage);
-            var tokensused = string.IsNullOrEmpty(msg) ? 0 :GetTokenCount(msg);
-            tokensused += imgpadding;
-            tokensused += string.IsNullOrEmpty(pluginmsg) ? 0 : GetTokenCount(pluginmsg);
-            var rawprompt = new StringBuilder(SystemPrompt.GetSystemPromptRaw(Bot));
             var searchmessage = string.IsNullOrWhiteSpace(newMessage) ? History.GetLastUserMessageContent() : newMessage;
-            // refresh the textual inserts
+            var rawprompt = new StringBuilder(SystemPrompt.GetSystemPromptRaw(Bot));
+
+            // Check if the plugin has anything to add to system prompts
+            foreach (var ctxplug in ContextPlugins)
+            {
+                if (ctxplug.Enabled && ctxplug.AddToSystemPrompt(searchmessage, History, out var ctxinfo))
+                    rawprompt.AppendLinuxLine(ctxinfo);
+            }
+
+            // Now add the system prompt entries we gathered
+            var syspromptentries = dataInserts.GetEntriesByPosition(-1);
+            if (syspromptentries.Count > 0)
+            {
+                rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle);
+                foreach (var item in syspromptentries)
+                    rawprompt.AppendLinuxLine(item.Content);
+            }
+
+            if (Bot.SessionMemorySystem && ReservedSessionTokens > 0 && History.Sessions.Count > 1)
+            {
+                usedGuidInSession = dataInserts.GetGuids();
+                var shistory = History.GetPreviousSummaries(ReservedSessionTokens - GetTokenCount(ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator);
+                if (!string.IsNullOrEmpty(shistory))
+                {
+                    rawprompt.AppendLinuxLine(NewLine + ReplaceMacros(SystemPrompt.SessionHistoryTitle) + NewLine);
+                    rawprompt.AppendLinuxLine(shistory);
+                }
+            }
+
+            return rawprompt.ToString().CleanupAndTrim();
+        }
+
+        /// <summary>
+        /// Checks for RAG entries and refreshes the textual inserts.
+        /// </summary>
+        /// <param name="MsgSender"></param>
+        /// <param name="newMessage"></param>
+        /// <returns></returns>
+        private static async Task UpdateRagAndInserts(AuthorRole MsgSender, string newMessage)
+        {
+            // Check for RAG entries and refresh the textual inserts
             dataInserts.DecreaseDuration();
+            var searchmessage = string.IsNullOrWhiteSpace(newMessage) ? History.GetLastUserMessageContent() : newMessage;
+            if (RAGSystem.Enabled)
+            {
+                var search = await RAGSystem.Search(ReplaceMacros(searchmessage));
+                search.RemoveAll(search => usedGuidInSession.Contains(search.session.Guid));
+                dataInserts.AddMemories(search);
+            }
             // Check for keyword-activated world info entries
             if (WorldInfo && Bot.MyWorlds.Count > 0)
             {
@@ -424,7 +465,9 @@ namespace AIToolkit.LLM
                 }
                 foreach (var entry in _currentWorldEntries)
                 {
-                    dataInserts.AddInsert(new PromptInsert(entry.Guid, entry.Message, entry.Position == WEPosition.SystemPrompt ? -1 : entry.PositionIndex, entry.Duration));
+                    dataInserts.AddInsert(new PromptInsert(
+                        entry.Guid, entry.Message, entry.Position == WEPosition.SystemPrompt ? -1 : entry.PositionIndex, entry.Duration)
+                        );
                 }
             }
             // Check all sessions for sticky entries
@@ -436,56 +479,40 @@ namespace AIToolkit.LLM
                     dataInserts.AddInsert(new PromptInsert(session.Guid, rawmem, RAGSystem.RAGIndex, 1));
                 }
             }
-            // Check if the plugin has anything to add to system prompts
-            foreach (var ctxplug in ContextPlugins)
-            {
-                if (ctxplug.Enabled && ctxplug.AddToSystemPrompt(searchmessage, History, out var ctxinfo))
-                    rawprompt.AppendLinuxLine(ctxinfo);
-            }
+        }
 
-            usedGuidInSession = dataInserts.GetGuids();
-            // Check for RAG entries
-            if (RAGSystem.Enabled)
-            {
-                var search = await RAGSystem.Search(ReplaceMacros(searchmessage));
-                search.RemoveAll(search => usedGuidInSession.Contains(search.session.Guid));
-                dataInserts.AddMemories(search);
-            }
-            // Now add the system prompt entries we gathered
-            var syspromptentries = dataInserts.GetEntriesByPosition(-1);
-            if (syspromptentries.Count > 0)
-            {
-                rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle);
-                foreach (var item in syspromptentries)
-                    rawprompt.AppendLinuxLine(item.Content);
-            }
+        /// <summary>
+        /// Generates a full prompt for the LLM to use
+        /// </summary>
+        /// <param name="newMessage">Added message from the user</param>
+        /// <returns></returns>
+        private static async Task<string> GenerateFullPrompt(AuthorRole MsgSender, string newMessage, string? pluginMessage = null, int imgpadding = 0)
+        {
+            var availtokens = MaxContextLength - MaxReplyLength - imgpadding;
+
+            // setup user message (+ optional plugin message) and count tokens used
+            var msg = string.IsNullOrEmpty(newMessage) ? string.Empty : Instruct.FormatSinglePrompt(MsgSender, User, Bot, newMessage);
+            var pluginmsg = string.IsNullOrEmpty(pluginMessage) ? string.Empty : Instruct.FormatSinglePrompt(AuthorRole.System, User, Bot, pluginMessage);
+            availtokens -= GetTokenCount(msg);
+            availtokens -= GetTokenCount(pluginmsg);
+            // update the RAG, world info, and summary stuff
+            await UpdateRagAndInserts(MsgSender, newMessage);
             // Prepare the full system prompt and count the tokens used
-            var sysprompt = Instruct.BoSToken + Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, User, Bot, rawprompt.ToString().CleanupAndTrim());
+            var rawprompt = GenerateSystemPromptContent(MsgSender, newMessage);
+            var sysprompt = Instruct.BoSToken + Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, User, Bot, rawprompt);
             systemPromptSize = GetTokenCount(sysprompt);
-            tokensused += systemPromptSize;
+            availtokens -= systemPromptSize;
+
             // Prepare the bot's response tokens and count them
             if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
-                tokensused += GetTokenCount(Instruct.GetResponseStart(User));
+                availtokens -= GetTokenCount(Instruct.GetResponseStart(User));
             else
-                tokensused += GetTokenCount(Instruct.GetResponseStart(Bot));
-            var availtokens = (int)(MaxContextLength) - tokensused - MaxReplyLength;
-            // If we have a session memory system (and previous available sessions), reserve more tokens
-            if (Bot.SessionMemorySystem && History.Sessions.Count > 1)
-                availtokens -= ReservedSessionTokens;
+                availtokens -= GetTokenCount(Instruct.GetResponseStart(Bot));
+
             // get the full, formated chat history complemented by the data inserts
             var history = History.GetMessageHistory(SessionHandling, availtokens, dataInserts);
 
-            if (Bot.SessionMemorySystem && ReservedSessionTokens > 0 && History.Sessions.Count > 1)
-            {
-                usedGuidInSession = dataInserts.GetGuids();
-                var shistory = History.GetPreviousSummaries(ReservedSessionTokens - GetTokenCount(ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator);
-                if (!string.IsNullOrEmpty(shistory))
-                {
-                    rawprompt.AppendLinuxLine(NewLine + ReplaceMacros(SystemPrompt.SessionHistoryTitle) + NewLine);
-                    rawprompt.AppendLinuxLine(shistory);
-                    sysprompt = Instruct.BoSToken + Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, User, Bot, rawprompt.ToString().CleanupAndTrim());
-                }
-            }
+            // join all the things together
             string res = string.Empty;
             if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
             {
@@ -496,9 +523,9 @@ namespace AIToolkit.LLM
                 res = sysprompt + history + msg + pluginmsg + Instruct.GetResponseStart(Bot);
             }
             var final = GetTokenCount(res);
-            if (final > MaxContextLength + MaxReplyLength)
+            if (final > (MaxContextLength - MaxReplyLength))
             {
-                var diff = final - (MaxContextLength + MaxReplyLength);
+                var diff = final - (MaxContextLength - MaxReplyLength);
                 logger?.LogWarning("The prompt is {Diff} tokens over the limit.", diff);
             }
             return res;
