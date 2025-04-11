@@ -94,15 +94,15 @@ namespace AIToolkit.LLM
         public static event EventHandler<SystemStatus>? OnStatusChanged;
 
         /// <summary> Set to true if the backend supports text-to-speech </summary>
-        public static bool SupportsTTS => _client?.SupportsTTS ?? false;
+        public static bool SupportsTTS => Client?.SupportsTTS ?? false;
 
         /// <summary> Set to true if the backend supports web search </summary>
-        public static bool SupportsWebSearch => _client?.SupportsWebSearch ?? false;
+        public static bool SupportsWebSearch => Client?.SupportsWebSearch ?? false;
 
         /// <summary> Set to true if the backend supports vision </summary>
-        public static bool SupportsVision => _client?.SupportsVision ?? false;
+        public static bool SupportsVision => Client?.SupportsVision ?? false;
 
-        public static CompletionType CompletionAPIType => _client?.CompletionType ?? CompletionType.Text;
+        public static CompletionType CompletionAPIType => Client?.CompletionType ?? CompletionType.Text;
 
 
         private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(null, fullprompt);
@@ -169,17 +169,16 @@ namespace AIToolkit.LLM
 
         private static SystemStatus status = SystemStatus.NotInit;
         private static string StreamingTextProgress = string.Empty;
-        public static string _LastGeneratedPrompt = string.Empty;
-        private static List<OpenAI.Chat.Message> _LastGeneratedChat = [];
         private static int maxContextLength = 4096;
         private static InstructFormat instruct = new();
         private static ILogger? logger = null;
         private static BasePersona bot = new() { IsUser = false, Name = "Bot", Bio = "You are an helpful AI assistant whose goal is to answer questions and complete tasks.", UniqueName = string.Empty };
         private static BasePersona user = new() { IsUser = true, Name = "User", UniqueName = string.Empty };
 
-        private static List<string> vlm_pictures = [];
+        internal static List<string> vlm_pictures = [];
 
-        private static ILLMServiceClient? _client;
+        public static ILLMServiceClient? Client { get; private set; }
+        public static IPromptBuilder? PromptBuilder { get; private set; }
 
         internal static HashSet<Guid> usedGuidInSession = [];
         internal static PromptInserts dataInserts = [];
@@ -191,15 +190,18 @@ namespace AIToolkit.LLM
                 return;
             // Create the appropriate client based on the selected backend
             var httpClient = new HttpClient();
-            _client = BackendAPI switch
+            Client = BackendAPI switch
             {
                 BackendAPI.KoboldAPI => new KoboldCppAdapter(httpClient),
                 BackendAPI.OpenAI => new OpenAIAdapter(httpClient),
                 _ => throw new NotSupportedException($"Backend {BackendAPI} is not supported")
             };
             // Subscribe to the TokenReceived event
-            _client.BaseUrl = BackendUrl;
-            _client.TokenReceived += Client_StreamingMessageReceived;
+            Client.BaseUrl = BackendUrl;
+            Client.TokenReceived += Client_StreamingMessageReceived;
+
+            PromptBuilder = Client.GetPromptBuilder();
+
             Status = SystemStatus.Ready;
         }
 
@@ -324,13 +326,13 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         public static int GetTokenCount(string text)
         {
-            if (string.IsNullOrEmpty(text) || _client == null)
+            if (string.IsNullOrEmpty(text) || Client == null)
                 return 0;
             else if (Status == SystemStatus.NotInit || text.Length > MaxContextLength * 10)
                 return TokenTools.CountTokens(text);
             try
             {
-                return _client.CountTokensSync(text);
+                return Client.CountTokensSync(text);
             }
             catch (Exception ex)
             {
@@ -341,12 +343,12 @@ namespace AIToolkit.LLM
 
         public static bool CancelGeneration()
         {
-            if (_client == null)
+            if (Client == null)
                 return true;
             try
             {
                 var mparams = new GenkeyData() { };
-                var success = _client.AbortGenerationSync();
+                var success = Client.AbortGenerationSync();
                 if (success)
                     Status = SystemStatus.Ready;
                 return success;
@@ -368,11 +370,15 @@ namespace AIToolkit.LLM
             Init();
         }
 
+        /// <summary>
+        /// Check if the backend is working
+        /// </summary>
+        /// <returns></returns>
         public static async Task<bool> CheckBackend()
         {
-            if (_client == null)
+            if (Client == null)
                 return false;
-            return await _client.CheckBackend();
+            return await Client.CheckBackend();
         }
 
         /// <summary>
@@ -381,7 +387,7 @@ namespace AIToolkit.LLM
         public static async Task Connect()
         {
             Init();
-            if (_client == null)
+            if (Client == null)
             {
                 MaxContextLength = 4096;
                 CurrentModel = "Nothing Loaded";
@@ -390,9 +396,9 @@ namespace AIToolkit.LLM
             }
             try
             {
-                MaxContextLength = await _client.GetMaxContextLength();
-                CurrentModel = await _client.GetModelInfo();
-                Backend = await _client.GetBackendInfo();
+                MaxContextLength = await Client.GetMaxContextLength();
+                CurrentModel = await Client.GetModelInfo();
+                Backend = await Client.GetBackendInfo();
                 Status = SystemStatus.Ready;
             }
             catch (Exception ex)
@@ -488,72 +494,33 @@ namespace AIToolkit.LLM
             }
         }
 
-        private static async Task<ChatRequest> GenerateFullChatPrompt(AuthorRole MsgSender, string newMessage, string? pluginMessage = null, int imgpadding = 0)
-        {
-            var availtokens = MaxContextLength - MaxReplyLength - imgpadding;
-            // setup user message (+ optional plugin message) and count tokens used
-            var pluginmsg = string.IsNullOrEmpty(pluginMessage) ? string.Empty : Instruct.FormatSinglePrompt(AuthorRole.System, User, Bot, pluginMessage);
-            availtokens -= GetTokenCount(pluginmsg);
-            // update the RAG, world info, and summary stuff
-            await UpdateRagAndInserts(MsgSender, newMessage);
-            // Prepare the full system prompt and count the tokens used
-            var rawprompt = GenerateSystemPromptContent(MsgSender, newMessage);
-            var sysprompt = new Message(OpenAI.Role.System, rawprompt);
-            availtokens -= (GetTokenCount(rawprompt) + 4);
-            // Prepare the bot's response tokens and count them
-            if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
-                availtokens -= GetTokenCount(Instruct.GetResponseStart(User));
-            else
-                availtokens -= GetTokenCount(Instruct.GetResponseStart(Bot));
-            // get the full, formated chat history complemented by the data inserts
-            var history = History.MessagesToChatCompletion(SessionHandling, availtokens, dataInserts);
-            // add the system prompt to the history
-            history.Insert(0, sysprompt);
-            // add the user message to the history
-            if (!string.IsNullOrEmpty(newMessage))
-            {
-                history.Add(FormatSingleMessage(MsgSender, User, Bot, newMessage));
-            }
-            if (!string.IsNullOrEmpty(newMessage) || MsgSender != AuthorRole.User)
-            {
-                if (!string.IsNullOrEmpty(pluginmsg))
-                {
-                    history.Add(FormatSingleMessage(AuthorRole.System, User, Bot, pluginmsg));
-                }
-            }
-
-            // join all the things together
-            var chatrq = new ChatRequest(history,
-                topP: Sampler.Top_p,
-                frequencyPenalty: Sampler.Rep_pen - 1,
-                seed: Sampler.Sampler_seed != -1 ? Sampler.Sampler_seed : null,
-                user: NamesInPromptOverride ?? Instruct.AddNamesToPrompt ? User.Name : null,
-                stops: [.. Instruct.GetStoppingStrings(User, Bot)],
-                maxTokens: MaxReplyLength,
-                temperature: (ForceTemperature >= 0) ? ForceTemperature : Sampler.Temperature);
-            return chatrq;
-        }
-
         /// <summary>
         /// Generates a full prompt for the LLM to use
         /// </summary>
         /// <param name="newMessage">Added message from the user</param>
         /// <returns></returns>
-        private static async Task<string> GenerateFullTextPrompt(AuthorRole MsgSender, string newMessage, string? pluginMessage = null, int imgpadding = 0)
+        private static async Task<object> GenerateFullPrompt(AuthorRole MsgSender, string newMessage, string? pluginMessage = null, int imgpadding = 0)
         {
             var availtokens = MaxContextLength - MaxReplyLength - imgpadding;
+            PromptBuilder!.ResetPrompt();
 
             // setup user message (+ optional plugin message) and count tokens used
             var msg = string.IsNullOrEmpty(newMessage) ? string.Empty : Instruct.FormatSinglePrompt(MsgSender, User, Bot, newMessage);
             var pluginmsg = string.IsNullOrEmpty(pluginMessage) ? string.Empty : Instruct.FormatSinglePrompt(AuthorRole.System, User, Bot, pluginMessage);
-            availtokens -= GetTokenCount(msg);
-            availtokens -= GetTokenCount(pluginmsg);
+            if (!string.IsNullOrEmpty(newMessage))
+            {
+                availtokens -= PromptBuilder.GetTokenCount(MsgSender, newMessage);
+            }
+            if (!string.IsNullOrEmpty(pluginMessage))
+            {
+                availtokens -= PromptBuilder.GetTokenCount(AuthorRole.System, pluginMessage);
+            }
+
             // update the RAG, world info, and summary stuff
             await UpdateRagAndInserts(MsgSender, newMessage);
             // Prepare the full system prompt and count the tokens used
             var rawprompt = GenerateSystemPromptContent(MsgSender, newMessage);
-            var sysprompt = Instruct.BoSToken + Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, User, Bot, rawprompt);
-            availtokens -= GetTokenCount(sysprompt);
+            availtokens -= PromptBuilder.AddMessage(AuthorRole.SysPrompt, rawprompt);
 
             // Prepare the bot's response tokens and count them
             if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
@@ -562,25 +529,29 @@ namespace AIToolkit.LLM
                 availtokens -= GetTokenCount(Instruct.GetResponseStart(Bot));
 
             // get the full, formated chat history complemented by the data inserts
-            var history = History.MessagesToTextCompletion(SessionHandling, availtokens, dataInserts);
+            History.AddHistoryToPrompt(SessionHandling, availtokens, dataInserts);
+            if (!string.IsNullOrEmpty(newMessage))
+            {
+                PromptBuilder.AddMessage(MsgSender, newMessage);
+            }
+            if (!string.IsNullOrEmpty(newMessage) || MsgSender != AuthorRole.User)
+            {
+                if (!string.IsNullOrEmpty(pluginmsg))
+                {
+                    PromptBuilder.AddMessage(AuthorRole.System, pluginmsg);
+                }
+            }
 
-            // join all the things together
-            string res = string.Empty;
-            if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
-            {
-                res = sysprompt + history + msg + Instruct.GetUserStart(User).TrimEnd();
-            }
-            else
-            {
-                res = sysprompt + history + msg + pluginmsg + Instruct.GetResponseStart(Bot);
-            }
-            var final = GetTokenCount(res);
+            var final = PromptBuilder.GetTokenUsage();
             if (final > (MaxContextLength - MaxReplyLength))
             {
                 var diff = final - (MaxContextLength - MaxReplyLength);
                 logger?.LogWarning("The prompt is {Diff} tokens over the limit.", diff);
             }
-            return res;
+            if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
+                return PromptBuilder.PromptToQuery(AuthorRole.User);
+            else
+                return PromptBuilder.PromptToQuery(AuthorRole.Assistant);
         }
 
         internal static Message FormatSingleMessage(AuthorRole role, BasePersona user, BasePersona bot, string prompt)
@@ -640,10 +611,10 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         public static async Task RerollLastMessage()
         {
-            if (Status != SystemStatus.Ready || History.CurrentSession.Messages.Count == 0 || History.LastMessage()?.Role != AuthorRole.Assistant || _client == null)
+            if (Status != SystemStatus.Ready || History.CurrentSession.Messages.Count == 0 || History.LastMessage()?.Role != AuthorRole.Assistant || Client == null || PromptBuilder == null)
                 return;
             History.RemoveLast();
-            if (string.IsNullOrEmpty(_LastGeneratedPrompt) && _LastGeneratedChat.Count == 0)
+            if (PromptBuilder.Count == 0)
             {
                 await StartGeneration(AuthorRole.Assistant, string.Empty);
             }
@@ -656,41 +627,8 @@ namespace AIToolkit.LLM
                     StreamingTextProgress = Instruct.ThinkingStart + Instruct.ThinkingForcedThought;
                     RaiseOnInferenceStreamed(StreamingTextProgress);
                 }
-
-                switch (_client.CompletionType)
-                {
-                    case CompletionType.Text:
-                        {
-                            GenerationInput genparams = Sampler.GetCopy();
-                            if (ForceTemperature >= 0)
-                                genparams.Temperature = ForceTemperature;
-                            genparams.Max_context_length = MaxContextLength;
-                            genparams.Max_length = MaxReplyLength;
-                            genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
-                            genparams.Prompt = _LastGeneratedPrompt;
-                            genparams.Images = [.. vlm_pictures];
-                            RaiseOnFullPromptReady(genparams.Prompt);
-                            await _client.GenerateTextStreaming(genparams);
-                        }
-                        break;
-                    case CompletionType.Chat:
-                        {
-                            var addnames = NamesInPromptOverride ?? Instruct.AddNamesToPrompt;
-                            var chatrq = new ChatRequest(_LastGeneratedChat,
-                                topP: Sampler.Top_p,
-                                frequencyPenalty: Sampler.Rep_pen - 1,
-                                seed: Sampler.Sampler_seed != -1 ? Sampler.Sampler_seed : null,
-                                user: addnames ? User.Name : null,
-                                stops: [.. Instruct.GetStoppingStrings(User, Bot)],
-                                maxTokens: MaxReplyLength, 
-                                temperature: (ForceTemperature >= 0) ? ForceTemperature : Sampler.Temperature);
-                            await _client.GenerateTextStreaming(chatrq);
-                        }
-                        break;
-                    default:
-                        break;
-                }
-
+                RaiseOnFullPromptReady(PromptBuilder.PromptToText());
+                await Client.GenerateTextStreaming(PromptBuilder.PromptToQuery(AuthorRole.Assistant));
             }
         }
 
@@ -702,39 +640,20 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         public static async Task<string> QuickInferenceForSystemPrompt(string systemMessage, bool logSystemPrompt)
         {
-            if (Status == SystemStatus.Busy || _client == null)
+            if (Status == SystemStatus.Busy || Client == null)
                 return string.Empty;
             var inputText = systemMessage;
             StreamingTextProgress = string.Empty;
             if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
                 StreamingTextProgress = Instruct.ThinkingStart + Instruct.ThinkingForcedThought;
-            if (_client.CompletionType == CompletionType.Chat)
-            {
-                var newchat = await GenerateFullChatPrompt(AuthorRole.System, inputText, null, 0);
-                _LastGeneratedChat = [.. newchat.Messages];
-                Status = SystemStatus.Busy;
-                var result = await _client.GenerateText(newchat);
-                Status = SystemStatus.Ready;
-                return string.IsNullOrEmpty(result) ? string.Empty : result;
-            }
-            else
-            {
-                GenerationInput genparams = Sampler.GetCopy();
-                _LastGeneratedPrompt = await GenerateFullTextPrompt(AuthorRole.System, inputText, null, 0);
-                if (ForceTemperature >= 0)
-                    genparams.Temperature = ForceTemperature;
-                genparams.Max_context_length = MaxContextLength;
-                genparams.Max_length = MaxReplyLength;
-                genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
-                genparams.Images = [.. vlm_pictures];
-                genparams.Prompt = _LastGeneratedPrompt;
-                if (!string.IsNullOrEmpty(systemMessage) && logSystemPrompt)
-                    Bot.History.LogMessage(AuthorRole.System, systemMessage, User, Bot);
-                Status = SystemStatus.Busy;
-                var result = await _client.GenerateText(genparams);
-                Status = SystemStatus.Ready;
-                return string.IsNullOrEmpty(result) ? string.Empty : result;
-            }
+
+            var genparams = await GenerateFullPrompt(AuthorRole.System, inputText, null, 0);
+            if (!string.IsNullOrEmpty(systemMessage) && logSystemPrompt)
+                Bot.History.LogMessage(AuthorRole.System, systemMessage, User, Bot);
+            Status = SystemStatus.Busy;
+            var result = await Client.GenerateText(genparams);
+            Status = SystemStatus.Ready;
+            return string.IsNullOrEmpty(result) ? string.Empty : result;
         }
 
         /// <summary>
@@ -745,7 +664,7 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         private static async Task StartGeneration(AuthorRole MsgSender, string userInput)
         {
-            if (Status == SystemStatus.Busy || _client == null)
+            if (Status == SystemStatus.Busy || Client == null || PromptBuilder == null)
                 return;
             Status = SystemStatus.Busy;
             var inputText = userInput;
@@ -772,36 +691,16 @@ namespace AIToolkit.LLM
 
             StreamingTextProgress = string.Empty;
 
-            if (_client.CompletionType == CompletionType.Chat)
+            if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
             {
-                var newchat = await GenerateFullChatPrompt(MsgSender, inputText, null, 0);
-                _LastGeneratedChat = [.. newchat.Messages];
-                if (!string.IsNullOrEmpty(userInput))
-                    Bot.History.LogMessage(MsgSender, userInput, User, Bot);
-                RaiseOnFullPromptReady("Using Chat Completion... No text prompt");
-                await _client.GenerateTextStreaming(newchat);
+                StreamingTextProgress = Instruct.ThinkingStart + Instruct.ThinkingForcedThought;
+                RaiseOnInferenceStreamed(StreamingTextProgress);
             }
-            else
-            {
-                if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
-                {
-                    StreamingTextProgress = Instruct.ThinkingStart + Instruct.ThinkingForcedThought;
-                    RaiseOnInferenceStreamed(StreamingTextProgress);
-                }
-                GenerationInput genparams = Sampler.GetCopy();
-                _LastGeneratedPrompt = await GenerateFullTextPrompt(MsgSender, inputText, pluginmessage, vlm_pictures.Count > 0 ? vlm_pictures.Count * 1024 : 0);
-                if (ForceTemperature >= 0)
-                    genparams.Temperature = ForceTemperature;
-                genparams.Max_context_length = MaxContextLength;
-                genparams.Max_length = MaxReplyLength;
-                genparams.Stop_sequence = Instruct.GetStoppingStrings(User, Bot);
-                genparams.Prompt = _LastGeneratedPrompt;
-                genparams.Images = [.. vlm_pictures];
-                if (!string.IsNullOrEmpty(userInput))
-                    Bot.History.LogMessage(MsgSender, userInput, User, Bot);
-                RaiseOnFullPromptReady(genparams.Prompt);
-                await _client.GenerateTextStreaming(genparams);
-            }
+            var genparams = await GenerateFullPrompt(MsgSender, inputText, pluginmessage, vlm_pictures.Count > 0 ? vlm_pictures.Count * 1024 : 0);
+            if (!string.IsNullOrEmpty(userInput))
+                Bot.History.LogMessage(MsgSender, userInput, User, Bot);
+            RaiseOnFullPromptReady(PromptBuilder.PromptToText());
+            await Client.GenerateTextStreaming(genparams);
         }
 
         /// <summary>
@@ -831,19 +730,19 @@ namespace AIToolkit.LLM
 
         public static void InvalidatePromptCache()
         {
-            _LastGeneratedPrompt = string.Empty;
-            _LastGeneratedChat = [];
+            if (PromptBuilder != null)
+                PromptBuilder.ResetPrompt();
             dataInserts.Clear();
             usedGuidInSession.Clear();
         }
 
         public static async Task<string> SimpleQuery(object chatlog)
         {
-            if (_client == null)
+            if (Client == null)
                 return string.Empty;
             var oldst = status;
             Status = SystemStatus.Busy;
-            var result = await _client.GenerateText(chatlog);
+            var result = await Client.GenerateText(chatlog);
             Status = oldst;
             RaiseOnQuickInferenceEnded(result);
             return string.IsNullOrEmpty(result) ? string.Empty : result;
@@ -851,9 +750,9 @@ namespace AIToolkit.LLM
 
         public static async Task<WebQueryFullResponse> WebSearch(string query)
         {
-            if (_client == null || !SupportsWebSearch)
+            if (Client == null || !SupportsWebSearch)
                 return [];
-            var res = await _client.WebSearch(query);
+            var res = await Client.WebSearch(query);
             var webres = JsonConvert.DeserializeObject<WebQueryFullResponse>(res);
             if (webres is null)
             {
@@ -867,12 +766,12 @@ namespace AIToolkit.LLM
         {
             // female: "Tina", "super chariot of death", "super chariot in death"
             // male: "Lor_ Merciless", "kobo", "chatty"
-            if (_client?.SupportsTTS != true)
+            if (Client?.SupportsTTS != true)
             {
                 logger?.LogError("TTS is not supported by the current backend.");
                 return [];
             }
-            var audioData = await _client.TextToSpeech(input, voiceID);
+            var audioData = await Client.TextToSpeech(input, voiceID);
             return audioData;
         }
 

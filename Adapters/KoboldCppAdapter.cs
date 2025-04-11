@@ -141,6 +141,11 @@ namespace AIToolkit.API
             }
         }
 
+        public IPromptBuilder GetPromptBuilder()
+        {
+            return new TextPromptBuilder();
+        }
+
         public bool SupportsStreaming => true;
         public bool SupportsTTS { get; private set; } = false;
         public bool SupportsVision { get; private set; } = false;

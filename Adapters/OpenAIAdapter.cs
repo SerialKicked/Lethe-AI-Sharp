@@ -76,6 +76,12 @@ namespace AIToolkit.API
             await _client.StreamChatCompletion(input);
         }
 
+        public IPromptBuilder GetPromptBuilder()
+        {
+            return new ChatPromptBuilder();
+        }
+
+
         public Task<bool> AbortGeneration()
         {
             throw new NotImplementedException();

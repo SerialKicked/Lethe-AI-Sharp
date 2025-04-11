@@ -165,11 +165,15 @@ namespace AIToolkit.Files
 
         public async Task<string> GenerateTaskRes(string requestedTask, int responseLen, bool lightDialogs = false, bool showHidden = false)
         {
+            if (LLMSystem.Client == null)
+                return string.Empty;
             LLMSystem.NamesInPromptOverride = false;
             var replyln = responseLen;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 replyln += 1024;
-            var availtokens = LLMSystem.MaxContextLength - replyln - 1;
+            var availtokens = LLMSystem.MaxContextLength - replyln - 20;
+
+            var promptbuild = LLMSystem.Client.GetPromptBuilder();
 
             var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMSystem.NewLine +
                 LLMSystem.NewLine +
@@ -182,48 +186,16 @@ namespace AIToolkit.Files
                 "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
                 "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine;
             var finalstr = string.Empty;
-            if (LLMSystem.CompletionAPIType == CompletionType.Text)
-            {
-                var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, sysprompt);
-                availtokens -= LLMSystem.GetTokenCount(msg);
 
-                var task = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, requestedTask);
-                availtokens -= LLMSystem.GetTokenCount(task);
+            availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
+            availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
 
-                var repstart = LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-                availtokens -= LLMSystem.GetTokenCount(repstart);
-
-                var docs = GetRawDialogs(availtokens, false, lightDialogs, showHidden);
-                var fullprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, sysprompt + docs) + task + repstart;
-                var llmparams = LLMSystem.Sampler.GetCopy();
-                llmparams.Prompt = fullprompt;
-                llmparams.Max_length = replyln;
-                llmparams.Max_context_length = LLMSystem.MaxContextLength;
-                llmparams.Grammar = string.Empty;
-                if (llmparams.Temperature > 0.5f)
-                    llmparams.Temperature = 0.5f;
-                finalstr = await LLMSystem.SimpleQuery(llmparams);
-            }
-            else
-            {
-                var chat = new List<Message>();
-                availtokens -= (LLMSystem.GetTokenCount(sysprompt) + 10);
-                var querymsg = LLMSystem.FormatSingleMessage(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, requestedTask);
-                availtokens -= (LLMSystem.GetTokenCount(requestedTask) + 10);
-                var docs = GetRawDialogs(availtokens, false, lightDialogs, showHidden);
-                chat.Add(LLMSystem.FormatSingleMessage(AuthorRole.SysPrompt, LLMSystem.User, LLMSystem.Bot, sysprompt + docs));
-                chat.Add(querymsg);
-                var chatrq = new ChatRequest(chat,
-                    topP: LLMSystem.Sampler.Top_p,
-                    frequencyPenalty: LLMSystem.Sampler.Rep_pen - 1,
-                    seed: LLMSystem.Sampler.Sampler_seed != -1 ? LLMSystem.Sampler.Sampler_seed : null,
-                    user: LLMSystem.NamesInPromptOverride ?? LLMSystem.Instruct.AddNamesToPrompt ? LLMSystem.User.Name : null,
-                    stops: [.. LLMSystem.Instruct.GetStoppingStrings(LLMSystem.User, LLMSystem.Bot)],
-                    maxTokens: replyln,
-                    temperature: (LLMSystem.Sampler.Temperature > 0.5) ? 0.5 : LLMSystem.Sampler.Temperature);
-                finalstr = await LLMSystem.SimpleQuery(chatrq);
-            }
-
+            var docs = GetRawDialogs(availtokens, false, lightDialogs, showHidden);
+            promptbuild.AddMessage(AuthorRole.SysPrompt, sysprompt + docs);
+            promptbuild.AddMessage(AuthorRole.User, requestedTask);
+            
+            var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.5) ? 0.5 : LLMSystem.Sampler.Temperature, replyln);
+            finalstr = await LLMSystem.SimpleQuery(ct);
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
             {
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
@@ -423,12 +395,12 @@ namespace AIToolkit.Files
             return res.ToString();
         }
 
-        public string MessagesToTextCompletion(SessionHandling sessionHandling, int maxTokens, PromptInserts? memories)
+        public void AddHistoryToPrompt(SessionHandling sessionHandling, int maxTokens, PromptInserts? memories)
         {
-            var sb = new StringBuilder();
+            //var sb = new StringBuilder();
             var tokensleft = maxTokens;
             var entrydepth = 0;
-
+            var startpos = LLMSystem.PromptBuilder!.Count;
             // add all messages together in the same list
             var messagelist = new List<(int, SingleMessage)>();
             var curSessionID = CurrentSessionID == -1 ? Sessions.Count - 1 : CurrentSessionID;
@@ -436,113 +408,41 @@ namespace AIToolkit.Files
             if (sessionHandling == SessionHandling.FitAll)
             {
                 for (int i = 0; i <= curSessionID; i++)
-                {
                     foreach (var msg in Sessions[i].Messages)
-                    {
-                        messagelist.Add((i,msg));
-                    }
-                }
-            }
-            else
-            {
-                foreach (var msg in CurrentSession.Messages)
-                {
-                    messagelist.Add((curSessionID, msg));
-                }
-            }
-
-            var oldest = int.MaxValue;
-            // iterate through the messages in reverse order until we reach the token limit or end of messages
-            for (int i = messagelist.Count - 1; i >= 0; i--)
-            {
-                var msg = messagelist[i];
-                oldest = Math.Min(oldest, msg.Item1);
-                var res = LLMSystem.Instruct.FormatSingleMessage(msg.Item2);
-                var tks = LLMSystem.GetTokenCount(res);
-                tokensleft -= tks;
-                if (tokensleft <= 0)
-                    break;
-                sb.Insert(0, res);
-                // check if we need to add a memory
-                if (memories?.Count > 0)
-                {
-                    var foundmemory = memories.GetContentByPosition(entrydepth);
-                    if (!string.IsNullOrEmpty(foundmemory))
-                    {
-                        var formattedmemory = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, foundmemory.CleanupAndTrim());
-                        var tksmem = LLMSystem.GetTokenCount(formattedmemory);
-                        if (tksmem <= tokensleft)
-                        {
-                            tokensleft -= tksmem;
-                            sb.Insert(0, formattedmemory);
-                        }
-                    }
-                }
-                entrydepth++;
-            }
-            lastSessionID = oldest;
-            // return the result
-            return sb.ToString();
-        }
-
-        public List<Message> MessagesToChatCompletion(SessionHandling sessionHandling, int maxTokens, PromptInserts? memories)
-        {
-            var sb = new List<Message>();
-            var tokensleft = maxTokens;
-            var entrydepth = 0;
-            // add all messages together in the same list
-            var messagelist = new List<(int, SingleMessage)>();
-            var curSessionID = CurrentSessionID == -1 ? Sessions.Count - 1 : CurrentSessionID;
-            // make a list of all messages
-            if (sessionHandling == SessionHandling.FitAll)
-            {
-                for (int i = 0; i <= curSessionID; i++)
-                {
-                    foreach (var msg in Sessions[i].Messages)
-                    {
                         messagelist.Add((i, msg));
-                    }
-                }
             }
             else
             {
                 foreach (var msg in CurrentSession.Messages)
-                {
                     messagelist.Add((curSessionID, msg));
-                }
             }
+
             var oldest = int.MaxValue;
             // iterate through the messages in reverse order until we reach the token limit or end of messages
             for (int i = messagelist.Count - 1; i >= 0; i--)
             {
                 var msg = messagelist[i];
                 oldest = Math.Min(oldest, msg.Item1);
-                var res = msg.Item2.ToChatCompletion();
-                var tks = LLMSystem.GetTokenCount(msg.Item2.Message) + 5;
-                tokensleft -= tks;
+                tokensleft -= LLMSystem.PromptBuilder.GetTokenCount(msg.Item2.Role, msg.Item2.Message);
                 if (tokensleft <= 0)
                     break;
-                sb.Insert(0, res);
+                LLMSystem.PromptBuilder.InsertMessage(startpos, msg.Item2.Role, msg.Item2.Message);
                 // check if we need to add a memory
                 if (memories?.Count > 0)
                 {
                     var foundmemory = memories.GetContentByPosition(entrydepth);
                     if (!string.IsNullOrEmpty(foundmemory))
                     {
-                        var formattedmemory = new Message(OpenAI.Role.System, foundmemory.CleanupAndTrim());
-                        var tksmem = LLMSystem.GetTokenCount(foundmemory) + 4;
-                        if (tksmem <= tokensleft)
+                        tokensleft -= LLMSystem.PromptBuilder.GetTokenCount(AuthorRole.System, foundmemory.CleanupAndTrim());
+                        if (tokensleft > 0)
                         {
-                            tokensleft -= tksmem;
-                            sb.Insert(0, formattedmemory);
+                            LLMSystem.PromptBuilder.InsertMessage(startpos, AuthorRole.System, foundmemory.CleanupAndTrim());
                         }
                     }
                 }
                 entrydepth++;
             }
             lastSessionID = oldest;
-            // return the result
-            return sb;
         }
 
         public ChatSession? GetSessionByID(Guid id) => Sessions.FirstOrDefault(s => s.Guid == id);

@@ -49,6 +49,7 @@ namespace AIToolkit.API
         Task<int> GetMaxContextLength();
         Task<string> GetModelInfo();
         Task<string> GetBackendInfo();
+        IPromptBuilder GetPromptBuilder();
 
         // Text generation (common to all LLMs)
         Task<string> GenerateText(object parameters);
@@ -70,5 +71,6 @@ namespace AIToolkit.API
         bool SupportsTTS { get; }
         bool SupportsVision { get; }
         bool SupportsWebSearch { get; }
+
     }
 }
