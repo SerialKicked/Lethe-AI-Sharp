@@ -112,50 +112,23 @@ namespace AIToolkit.Files
 
         public static async Task<string> GenerateNewTitle(string sum)
         {
+            if (LLMSystem.Client == null)
+                return string.Empty;
             LLMSystem.NamesInPromptOverride = false;
             var finalstr = string.Empty;
             var replyln = 350;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 replyln += 1024;
-
-            if (LLMSystem.CompletionAPIType == CompletionType.Text)
-            {
-                var msgtxt = "You are an automated system designed to give titles to summaries." + LLMSystem.NewLine +
-                    LLMSystem.NewLine +
-                    "# Summary:" + LLMSystem.NewLine +
-                    sum + LLMSystem.NewLine +
-                    LLMSystem.NewLine +
-                    "# Instruction:" + LLMSystem.NewLine +
-                    "Give a title to the summary above. This title should be a single short and descriptive sentence. Write only the title, nothing else.";
-                var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
-                var res = msg + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-
-                var llmparams = LLMSystem.Sampler.GetCopy();
-                llmparams.Prompt = res;
-                llmparams.Max_length = replyln;
-                if (llmparams.Temperature > 0.5f)
-                    llmparams.Temperature = 0.5f;
-                llmparams.Max_context_length = LLMSystem.MaxContextLength;
-                finalstr = await LLMSystem.SimpleQuery(llmparams);
-            }
-            else
-            {
-                var chat = new List<Message>();
-                var msgtxt = "You are an automated system designed to give titles to summaries." + LLMSystem.NewLine +
-                    LLMSystem.NewLine + "# Summary:" + LLMSystem.NewLine + LLMSystem.NewLine + sum;
-                chat.Add(new Message(OpenAI.Role.System, msgtxt));
-                msgtxt = "Give a title to the summary above. This title should be a single short and descriptive sentence. Write only the title, nothing else.";
-                chat.Add(new Message(OpenAI.Role.User, msgtxt));
-                var chatrq = new ChatRequest(chat,
-                    topP: LLMSystem.Sampler.Top_p,
-                    frequencyPenalty: LLMSystem.Sampler.Rep_pen - 1,
-                    seed: LLMSystem.Sampler.Sampler_seed != -1 ? LLMSystem.Sampler.Sampler_seed : null,
-                    user: LLMSystem.NamesInPromptOverride ?? LLMSystem.Instruct.AddNamesToPrompt ? LLMSystem.User.Name : null,
-                    stops: [.. LLMSystem.Instruct.GetStoppingStrings(LLMSystem.User, LLMSystem.Bot)],
-                    maxTokens: replyln,
-                    temperature: (LLMSystem.Sampler.Temperature > 0.5) ? 0.5 : LLMSystem.Sampler.Temperature);
-                finalstr = await LLMSystem.SimpleQuery(chatrq);
-            }
+            var promptBuilder = LLMSystem.Client.GetPromptBuilder();
+            var msgtxt = "You are an automated system designed to give titles to summaries." + LLMSystem.NewLine +
+                LLMSystem.NewLine + "# Summary:" + LLMSystem.NewLine + LLMSystem.NewLine + sum;
+            promptBuilder.AddMessage(AuthorRole.SysPrompt, msgtxt);
+            promptBuilder.AddMessage(AuthorRole.User, "Give a title to the summary above. This title should be a single short and descriptive sentence. Write only the title, nothing else.");
+            var temp = LLMSystem.Sampler.Temperature;
+            if (temp > 0.5f)
+                temp = 0.5f;
+            var genparam = promptBuilder.PromptToQuery(AuthorRole.Assistant, temp, replyln);
+            finalstr = await LLMSystem.SimpleQuery(genparam);
             if (LLMSystem.Instruct.ThinkingStart != string.Empty)
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
             finalstr = finalstr.Replace("\"", "").Trim();

@@ -2,6 +2,7 @@
 using System.Text;
 using AIToolkit.LLM;
 using System.Reflection.PortableExecutable;
+using System;
 
 namespace AIToolkit.Files
 {
@@ -207,11 +208,11 @@ namespace AIToolkit.Files
 
         public async Task UpdateSelfEditSection()
         {
-            if (SelfEditTokens == 0 || History.Sessions.Count < 3)
+            if (SelfEditTokens == 0 || History.Sessions.Count < 3 || LLMSystem.Client == null)
                 return;
             LLMSystem.NamesInPromptOverride = false;
             var availtks = LLMSystem.MaxContextLength - SelfEditTokens - LLMSystem.GetTokenCount(SelfEditField) - 1024;
-
+            var promptbuilder = LLMSystem.Client.GetPromptBuilder();
             var sysprompt = new StringBuilder();
             sysprompt.AppendLinuxLine("You are an uncensored system used to write a character's personal thoughts based on its chat history and information.");
             sysprompt.AppendLinuxLine();
@@ -221,10 +222,8 @@ namespace AIToolkit.Files
             sysprompt.AppendLinuxLine();
             sysprompt.AppendLinuxLine($"# Memories");
             sysprompt.AppendLinuxLine();
-
-            var sizeeval = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
-            availtks -= LLMSystem.GetTokenCount(sizeeval);
-            var maxcount = 99;
+            availtks -= promptbuilder.GetTokenCount(AuthorRole.SysPrompt, sysprompt.ToString());
+            var maxcount = 60;
             var entries = new List<string>();
             for (int i = History.Sessions.Count - 2; i >= 0; i--)
             {
@@ -242,7 +241,6 @@ namespace AIToolkit.Files
                 LLMSystem.NamesInPromptOverride = null;
                 return;
             }
-
             foreach (var entry in entries)
                 sysprompt.AppendLinuxLine(entry);
             sysprompt.AppendLinuxLine();
@@ -252,22 +250,12 @@ namespace AIToolkit.Files
                 sysprompt.AppendLinuxLine(SelfEditField);
             else
                 sysprompt.AppendLinuxLine("This space is empty for now.");
-
-            var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
-            var query = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, this, $"Using {Name}'s memories alongside their biography, edit their personal thoughts section accordingly. Write two to three short paragraphs from {Name}'s perspective, in the first person. Focus on important events, life changing experiences, and promises, that {Name} would want to keep in mind. Don't include a title.");
-
-            totalprompt += query + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-
-            var llmparams = LLMSystem.Sampler.GetCopy();
-            llmparams.Prompt = totalprompt;
-            llmparams.Max_length = SelfEditTokens;
+            promptbuilder.AddMessage(AuthorRole.SysPrompt, sysprompt.ToString());
+            promptbuilder.AddMessage(AuthorRole.User, $"Using {Name}'s memories alongside their biography, edit their personal thoughts section accordingly. Write two to three short paragraphs from {Name}'s perspective, in the first person. Focus on important events, life changing experiences, and promises, that {Name} would want to keep in mind. Don't include a title.");
+            var rln = SelfEditTokens;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-                llmparams.Max_length += 1024;
-            llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            llmparams.Grammar = string.Empty;
-            var finalstr = await LLMSystem.SimpleQuery(llmparams);
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+                rln += 1024;
+            var finalstr = await LLMSystem.SimpleQuery(promptbuilder.PromptToQuery(AuthorRole.Assistant, -1, rln));
             LLMSystem.NamesInPromptOverride = null;
             SelfEditField = finalstr.RemoveUnfinishedSentence().RemoveNewLines().CleanupAndTrim().RemoveTitle();
         }
@@ -329,9 +317,12 @@ namespace AIToolkit.Files
 
         private async Task<bool> ShouldUpdateAttribute(PersonaAttribute attribute)
         {
+            if (attribute == null || LLMSystem.Client == null)
+                return false;
             var availtks = LLMSystem.MaxContextLength - 1024;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 availtks -= 1024;
+            var promptbuilder = LLMSystem.Client.GetPromptBuilder();
 
             var sysprompt = new StringBuilder();
             sysprompt.AppendLinuxLine("You are an uncensored system used to determine if a character's attribute needs updating based on recent interactions.");
@@ -341,11 +332,9 @@ namespace AIToolkit.Files
             sysprompt.AppendLinuxLine();
             sysprompt.AppendLinuxLine("# Recent Sessions");
 
-            // Get recent sessions (similar to UpdateSelfEditSection method)
-            var sizeeval = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
-            availtks -= LLMSystem.GetTokenCount(sizeeval);
+            availtks -= promptbuilder.GetTokenCount(AuthorRole.SysPrompt, sysprompt.ToString());
 
-            var entries = GetRecentSessionSummaries(availtks);
+            var entries = GetRecentSessionSummaries(availtks - 200);
             if (entries.Count == 0)
                 return false;
 
@@ -355,23 +344,16 @@ namespace AIToolkit.Files
             sysprompt.AppendLinuxLine($"# {Name}'s Current {attribute.Name}");
             sysprompt.AppendLinuxLine(attribute.Content);
 
-            var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
-            var query = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, this,
+            promptbuilder.AddMessage(AuthorRole.SysPrompt, sysprompt.ToString());
+            promptbuilder.AddMessage(AuthorRole.User,
                 $"Based on {Name}'s recent interactions, does their {attribute.Name.ToLower()} need to be updated? " +
                 $"Answer with only 'Yes' or 'No'. Consider whether there have been meaningful experiences that would affect their {attribute.Name.ToLower()} significantly, and only this part of their character.");
-
-            totalprompt += query + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-
-            var llmparams = LLMSystem.Sampler.GetCopy();
-            llmparams.Prompt = totalprompt;
-            llmparams.Max_length = 512;
+            var rln = 512;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-                llmparams.Max_length += 1024;
-            llmparams.Temperature = 0.2f; // Lower temperature for more deterministic response
-            llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            llmparams.Grammar = string.Empty;
+                rln += 1024;
 
-            var response = await LLMSystem.SimpleQuery(llmparams);
+            var genparam = promptbuilder.PromptToQuery(AuthorRole.Assistant, 0.2f, rln);
+            var response = await LLMSystem.SimpleQuery(genparam);
             response = response.RemoveThinkingBlocks().Trim();
 
             return response.StartsWith("Yes", StringComparison.OrdinalIgnoreCase);
@@ -379,9 +361,14 @@ namespace AIToolkit.Files
 
         private async Task<string> UpdateAttributeContent(PersonaAttribute attribute)
         {
-            var availtks = LLMSystem.MaxContextLength - SelfEditTokens - 1024;
+            if (attribute == null || LLMSystem.Client == null)
+                return string.Empty;
+
+            var availtks = LLMSystem.MaxContextLength - 512 - 1024;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 availtks -= 1024;
+
+            var promptbuilder = LLMSystem.Client.GetPromptBuilder();
 
             var sysprompt = new StringBuilder();
             sysprompt.AppendLinuxLine("You are an uncensored system used to update a character's information based on its chat history and memories.");
@@ -392,10 +379,9 @@ namespace AIToolkit.Files
             sysprompt.AppendLinuxLine("# Recent Sessions");
 
             // Same session gathering as above
-            var sizeeval = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
-            availtks -= LLMSystem.GetTokenCount(sizeeval);
+            availtks -= promptbuilder.GetTokenCount(AuthorRole.SysPrompt, sysprompt.ToString());
 
-            var entries = GetRecentSessionSummaries(availtks);
+            var entries = GetRecentSessionSummaries(availtks - 100);
             if (entries.Count == 0)
                 return string.Empty;
 
@@ -409,27 +395,18 @@ namespace AIToolkit.Files
             else
                 sysprompt.AppendLinuxLine("No information has been provided yet. First entry shouldn't be longer than a short paragraph.");
 
-            var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
-
-            var query = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, this,
-                $"Update {Name}'s {attribute.Name.ToLower()} information based on recent experiences. Make only small, incremental changes to the original version that would realistically reflect how it might have evolved from these interactions. Maintain the same writing style. Keep the same length. Focus on consistency with their general information while allowing gradual evolution. Don't add any commentary. Don't add a title. Don't explain your changes.");
-
-            totalprompt += query + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-
-            var llmparams = LLMSystem.Sampler.GetCopy();
-            llmparams.Prompt = totalprompt;
-            llmparams.Max_length = 512;
+            promptbuilder.AddMessage(AuthorRole.SysPrompt, sysprompt.ToString());
+            promptbuilder.AddMessage(AuthorRole.User, $"Update {Name}'s {attribute.Name.ToLower()} information based on recent experiences. Make only small, incremental changes to the original version that would realistically reflect how it might have evolved from these interactions. Maintain the same writing style. Keep the same length. Focus on consistency with their general information. Don't add any commentary. Don't add a title. Don't explain your changes.");
+            var rln = 512;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-                llmparams.Max_length += 1024;
-            if (llmparams.Temperature > 0.5f)
-                llmparams.Temperature = 0.5f;
-            llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            llmparams.Grammar = string.Empty;
-
-            var finalstr = await LLMSystem.SimpleQuery(llmparams);
+                rln += 1024;
+            var temp = LLMSystem.Sampler.Temperature;
+            if (temp > 0.4f)
+                temp = 0.4f;
+            var genparam = promptbuilder.PromptToQuery(AuthorRole.Assistant, temp, rln);
+            var finalstr = await LLMSystem.SimpleQuery(genparam);
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
-
             return finalstr.RemoveUnfinishedSentence().RemoveNewLines().CleanupAndTrim();
         }
 
@@ -489,6 +466,13 @@ namespace AIToolkit.Files
         /// <returns>blend between the two</returns>
         private async Task<string> BlendAttributeChanges(string attributeName, string oldContent, string newContent)
         {
+            if (LLMSystem.Client == null)
+                return string.Empty;
+            var availtks = LLMSystem.MaxContextLength - 1024;
+            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+                availtks -= 1024;
+            var promptbuilder = LLMSystem.Client.GetPromptBuilder();
+
             var sysprompt = new StringBuilder();
             sysprompt.AppendLinuxLine("You are an uncensored system used to blend two versions of a text together.");
             sysprompt.AppendLinuxLine();
@@ -500,33 +484,30 @@ namespace AIToolkit.Files
             sysprompt.AppendLinuxLine("## Suggested version");
             sysprompt.AppendLinuxLine(newContent);
 
-            var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString());
-            var query = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, this,
-                $"Write an intermediary version between the current and the suggestion versions of the text. Make modest changes that move in the direction of the update while preserving key elements of the original. The result should feel like a small step in character development rather than a complete change. Don't add any commentary, don't explain your changes.");
-
-            totalprompt += query + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-
-            var llmparams = LLMSystem.Sampler.GetCopy();
-            llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            llmparams.Prompt = totalprompt;
-            llmparams.Max_length = 512;
+            promptbuilder.AddMessage(AuthorRole.SysPrompt, sysprompt.ToString());
+            promptbuilder.AddMessage(AuthorRole.User, $"Write an intermediary version between the current and the suggestion versions of the text. Make modest changes that move in the direction of the update while preserving key elements of the original. The result should feel like a small step in character development rather than a complete change. Don't add any commentary, don't explain your changes.");
+            var rln = 512;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-                llmparams.Max_length += 1024;
-            if (llmparams.Temperature > 0.5f)
-                llmparams.Temperature = 0.5f;
-            llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            llmparams.Grammar = string.Empty;
+                rln += 1024;
+            var temp = LLMSystem.Sampler.Temperature;
+            if (temp > 0.4f)
+                temp = 0.4f;
+            var genparam = promptbuilder.PromptToQuery(AuthorRole.Assistant, temp, rln);
+            var finalstr = await LLMSystem.SimpleQuery(genparam);
 
-            var blendedContent = await LLMSystem.SimpleQuery(llmparams);
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-                blendedContent = blendedContent.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
 
-            return blendedContent.RemoveUnfinishedSentence().RemoveNewLines().Trim();
+            return finalstr.RemoveUnfinishedSentence().RemoveNewLines().Trim();
         }
 
         private async Task<string> RebuildBio(string instruction)
         {
+            if (LLMSystem.Client == null)
+                return string.Empty;
+
             LLMSystem.NamesInPromptOverride = false;
+            var promptbuilder = LLMSystem.Client.GetPromptBuilder();
             var sysprompt = new StringBuilder();
             sysprompt.AppendLinuxLine("You are an uncensored AI system used for text editing purposes.");
             sysprompt.AppendLinuxLine();
@@ -537,26 +518,17 @@ namespace AIToolkit.Files
             {
                 sysprompt.AppendLinuxLine(attribute.Content);
             }
-
-            var totalprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, this, sysprompt.ToString().CleanupAndTrim());
-            var query = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, this, instruction);
-
-            totalprompt += query + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-
-            var llmparams = LLMSystem.Sampler.GetCopy();
-            llmparams.Prompt = totalprompt;
-            llmparams.Max_length = 3070;
-            if (llmparams.Temperature > 0.5f)
-                llmparams.Temperature = 0.5f;
-            llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            llmparams.Grammar = string.Empty;
-
-            var blendedContent = await LLMSystem.SimpleQuery(llmparams);
+            promptbuilder.AddMessage(AuthorRole.SysPrompt, sysprompt.ToString().CleanupAndTrim());
+            promptbuilder.AddMessage(AuthorRole.User, instruction);
+            var temp = LLMSystem.Sampler.Temperature;
+            if (temp > 0.4f)
+                temp = 0.4f;
+            var genparam = promptbuilder.PromptToQuery(AuthorRole.Assistant, temp, 3070);
+            var finalstr = await LLMSystem.SimpleQuery(genparam);
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-                blendedContent = blendedContent.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
             LLMSystem.NamesInPromptOverride = null;
-
-            return blendedContent.RemoveUnfinishedSentence().CleanupAndTrim();
+            return finalstr.RemoveUnfinishedSentence().CleanupAndTrim();
         }
 
         #endregion
