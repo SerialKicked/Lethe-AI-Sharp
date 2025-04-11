@@ -94,9 +94,7 @@ namespace AIToolkit.API
         /// <returns>Estimated token count</returns>
         public virtual int CountTokens(string text)
         {
-            if (string.IsNullOrEmpty(text))
-                return 0;
-            return text.Length / 4;
+            return string.IsNullOrEmpty(text) ? 0 : TokenTools.CountTokens(text);
         }
     }
 }
