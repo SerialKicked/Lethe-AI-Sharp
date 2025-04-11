@@ -5,6 +5,7 @@ using AIToolkit.LLM;
 using AIToolkit.API;
 using System.Collections.Generic;
 using OpenAI.Chat;
+using CommunityToolkit.HighPerformance;
 
 namespace AIToolkit.Files
 {
@@ -33,7 +34,15 @@ namespace AIToolkit.Files
 
         public Message ToChatCompletion()
         {
-            return new Message(TokenTools.InternalRoleToChatRole(Role), Message, LLMSystem.NamesInPromptOverride ?? LLMSystem.Instruct.AddNamesToPrompt ? Sender?.Name : null);
+            var addname = LLMSystem.NamesInPromptOverride ?? LLMSystem.Instruct.AddNamesToPrompt;
+            if (Role == AuthorRole.System || Role == AuthorRole.SysPrompt)
+            {
+                addname = false;
+            }
+
+            var msg = (addname && Sender != null) ?  Sender.Name + ": " + Message : Message;
+
+            return new Message(TokenTools.InternalRoleToChatRole(Role), msg, addname ? Sender?.Name : null);
         }
     }
 
@@ -104,26 +113,49 @@ namespace AIToolkit.Files
         public static async Task<string> GenerateNewTitle(string sum)
         {
             LLMSystem.NamesInPromptOverride = false;
-            var msgtxt = "You are an automated system designed to give titles to summaries." + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Summary:" + LLMSystem.NewLine +
-                sum + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Instruction:" + LLMSystem.NewLine +
-                "Give a title to the summary above. This title should be a single short and descriptive sentence. Write only the title, nothing else.";
-            var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
-            var res = msg + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-
-            var llmparams = LLMSystem.Sampler.GetCopy();
-            llmparams.Prompt = res;
-            llmparams.Max_length = 350;
+            var finalstr = string.Empty;
+            var replyln = 350;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-                llmparams.Max_length += 1024;
-            if (llmparams.Temperature > 0.5f)
-                llmparams.Temperature = 0.5f;
-            llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            var finalstr = await LLMSystem.SimpleQuery(llmparams);
-            // remove any " character from the finalstr
+                replyln += 1024;
+
+            if (LLMSystem.CompletionAPIType == CompletionType.Text)
+            {
+                var msgtxt = "You are an automated system designed to give titles to summaries." + LLMSystem.NewLine +
+                    LLMSystem.NewLine +
+                    "# Summary:" + LLMSystem.NewLine +
+                    sum + LLMSystem.NewLine +
+                    LLMSystem.NewLine +
+                    "# Instruction:" + LLMSystem.NewLine +
+                    "Give a title to the summary above. This title should be a single short and descriptive sentence. Write only the title, nothing else.";
+                var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, msgtxt);
+                var res = msg + LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
+
+                var llmparams = LLMSystem.Sampler.GetCopy();
+                llmparams.Prompt = res;
+                llmparams.Max_length = replyln;
+                if (llmparams.Temperature > 0.5f)
+                    llmparams.Temperature = 0.5f;
+                llmparams.Max_context_length = LLMSystem.MaxContextLength;
+                finalstr = await LLMSystem.SimpleQuery(llmparams);
+            }
+            else
+            {
+                var chat = new List<Message>();
+                var msgtxt = "You are an automated system designed to give titles to summaries." + LLMSystem.NewLine +
+                    LLMSystem.NewLine + "# Summary:" + LLMSystem.NewLine + LLMSystem.NewLine + sum;
+                chat.Add(new Message(OpenAI.Role.System, msgtxt));
+                msgtxt = "Give a title to the summary above. This title should be a single short and descriptive sentence. Write only the title, nothing else.";
+                chat.Add(new Message(OpenAI.Role.User, msgtxt));
+                var chatrq = new ChatRequest(chat,
+                    topP: LLMSystem.Sampler.Top_p,
+                    frequencyPenalty: LLMSystem.Sampler.Rep_pen - 1,
+                    seed: LLMSystem.Sampler.Sampler_seed != -1 ? LLMSystem.Sampler.Sampler_seed : null,
+                    user: LLMSystem.NamesInPromptOverride ?? LLMSystem.Instruct.AddNamesToPrompt ? LLMSystem.User.Name : null,
+                    stops: [.. LLMSystem.Instruct.GetStoppingStrings(LLMSystem.User, LLMSystem.Bot)],
+                    maxTokens: replyln,
+                    temperature: (LLMSystem.Sampler.Temperature > 0.5) ? 0.5 : LLMSystem.Sampler.Temperature);
+                finalstr = await LLMSystem.SimpleQuery(chatrq);
+            }
             if (LLMSystem.Instruct.ThinkingStart != string.Empty)
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
             finalstr = finalstr.Replace("\"", "").Trim();
@@ -134,6 +166,11 @@ namespace AIToolkit.Files
         public async Task<string> GenerateTaskRes(string requestedTask, int responseLen, bool lightDialogs = false, bool showHidden = false)
         {
             LLMSystem.NamesInPromptOverride = false;
+            var replyln = responseLen;
+            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+                replyln += 1024;
+            var availtokens = LLMSystem.MaxContextLength - replyln - 1;
+
             var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMSystem.NewLine +
                 LLMSystem.NewLine +
                 "# Character Information:" + LLMSystem.NewLine +
@@ -144,30 +181,49 @@ namespace AIToolkit.Files
                 "# Chat Session:" + LLMSystem.NewLine +
                 "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
                 "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine;
-            var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, sysprompt);
-            var systokens = LLMSystem.GetTokenCount(msg) + 1;
+            var finalstr = string.Empty;
+            if (LLMSystem.CompletionAPIType == CompletionType.Text)
+            {
+                var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, sysprompt);
+                availtokens -= LLMSystem.GetTokenCount(msg);
 
-            var task = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, requestedTask);
-            var tasktokens = LLMSystem.GetTokenCount(task);
+                var task = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, requestedTask);
+                availtokens -= LLMSystem.GetTokenCount(task);
 
-            var repstart = LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-            var repstarttokens = LLMSystem.GetTokenCount(repstart);
+                var repstart = LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
+                availtokens -= LLMSystem.GetTokenCount(repstart);
 
-            var availtokens = LLMSystem.MaxContextLength - systokens - tasktokens - repstarttokens - responseLen;
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-                availtokens -= 1024;
+                var docs = GetRawDialogs(availtokens, false, lightDialogs, showHidden);
+                var fullprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, sysprompt + docs) + task + repstart;
+                var llmparams = LLMSystem.Sampler.GetCopy();
+                llmparams.Prompt = fullprompt;
+                llmparams.Max_length = replyln;
+                llmparams.Max_context_length = LLMSystem.MaxContextLength;
+                llmparams.Grammar = string.Empty;
+                if (llmparams.Temperature > 0.5f)
+                    llmparams.Temperature = 0.5f;
+                finalstr = await LLMSystem.SimpleQuery(llmparams);
+            }
+            else
+            {
+                var chat = new List<Message>();
+                availtokens -= (LLMSystem.GetTokenCount(sysprompt) + 10);
+                var querymsg = LLMSystem.FormatSingleMessage(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, requestedTask);
+                availtokens -= (LLMSystem.GetTokenCount(requestedTask) + 10);
+                var docs = GetRawDialogs(availtokens, false, lightDialogs, showHidden);
+                chat.Add(LLMSystem.FormatSingleMessage(AuthorRole.SysPrompt, LLMSystem.User, LLMSystem.Bot, sysprompt + docs));
+                chat.Add(querymsg);
+                var chatrq = new ChatRequest(chat,
+                    topP: LLMSystem.Sampler.Top_p,
+                    frequencyPenalty: LLMSystem.Sampler.Rep_pen - 1,
+                    seed: LLMSystem.Sampler.Sampler_seed != -1 ? LLMSystem.Sampler.Sampler_seed : null,
+                    user: LLMSystem.NamesInPromptOverride ?? LLMSystem.Instruct.AddNamesToPrompt ? LLMSystem.User.Name : null,
+                    stops: [.. LLMSystem.Instruct.GetStoppingStrings(LLMSystem.User, LLMSystem.Bot)],
+                    maxTokens: replyln,
+                    temperature: (LLMSystem.Sampler.Temperature > 0.5) ? 0.5 : LLMSystem.Sampler.Temperature);
+                finalstr = await LLMSystem.SimpleQuery(chatrq);
+            }
 
-            var docs = GetRawDialogs(availtokens, false, lightDialogs, showHidden);
-            var fullprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, sysprompt + docs) + task + repstart;
-
-            var llmparams = LLMSystem.Sampler.GetCopy();
-            llmparams.Prompt = fullprompt;
-            llmparams.Max_length = string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart) ? responseLen : responseLen + 1024;
-            llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            llmparams.Grammar = string.Empty;
-            if (llmparams.Temperature > 0.5f)
-                llmparams.Temperature = 0.5f;
-            var finalstr = await LLMSystem.SimpleQuery(llmparams);
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
             {
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);

@@ -65,7 +65,8 @@ namespace AIToolkit.API
             if (parameters is not ChatRequest input)
                 throw new ArgumentException("Parameters must be of type ChatRequest");
             var result = await _client.ChatCompletion(input);
-            return result.Message.Content;
+            var res = result.Message.Content.ToString();
+            return res;
         }
 
         public async Task GenerateTextStreaming(object parameters)

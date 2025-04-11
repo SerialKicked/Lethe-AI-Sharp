@@ -15,6 +15,7 @@ using System.Collections.ObjectModel;
 using System.Drawing;
 using OpenAI.Chat;
 using Message = OpenAI.Chat.Message;
+using System.Drawing.Drawing2D;
 
 namespace AIToolkit.LLM
 {
@@ -101,6 +102,9 @@ namespace AIToolkit.LLM
         /// <summary> Set to true if the backend supports vision </summary>
         public static bool SupportsVision => _client?.SupportsVision ?? false;
 
+        public static CompletionType CompletionAPIType => _client?.CompletionType ?? CompletionType.Text;
+
+
         private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(null, fullprompt);
         private static void RaiseOnStatusChange(SystemStatus newStatus) => OnStatusChanged?.Invoke(null, newStatus);
         private static void RaiseOnInferenceStreamed(string addedString) => OnInferenceStreamed?.Invoke(null, addedString);
@@ -164,7 +168,6 @@ namespace AIToolkit.LLM
         public static readonly string NewLine = "\n";
 
         private static SystemStatus status = SystemStatus.NotInit;
-        private static int systemPromptSize = 0;
         private static string StreamingTextProgress = string.Empty;
         public static string _LastGeneratedPrompt = string.Empty;
         private static List<OpenAI.Chat.Message> _LastGeneratedChat = [];
@@ -496,9 +499,7 @@ namespace AIToolkit.LLM
             // Prepare the full system prompt and count the tokens used
             var rawprompt = GenerateSystemPromptContent(MsgSender, newMessage);
             var sysprompt = new Message(OpenAI.Role.System, rawprompt);
-
-            systemPromptSize = GetTokenCount(rawprompt) + 4;
-            availtokens -= systemPromptSize;
+            availtokens -= (GetTokenCount(rawprompt) + 4);
             // Prepare the bot's response tokens and count them
             if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
                 availtokens -= GetTokenCount(Instruct.GetResponseStart(User));
@@ -511,13 +512,13 @@ namespace AIToolkit.LLM
             // add the user message to the history
             if (!string.IsNullOrEmpty(newMessage))
             {
-                history.Add(new Message(TokenTools.InternalRoleToChatRole(MsgSender), newMessage));
+                history.Add(FormatSingleMessage(MsgSender, User, Bot, newMessage));
             }
             if (!string.IsNullOrEmpty(newMessage) || MsgSender != AuthorRole.User)
             {
                 if (!string.IsNullOrEmpty(pluginmsg))
                 {
-                    history.Add(new Message(OpenAI.Role.System, pluginmsg));
+                    history.Add(FormatSingleMessage(AuthorRole.System, User, Bot, pluginmsg));
                 }
             }
 
@@ -552,8 +553,7 @@ namespace AIToolkit.LLM
             // Prepare the full system prompt and count the tokens used
             var rawprompt = GenerateSystemPromptContent(MsgSender, newMessage);
             var sysprompt = Instruct.BoSToken + Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, User, Bot, rawprompt);
-            systemPromptSize = GetTokenCount(sysprompt);
-            availtokens -= systemPromptSize;
+            availtokens -= GetTokenCount(sysprompt);
 
             // Prepare the bot's response tokens and count them
             if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
@@ -581,6 +581,29 @@ namespace AIToolkit.LLM
                 logger?.LogWarning("The prompt is {Diff} tokens over the limit.", diff);
             }
             return res;
+        }
+
+        internal static Message FormatSingleMessage(AuthorRole role, BasePersona user, BasePersona bot, string prompt)
+        {
+            var realprompt = prompt;
+            var addname = NamesInPromptOverride ?? Instruct.AddNamesToPrompt;
+            if (role != AuthorRole.Assistant && role != AuthorRole.User)
+                addname = false;
+            string? selname = null;
+            if (addname)
+            {
+                if (role == AuthorRole.Assistant)
+                {
+                    realprompt = string.Format("{0}: {1}", bot.Name, prompt);
+                    selname = bot.Name;
+                }
+                else if (role == AuthorRole.User)
+                {
+                    realprompt = string.Format("{0}: {1}", user.Name, prompt);
+                    selname = user.Name;
+                }
+            }
+            return new Message(TokenTools.InternalRoleToChatRole(role), ReplaceMacros(realprompt, user, bot), selname);
         }
 
         public static async Task AddBotMessage()
@@ -655,7 +678,7 @@ namespace AIToolkit.LLM
                             var addnames = NamesInPromptOverride ?? Instruct.AddNamesToPrompt;
                             var chatrq = new ChatRequest(_LastGeneratedChat,
                                 topP: Sampler.Top_p,
-                                frequencyPenalty: Sampler.Rep_pen,
+                                frequencyPenalty: Sampler.Rep_pen - 1,
                                 seed: Sampler.Sampler_seed != -1 ? Sampler.Sampler_seed : null,
                                 user: addnames ? User.Name : null,
                                 stops: [.. Instruct.GetStoppingStrings(User, Bot)],
@@ -814,13 +837,13 @@ namespace AIToolkit.LLM
             usedGuidInSession.Clear();
         }
 
-        public static async Task<string> SimpleQuery(SamplerSettings llmparams)
+        public static async Task<string> SimpleQuery(object chatlog)
         {
-            if (_client?.CompletionType != CompletionType.Text)
+            if (_client == null)
                 return string.Empty;
             var oldst = status;
             Status = SystemStatus.Busy;
-            var result = await _client.GenerateText(llmparams);
+            var result = await _client.GenerateText(chatlog);
             Status = oldst;
             RaiseOnQuickInferenceEnded(result);
             return string.IsNullOrEmpty(result) ? string.Empty : result;
