@@ -12,6 +12,7 @@ namespace AIToolkit.API
 
         private readonly OpenAI_APIClient _client;
         private readonly HttpClient _httpClient;
+        public CompletionType CompletionType => CompletionType.Chat;
 
         public OpenAIAdapter(HttpClient httpClient)
         {

@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 
 namespace AIToolkit.API
 {
+    public enum CompletionType { Text, Chat }
+
 
     /// <summary>
     /// Arguments for text token streaming events
@@ -39,6 +41,8 @@ namespace AIToolkit.API
 
         // Connection properties
         string BaseUrl { get; set; }
+
+        CompletionType CompletionType { get; } // Text or Chat completion
 
         // Core operations every backend needs to support
         Task<bool> CheckBackend();

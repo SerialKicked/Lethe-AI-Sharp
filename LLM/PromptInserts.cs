@@ -51,7 +51,7 @@ namespace AIToolkit.LLM
         {
             var res = new StringBuilder();
             foreach (var item in GetEntriesByPosition(position))
-                res.AppendLinuxLine(item.Content);
+                res.AppendLinuxLine(LLMSystem.ReplaceMacros(item.Content));
             return res.ToString();
         }
 

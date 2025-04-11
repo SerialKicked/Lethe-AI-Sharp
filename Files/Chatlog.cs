@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using AIToolkit.LLM;
 using AIToolkit.API;
 using System.Collections.Generic;
+using OpenAI.Chat;
 
 namespace AIToolkit.Files
 {
@@ -24,6 +25,18 @@ namespace AIToolkit.Files
             !string.IsNullOrEmpty(CharID) && LLMSystem.LoadedPersonas.TryGetValue(CharID, out var c) ? c : LLMSystem.Bot;
         [JsonIgnore] public BasePersona? Sender => 
             Role == AuthorRole.User? User : Role == AuthorRole.Assistant ? Bot : null;
+
+        public string ToTextCompletion()
+        {
+            return LLMSystem.Instruct.FormatSingleMessage(this);
+        }
+
+        public Message ToChatCompletion()
+        {
+            if (LLMSystem.NamesInPromptOverride == true)
+                return new Message(TokenTools.InternalRoleToChatRole(Role), Message, Sender?.Name);
+            return new Message(TokenTools.InternalRoleToChatRole(Role), Message, null);
+        }
     }
 
     public class ChatSession : KeywordEntry, IEmbed
@@ -356,27 +369,11 @@ namespace AIToolkit.Files
             return res.ToString();
         }
 
-        public string GetMessageHistory(SessionHandling sessionHandling, int maxTokens, PromptInserts memories)
+        public string MessagesToTextCompletion(SessionHandling sessionHandling, int maxTokens, PromptInserts? memories)
         {
             var sb = new StringBuilder();
             var tokensleft = maxTokens;
-            var mems = memories;
             var entrydepth = 0;
-
-            /// <summary> Insert WorldInfo memories into the chatlog </summary>
-            void InsertMemories()
-            {
-                var foundmemory = mems.GetContentByPosition(entrydepth);
-                if (string.IsNullOrEmpty(foundmemory))
-                    return;
-                var formattedmemory = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, foundmemory.CleanupAndTrim());
-                var tksmem = LLMSystem.GetTokenCount(formattedmemory);
-                if (tksmem <= tokensleft)
-                {
-                    tokensleft -= tksmem;
-                    sb.Insert(0, formattedmemory);
-                }
-            }
 
             // add all messages together in the same list
             var messagelist = new List<(int, SingleMessage)>();
@@ -413,12 +410,85 @@ namespace AIToolkit.Files
                     break;
                 sb.Insert(0, res);
                 // check if we need to add a memory
-                InsertMemories();
+                if (memories?.Count > 0)
+                {
+                    var foundmemory = memories.GetContentByPosition(entrydepth);
+                    if (!string.IsNullOrEmpty(foundmemory))
+                    {
+                        var formattedmemory = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.System, LLMSystem.User, LLMSystem.Bot, foundmemory.CleanupAndTrim());
+                        var tksmem = LLMSystem.GetTokenCount(formattedmemory);
+                        if (tksmem <= tokensleft)
+                        {
+                            tokensleft -= tksmem;
+                            sb.Insert(0, formattedmemory);
+                        }
+                    }
+                }
                 entrydepth++;
             }
             lastSessionID = oldest;
             // return the result
             return sb.ToString();
+        }
+
+        public List<Message> MessagesToChatCompletion(SessionHandling sessionHandling, int maxTokens, PromptInserts? memories)
+        {
+            var sb = new List<Message>();
+            var tokensleft = maxTokens;
+            var entrydepth = 0;
+            // add all messages together in the same list
+            var messagelist = new List<(int, SingleMessage)>();
+            var curSessionID = CurrentSessionID == -1 ? Sessions.Count - 1 : CurrentSessionID;
+            // make a list of all messages
+            if (sessionHandling == SessionHandling.FitAll)
+            {
+                for (int i = 0; i <= curSessionID; i++)
+                {
+                    foreach (var msg in Sessions[i].Messages)
+                    {
+                        messagelist.Add((i, msg));
+                    }
+                }
+            }
+            else
+            {
+                foreach (var msg in CurrentSession.Messages)
+                {
+                    messagelist.Add((curSessionID, msg));
+                }
+            }
+            var oldest = int.MaxValue;
+            // iterate through the messages in reverse order until we reach the token limit or end of messages
+            for (int i = messagelist.Count - 1; i >= 0; i--)
+            {
+                var msg = messagelist[i];
+                oldest = Math.Min(oldest, msg.Item1);
+                var res = msg.Item2.ToChatCompletion();
+                var tks = LLMSystem.GetTokenCount(msg.Item2.Message) + 5;
+                tokensleft -= tks;
+                if (tokensleft <= 0)
+                    break;
+                sb.Insert(0, res);
+                // check if we need to add a memory
+                if (memories?.Count > 0)
+                {
+                    var foundmemory = memories.GetContentByPosition(entrydepth);
+                    if (!string.IsNullOrEmpty(foundmemory))
+                    {
+                        var formattedmemory = new Message(OpenAI.Role.System, foundmemory.CleanupAndTrim());
+                        var tksmem = LLMSystem.GetTokenCount(foundmemory) + 4;
+                        if (tksmem <= tokensleft)
+                        {
+                            tokensleft -= tksmem;
+                            sb.Insert(0, formattedmemory);
+                        }
+                    }
+                }
+                entrydepth++;
+            }
+            lastSessionID = oldest;
+            // return the result
+            return sb;
         }
 
         public ChatSession? GetSessionByID(Guid id) => Sessions.FirstOrDefault(s => s.Guid == id);

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AIToolkit.Files;
+using AIToolkit.LLM;
 using SharpToken;
 
 namespace AIToolkit
@@ -85,6 +86,30 @@ namespace AIToolkit
             var consecutiveNewlinesCount = text.CountSubstring("\n\n");
             // Round up and add a small safety margin
             return (text.Length / 4) - consecutiveNewlinesCount;
+        }
+
+        internal static OpenAI.Role InternalRoleToChatRole(AuthorRole role)
+        {
+            return role switch
+            {
+                AuthorRole.User => OpenAI.Role.User,
+                AuthorRole.Assistant => OpenAI.Role.Assistant,
+                AuthorRole.System => OpenAI.Role.System,
+                AuthorRole.SysPrompt => OpenAI.Role.System,
+                _ => OpenAI.Role.User
+            };
+        }
+
+        internal static AuthorRole ChatRoleToInternalRole(OpenAI.Role role)
+        {
+            return role switch
+            {
+                OpenAI.Role.User => AuthorRole.User,
+                OpenAI.Role.Assistant => AuthorRole.Assistant,
+                OpenAI.Role.Developer => AuthorRole.System,
+                OpenAI.Role.System => AuthorRole.SysPrompt,
+                _ => AuthorRole.User
+            };
         }
 
     }

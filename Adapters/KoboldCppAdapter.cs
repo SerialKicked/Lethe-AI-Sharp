@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 
 namespace AIToolkit.API
 {
+
     /// <summary>
     /// Adapter for KoboldCpp backend
     /// </summary>
@@ -38,6 +39,8 @@ namespace AIToolkit.API
                 _httpClient.BaseAddress = new Uri(LLMSystem.BackendUrl);
             }
         }
+
+        public CompletionType CompletionType => CompletionType.Text;
 
         public async Task<int> GetMaxContextLength()
         {

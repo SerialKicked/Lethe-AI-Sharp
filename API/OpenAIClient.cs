@@ -62,6 +62,10 @@ namespace AIToolkit.API
                 foreach (var choice in partialResponse.Choices.Where(choice => choice.Delta?.Content != null))
                 {
                     cumulativeDelta += choice.Delta.Content;
+                    if (choice.FinishReason != null)
+                    {
+                        var x = 0;
+                    }
                     RaiseOnStreamingResponse(new OpenTokenResponse
                     {
                         Token = choice.Delta.Content,
@@ -69,6 +73,11 @@ namespace AIToolkit.API
                     });
                 }
             }
+            RaiseOnStreamingResponse(new OpenTokenResponse
+            {
+                Token = "",
+                FinishReason = "stop"
+            });
             LLMSystem.Logger?.LogInformation($"[OpenAI API] Final response: {cumulativeDelta}");
         }
 
