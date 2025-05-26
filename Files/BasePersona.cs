@@ -25,6 +25,8 @@ namespace AIToolkit.Files
         public string Name { get; set; } = name;
         public string Content { get; set; } = content;
         public bool Mutable { get; set; } = mutable;
+        // set to true for things like mood who don't need the previous version
+        public bool NoEvolve { get; set; } = false;
         public int UpdateFrequency { get; set; } = updatefreq;
         public int LastUpdated { get; set; } = lastupdated;
         public int StabilityFactor { get; set; } = stability;
@@ -257,6 +259,9 @@ namespace AIToolkit.Files
                 rln += 1024;
             var finalstr = await LLMSystem.SimpleQuery(promptbuilder.PromptToQuery(AuthorRole.Assistant, -1, rln));
             LLMSystem.NamesInPromptOverride = null;
+            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+
             SelfEditField = finalstr.RemoveUnfinishedSentence().RemoveNewLines().CleanupAndTrim().RemoveTitle();
         }
 

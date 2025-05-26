@@ -129,7 +129,7 @@ namespace AIToolkit.Files
                 temp = 0.5f;
             var genparam = promptBuilder.PromptToQuery(AuthorRole.Assistant, temp, replyln);
             finalstr = await LLMSystem.SimpleQuery(genparam);
-            if (LLMSystem.Instruct.ThinkingStart != string.Empty)
+            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
             finalstr = finalstr.Replace("\"", "").Trim();
             LLMSystem.NamesInPromptOverride = null;
