@@ -473,9 +473,6 @@ namespace AIToolkit.Files
         {
             if (LLMSystem.Client == null)
                 return string.Empty;
-            var availtks = LLMSystem.MaxContextLength - 1024;
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-                availtks -= 1024;
             var promptbuilder = LLMSystem.Client.GetPromptBuilder();
 
             var sysprompt = new StringBuilder();

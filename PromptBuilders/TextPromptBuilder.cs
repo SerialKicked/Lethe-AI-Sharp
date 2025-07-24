@@ -11,7 +11,7 @@ namespace AIToolkit
 {
     internal class TextPromptBuilder : IPromptBuilder
     {
-        private List<string> _prompt = [];
+        private readonly List<string> _prompt = [];
         public int Count => _prompt.Count;
 
         public int AddMessage(AuthorRole role, string message)

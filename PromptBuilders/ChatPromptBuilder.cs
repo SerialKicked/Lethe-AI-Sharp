@@ -11,7 +11,7 @@ namespace AIToolkit
 {
     internal class ChatPromptBuilder : IPromptBuilder
     {
-        private List<Message> _prompt = [];
+        private readonly List<Message> _prompt = [];
 
         public int Count => _prompt.Count;
 

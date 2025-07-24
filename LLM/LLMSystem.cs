@@ -406,7 +406,7 @@ namespace AIToolkit.LLM
                 MaxContextLength = 4096;
                 CurrentModel = "Error";
                 Backend = "Error";
-                LLMSystem.Logger?.LogError(ex, "Failed to connect to LLM server: " +ex.Message);
+                LLMSystem.Logger?.LogError(ex, "Failed to connect to LLM server: {Message}", ex.Message);
             }
         }
 
@@ -416,7 +416,7 @@ namespace AIToolkit.LLM
         /// <param name="MsgSender"></param>
         /// <param name="newMessage"></param>
         /// <returns></returns>
-        private static string GenerateSystemPromptContent(AuthorRole MsgSender, string newMessage)
+        private static string GenerateSystemPromptContent(string newMessage)
         {
             var searchmessage = string.IsNullOrWhiteSpace(newMessage) ? History.GetLastUserMessageContent() : newMessage;
             var rawprompt = new StringBuilder(SystemPrompt.GetSystemPromptRaw(Bot));
@@ -457,7 +457,7 @@ namespace AIToolkit.LLM
         /// <param name="MsgSender"></param>
         /// <param name="newMessage"></param>
         /// <returns></returns>
-        private static async Task UpdateRagAndInserts(AuthorRole MsgSender, string newMessage)
+        private static async Task UpdateRagAndInserts(string newMessage)
         {
             // Check for RAG entries and refresh the textual inserts
             dataInserts.DecreaseDuration();
@@ -505,7 +505,6 @@ namespace AIToolkit.LLM
             PromptBuilder!.ResetPrompt();
 
             // setup user message (+ optional plugin message) and count tokens used
-            var msg = string.IsNullOrEmpty(newMessage) ? string.Empty : Instruct.FormatSinglePrompt(MsgSender, User, Bot, newMessage);
             var pluginmsg = string.IsNullOrEmpty(pluginMessage) ? string.Empty : Instruct.FormatSinglePrompt(AuthorRole.System, User, Bot, pluginMessage);
             if (!string.IsNullOrEmpty(newMessage))
             {
@@ -517,9 +516,9 @@ namespace AIToolkit.LLM
             }
 
             // update the RAG, world info, and summary stuff
-            await UpdateRagAndInserts(MsgSender, newMessage);
+            await UpdateRagAndInserts(newMessage);
             // Prepare the full system prompt and count the tokens used
-            var rawprompt = GenerateSystemPromptContent(MsgSender, newMessage);
+            var rawprompt = GenerateSystemPromptContent(newMessage);
             availtokens -= PromptBuilder.AddMessage(AuthorRole.SysPrompt, rawprompt);
 
             // Prepare the bot's response tokens and count them
@@ -730,8 +729,7 @@ namespace AIToolkit.LLM
 
         public static void InvalidatePromptCache()
         {
-            if (PromptBuilder != null)
-                PromptBuilder.ResetPrompt();
+            PromptBuilder?.ResetPrompt();
             dataInserts.Clear();
             usedGuidInSession.Clear();
         }

@@ -115,7 +115,6 @@ namespace AIToolkit.Files
             if (LLMSystem.Client == null)
                 return string.Empty;
             LLMSystem.NamesInPromptOverride = false;
-            var finalstr = string.Empty;
             var replyln = 350;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 replyln += 1024;
@@ -128,7 +127,7 @@ namespace AIToolkit.Files
             if (temp > 0.5f)
                 temp = 0.5f;
             var genparam = promptBuilder.PromptToQuery(AuthorRole.Assistant, temp, replyln);
-            finalstr = await LLMSystem.SimpleQuery(genparam);
+            var finalstr = await LLMSystem.SimpleQuery(genparam);
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
             finalstr = finalstr.Replace("\"", "").Trim();
@@ -158,7 +157,6 @@ namespace AIToolkit.Files
                 "# Chat Session:" + LLMSystem.NewLine +
                 "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
                 "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine;
-            var finalstr = string.Empty;
 
             availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
             availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
@@ -168,7 +166,7 @@ namespace AIToolkit.Files
             promptbuild.AddMessage(AuthorRole.User, requestedTask);
             
             var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.5) ? 0.5 : LLMSystem.Sampler.Temperature, replyln);
-            finalstr = await LLMSystem.SimpleQuery(ct);
+            var finalstr = await LLMSystem.SimpleQuery(ct);
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
             {
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);

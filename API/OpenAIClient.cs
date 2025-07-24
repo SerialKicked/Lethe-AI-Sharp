@@ -32,7 +32,7 @@ namespace AIToolkit.API
             _httpClient = httpclient;
             _httpClient.DefaultRequestHeaders.ConnectionClose = false;
             _httpClient.Timeout = TimeSpan.FromMinutes(2);
-            var settings = new OpenAIClientSettings(LLMSystem.BackendUrl);
+            var settings = new OpenAISettings(LLMSystem.BackendUrl);
             API = new OpenAIClient(new OpenAIAuthentication("123"), settings, _httpClient);
         }
 
@@ -104,12 +104,13 @@ namespace AIToolkit.API
                 });
             }
 
-            LLMSystem.Logger?.LogInformation($"[OpenAI API] Final response: {cumulativeDelta}");
+            // CA2254 fix: Use a constant message template and pass cumulativeDelta as an argument
+            LLMSystem.Logger?.LogInformation("[OpenAI API] Final response: {CumulativeDelta}", cumulativeDelta);
         }
 
         public virtual async Task<Choice> ChatCompletion(ChatRequest request, CancellationToken cancellationToken = default)
         {
-            var response = await API.ChatEndpoint.GetCompletionAsync(request);
+            var response = await API.ChatEndpoint.GetCompletionAsync(request, cancellationToken);
             return response.FirstChoice;
         }
 

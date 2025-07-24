@@ -46,7 +46,7 @@ namespace AIToolkit.API
             // Use model info to determine context length
             // var modelInfo = await _client.GetModelInfo("default");
             // Parse context length from model info or use a default
-            return await Task.FromResult(16384);
+            return await Task.FromResult(32768);
         }
 
         /// <summary>
