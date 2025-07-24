@@ -49,9 +49,13 @@ namespace AIToolkit.API
             return await Task.FromResult(16384);
         }
 
+        /// <summary>
+        /// Get the default model info (first one if multiple loaded)
+        /// </summary>
+        /// <returns></returns>
         public async Task<string> GetModelInfo()
         {
-            var info = await _client.GetModelInfo("default");
+            var info = await _client.GetModelInfo();
             return info.Id;
         }
 
@@ -135,8 +139,8 @@ namespace AIToolkit.API
         }
 
         public bool SupportsStreaming => true;
-        public bool SupportsTTS => false;  // Depends on your implementation
-        public bool SupportsVision => false;  // Depends on your implementation
-        public bool SupportsWebSearch => false;
+        public bool SupportsTTS => false;  // TODO
+        public bool SupportsVision => false;  // TODO
+        public bool SupportsWebSearch => false; // TODO
     }
 }

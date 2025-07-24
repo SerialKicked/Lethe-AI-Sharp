@@ -43,11 +43,19 @@ namespace AIToolkit.API
             return lst;
         }
 
-        public virtual async Task<Model> GetModelInfo(string model)
+        public virtual async Task<Model> GetModelInfo(string? model = null)
         {
-            var models = await API.ModelsEndpoint.GetModelsAsync();
-            var lst = new List<Model>(models);
-            var info = await API.ModelsEndpoint.GetModelDetailsAsync(lst[0]);
+            if (model is null)
+            {
+                var models = await API.ModelsEndpoint.GetModelsAsync();
+                var lst = new List<Model>(models);
+                if (lst.Count == 0)
+                {
+                    throw new Exception("No models found in the backend.");
+                }
+                return lst[0];
+            }
+            var info = await API.ModelsEndpoint.GetModelDetailsAsync(model);
             return info;
         }
 

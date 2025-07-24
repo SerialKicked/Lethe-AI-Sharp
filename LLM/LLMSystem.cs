@@ -400,7 +400,7 @@ namespace AIToolkit.LLM
                 CurrentModel = await Client.GetModelInfo();
                 Backend = await Client.GetBackendInfo();
                 Status = SystemStatus.Ready;
-            }
+            } 
             catch (Exception ex)
             {
                 MaxContextLength = 4096;
