@@ -46,17 +46,59 @@ namespace AIToolkit.Files
 
         [JsonIgnore] private bool RealAddNameToPrompt => LLMSystem.NamesInPromptOverride ?? AddNamesToPrompt;
 
+        public string GetThinkPrefill()
+        {
+            var res = string.Empty;
+            if (PrefillThinking && !string.IsNullOrEmpty(ThinkingStart))
+            {
+                res = ThinkingStart;
+                if (!string.IsNullOrWhiteSpace(ThinkingForcedThought))
+                    res += LLMSystem.ReplaceMacros(ThinkingForcedThought);
+
+                if (LLMSystem.PutRAGInThinkingPrompt && LLMSystem.dataInserts.Count > 0)
+                {
+                    if (!res.EndsWith(LLMSystem.NewLine))
+                        res += LLMSystem.NewLine;
+
+                    if (LLMSystem.DisableThinkingPrompt)
+                    {
+                        // Better formatting to make it easier to read as it won't interfere with the thinking process
+                        res += LLMSystem.NewLine + "The following information might be relevant to the conversation:" + LLMSystem.NewLine;
+                        foreach (var insert in LLMSystem.dataInserts)
+                        {
+                            if (insert?.Location > -1)
+                            {
+                                res += "- " + LLMSystem.ReplaceMacros(insert.Content).CleanupAndTrim() + LLMSystem.NewLine;
+                            }
+                        }
+                        res += LLMSystem.NewLine;
+                    }
+                    else
+                    {
+                        // Raw information in paragraphs to mimick thinking, making it easier for the bot to continue from there.
+                        foreach (var insert in LLMSystem.dataInserts)
+                        {
+                            if (insert?.Location > -1)
+                            {
+                                res += LLMSystem.ReplaceMacros(insert.Content).CleanupAndTrim() + LLMSystem.NewLine + LLMSystem.NewLine;
+                            }
+                        }
+                    }
+
+                }
+                if (LLMSystem.DisableThinkingPrompt)
+                    res += LLMSystem.NewLine + ThinkingEnd + LLMSystem.NewLine;
+            }
+            return res;
+        }
+
         public string GetResponseStart(BasePersona bot)
         {
             var res = LLMSystem.ReplaceMacros(BotStart);
             if (RealAddNameToPrompt)
                 res += bot.Name + ":";
             if (PrefillThinking)
-            {
-                res += ThinkingStart;
-                if (!string.IsNullOrWhiteSpace(ThinkingForcedThought))
-                    res += ThinkingForcedThought;
-            }
+                res += GetThinkPrefill();
             return res;
         }
 
@@ -145,7 +187,7 @@ namespace AIToolkit.Files
 
         public List<string> GetStoppingStrings(BasePersona user, BasePersona bot)
         {
-            var res = new List<string>() { LLMSystem.NewLine + user.Name + ":", LLMSystem.NewLine + bot.Name + ":" };
+            var res = string.IsNullOrEmpty(ThinkingStart) ? new List<string>() { LLMSystem.NewLine + user.Name + ":", LLMSystem.NewLine + bot.Name + ":" } : new List<string>();
 
             if (!string.IsNullOrEmpty(BotStart))
                 res.Add(BotStart);

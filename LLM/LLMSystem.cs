@@ -74,6 +74,12 @@ namespace AIToolkit.LLM
         /// <summary> Should we stop the generation after the first paragraph? </summary>
         public static bool StopGenerationOnFirstParagraph { get; set; } = false;
 
+        /// <summary> Thinking models only, attempt to disable the thinking block </summary>
+        public static bool DisableThinkingPrompt { get; set; } = false;
+
+        /// <summary> Thinking models only, will move all RAG and WI to the thinking block </summary>
+        public static bool PutRAGInThinkingPrompt { get; set; } = false;
+
         /// <summary> Allow keyword-activated snippets to be inserted in the prompt (see WorldInfo and BasePersona) </summary>
         public static bool WorldInfo { get; set; } = true;
 
@@ -528,7 +534,8 @@ namespace AIToolkit.LLM
                 availtokens -= GetTokenCount(Instruct.GetResponseStart(Bot));
 
             // get the full, formated chat history complemented by the data inserts
-            History.AddHistoryToPrompt(SessionHandling, availtokens, dataInserts);
+            var addinserts = string.IsNullOrEmpty(Instruct.ThinkingStart) || !PutRAGInThinkingPrompt;
+            History.AddHistoryToPrompt(SessionHandling, availtokens, addinserts ? dataInserts : null);
             if (!string.IsNullOrEmpty(newMessage))
             {
                 PromptBuilder.AddMessage(MsgSender, newMessage);
@@ -620,10 +627,9 @@ namespace AIToolkit.LLM
             else
             {
                 Status = SystemStatus.Busy;
-                StreamingTextProgress = string.Empty;
+                StreamingTextProgress = Instruct.GetThinkPrefill();
                 if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
                 {
-                    StreamingTextProgress = Instruct.ThinkingStart + Instruct.ThinkingForcedThought;
                     RaiseOnInferenceStreamed(StreamingTextProgress);
                 }
                 RaiseOnFullPromptReady(PromptBuilder.PromptToText());
@@ -642,10 +648,7 @@ namespace AIToolkit.LLM
             if (Status == SystemStatus.Busy || Client == null)
                 return string.Empty;
             var inputText = systemMessage;
-            StreamingTextProgress = string.Empty;
-            if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
-                StreamingTextProgress = Instruct.ThinkingStart + Instruct.ThinkingForcedThought;
-
+            StreamingTextProgress = Instruct.GetThinkPrefill();
             var genparams = await GenerateFullPrompt(AuthorRole.System, inputText, null, 0);
             if (!string.IsNullOrEmpty(systemMessage) && logSystemPrompt)
                 Bot.History.LogMessage(AuthorRole.System, systemMessage, User, Bot);
@@ -688,14 +691,12 @@ namespace AIToolkit.LLM
                 pluginmessage += item + NewLine;
             pluginmessage = pluginmessage.Trim('\n');
 
-            StreamingTextProgress = string.Empty;
-
+            var genparams = await GenerateFullPrompt(MsgSender, inputText, pluginmessage, vlm_pictures.Count > 0 ? vlm_pictures.Count * 1024 : 0);
+            StreamingTextProgress = Instruct.GetThinkPrefill();
             if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
             {
-                StreamingTextProgress = Instruct.ThinkingStart + Instruct.ThinkingForcedThought;
                 RaiseOnInferenceStreamed(StreamingTextProgress);
             }
-            var genparams = await GenerateFullPrompt(MsgSender, inputText, pluginmessage, vlm_pictures.Count > 0 ? vlm_pictures.Count * 1024 : 0);
             if (!string.IsNullOrEmpty(userInput))
                 Bot.History.LogMessage(MsgSender, userInput, User, Bot);
             RaiseOnFullPromptReady(PromptBuilder.PromptToText());
