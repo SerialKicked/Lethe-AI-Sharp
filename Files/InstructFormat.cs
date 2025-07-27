@@ -68,7 +68,7 @@ namespace AIToolkit.Files
                         {
                             if (insert?.Location > -1)
                             {
-                                res += "- " + LLMSystem.ReplaceMacros(insert.Content).CleanupAndTrim() + LLMSystem.NewLine;
+                                res += "- " + LLMSystem.ReplaceMacros(insert.Content).RemoveNewLines().CleanupAndTrim() + LLMSystem.NewLine;
                             }
                         }
                         res += LLMSystem.NewLine;
@@ -80,7 +80,7 @@ namespace AIToolkit.Files
                         {
                             if (insert?.Location > -1)
                             {
-                                res += LLMSystem.ReplaceMacros(insert.Content).CleanupAndTrim() + LLMSystem.NewLine + LLMSystem.NewLine;
+                                res += LLMSystem.ReplaceMacros(insert.Content).RemoveNewLines().CleanupAndTrim() + LLMSystem.NewLine + LLMSystem.NewLine;
                             }
                         }
                     }
