@@ -55,6 +55,8 @@ namespace AIToolkit.Files
         public string[] Sentiments { get; set; } = [];
         public string[] Associations { get; set; } = [];
         public string Projects { get; set; } = string.Empty;
+        public string Scenario { get; set; } = string.Empty;
+        public bool IsRP { get; set; } = false;
 
         public float[] EmbedTitle { get; set; } = [];
         public float[] EmbedSummary { get; set; } = [];
@@ -90,6 +92,19 @@ namespace AIToolkit.Files
             var query = "Based on the exchange between {{user}} and {{char}} shown above, write a list of the plans they both setup for the near future. This list should contain between 0 and 4 items. Each item should be summarized in a single sentence. If there's no items, don't answer with anything. Make sure those plans aren't already resolved within the span of the dialog." + LLMSystem.NewLine + "Example:" + LLMSystem.NewLine + "- They promised to eat together tomorrow." + LLMSystem.NewLine + "- {{user}} will watch the movie recommanded by {{char}}.";
             var res = await GenerateTaskRes(query, 1024, true, false);
             return res;
+        }
+
+        public async Task<bool> IsRoleplay()
+        {
+            var query = "Based on the exchange between {{user}} and {{char}} shown above, determine if {{user}} and {{char}} are roleplaying a scenario. Respond Yes if they are acting a roleplay. Discussing a future roleplay doesn't count as a roleplay. Respond No if this is a just a chat." + LLMSystem.NewLine + LLMSystem.NewLine + 
+                "To qualify as a roleplay, the vast majority of the exchange must follow the following guidelines:" + LLMSystem.NewLine + 
+                "- Contains explicit actions (not just discussions)." + LLMSystem.NewLine + 
+                "- Both {{user}} and {{char}} are in a situation involving physical contact in a defined location." + LLMSystem.NewLine +
+                "- Heavy use of narrative text (between asterisks)" + LLMSystem.NewLine +
+                "- Clearly takes place outside of a chat interface." + LLMSystem.NewLine + LLMSystem.NewLine + "Your response must begin by either Yes or No.";
+            var res = await GenerateTaskRes(query, 1024, true, false);
+            var s = res.ToLowerInvariant().Replace(" ", string.Empty);
+            return s.StartsWith("yes");
         }
 
         public async Task<string> GenerateNewSummary()
@@ -510,6 +525,7 @@ namespace AIToolkit.Files
             session.FirstPersonSummary = LLMSystem.Bot.FirstPersonSummary;
             session.Associations = await session.GenerateKeywords();
             session.Projects = await session.GenerateGoals();
+            session.IsRP = await session.IsRoleplay();
             session.Title = await ChatSession.GenerateNewTitle(sum);
             session.Sentiments = []; //  await session.GenerateSentiment();
             await session.GenerateEmbeds();
@@ -533,11 +549,16 @@ namespace AIToolkit.Files
             // Save current session if it has enough messages otherwise just reset it
             if (archivePreviousSession && CurrentSession.Messages.Count > 2)
             {
+                CurrentSession.Scenario = LLMSystem.ScenarioOverride;
                 await UpdateSession(CurrentSession);
                 // reset session ID
                 CurrentSessionID = -1;
                 // Create new session
-                var newsession = new ChatSession();
+                var newsession = new ChatSession()
+                {
+                    Enabled = false,
+
+                };
                 Sessions.Add(newsession);
             }
             else

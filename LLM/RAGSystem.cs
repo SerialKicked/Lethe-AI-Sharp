@@ -45,7 +45,7 @@ namespace AIToolkit.LLM
         }
     }
 
-    record VectorSearchResult
+    class VectorSearchResult
     {
         public Guid ID;
         public EmbedType Category;
@@ -275,11 +275,14 @@ namespace AIToolkit.LLM
                 ResetVectorDB();
                 VectorizeChatBot(LLMSystem.Bot);
             }
+            // Check if message contains the words RP or roleplay
+            var RPCheck = message.Contains(" RP", StringComparison.OrdinalIgnoreCase) || message.Contains(" roleplay", StringComparison.OrdinalIgnoreCase);
+
             var emb = await EmbeddingText(message);
-            var subcount = MaxRAGEntries;
+            var subcount = MaxRAGEntries + 2;
             // If we have both titles and summaries double result count to get a better picture
             if (UseSummaries && UseTitles)
-                subcount += MaxRAGEntries;
+                subcount += MaxRAGEntries + 2;
             if (LLMSystem.WorldInfo)
                 subcount += 1;
             var res = Search(emb, subcount);
@@ -307,6 +310,21 @@ namespace AIToolkit.LLM
                 res = newlist;
                 res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
             }
+            foreach (var item in res)
+            {
+                if (item.Category == EmbedType.Summary || item.Category == EmbedType.Title)
+                {
+                    var found = LLMSystem.History.GetSessionByID(item.ID);
+                    if (found != null && found.IsRP)
+                    {
+                        if (RPCheck)
+                            item.Distance -= 0.1f; // Boost RP sessions
+                        else
+                            item.Distance += 0.1f; // Decay RP sessions
+                    }
+                }
+            }
+            res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
             // Make sure we got the correct amount of results
             if (res.Count > MaxRAGEntries)
                 res = res.GetRange(0, MaxRAGEntries);

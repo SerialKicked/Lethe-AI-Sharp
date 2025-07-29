@@ -49,10 +49,11 @@ namespace AIToolkit.Files
 
         public SamplerSettings GetCopy()
         {
-            var res = this.MemberwiseClone() as SamplerSettings;
-            if (res != null)
-                res.UniqueName = UniqueName;
-            return res!;
+            var res = (this.MemberwiseClone() as SamplerSettings)!;
+            res.UniqueName = UniqueName;
+            // Remove duplicates from dry_sequence_breakers
+            res.Dry_sequence_breakers = res.Dry_sequence_breakers.Distinct().ToList();
+            return res;
         }
     }
 }
