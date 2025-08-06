@@ -11,7 +11,6 @@ using System.Globalization;
 
 namespace AIToolkit
 {
-
     public class StringFix(bool removeAllBoldedText, bool fixQuotes, bool removeSingleWorldEmphasis, bool removeAllQuotes, bool removeItalic, float removeItalicRatio, int removeItalicMaxWords)
     {
         public bool RemoveAllBoldedText = removeAllBoldedText;
