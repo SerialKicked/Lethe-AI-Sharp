@@ -1,5 +1,6 @@
 ﻿using AIToolkit.LLM;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace AIToolkit.API
 {
@@ -146,9 +147,29 @@ namespace AIToolkit.API
             return new TextPromptBuilder();
         }
 
+        public async Task<bool> SaveKVState(int value)
+        {
+            var res = await _client.SaveKVState(value);
+            return res.success;
+        }
+
+        public async Task<bool> LoadKVState(int value)
+        {
+            var res = await _client.LoadKVState(value);
+            return res.success;
+        }
+
+        public async Task<bool> ClearKVStates()
+        {
+            var res = await _client.ClearKVState();
+            return res.success;
+        }
+
+
         public bool SupportsStreaming => true;
         public bool SupportsTTS { get; private set; } = false;
         public bool SupportsVision { get; private set; } = false;
         public bool SupportsWebSearch { get; private set; } = false;
+        public bool SupportsStateSave { get; private set; } = true;
     }
 }

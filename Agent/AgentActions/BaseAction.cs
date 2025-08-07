@@ -32,29 +32,29 @@ namespace AIToolkit.Agent
     {
         string Name { get; }
         string Description { get; }
-        List<string> ValidContexts { get; } // ["chat", "background", "proactive"]
-        Task<ActionResult> Execute(Dictionary<string, object> parameters);
+        Dictionary<string, object> Parameters { get; }
+        Task<ActionResult> Execute();
     }
 
-    public class AgentTaskSystem
+    public class BaseAction : IAgentAction
     {
-        private Dictionary<string, IAgentAction> availableActions = [];
+        public string Name { get; protected set; } = "base_action";
+        public string Description { get; protected set; } = "Base action with no specific functionality.";
+        public Dictionary<string, object> Parameters { get; protected set; } = [];
 
-        public string GetAvailableActionsPrompt()
+        public BaseAction(Dictionary<string, object>? parameters)
         {
-            var descriptions = availableActions.Values
-                .Select(a => $"{a.Name}: {a.Description} (contexts: {string.Join(",", a.ValidContexts)})")
-                .ToList();
-
-            return "Available actions:\n" + string.Join("\n", descriptions);
+            SetParameters(parameters);
         }
 
-        public void RegisterAction(IAgentAction action)
+        public void SetParameters(Dictionary<string, object>? parameters)
         {
-            if (!availableActions.ContainsKey(action.Name))
-            {
-                availableActions[action.Name] = action;
-            }
+            Parameters = parameters ?? [];
+        }
+
+        public virtual Task<ActionResult> Execute()
+        {
+            return Task.FromResult(new ActionResult(ActionResultType.Success, "Base action executed successfully."));
         }
     }
 }

@@ -16,6 +16,7 @@ using System.Drawing;
 using OpenAI.Chat;
 using Message = OpenAI.Chat.Message;
 using System.Drawing.Drawing2D;
+using AIToolkit.Agent;
 
 namespace AIToolkit.LLM
 {
@@ -189,6 +190,7 @@ namespace AIToolkit.LLM
         internal static HashSet<Guid> usedGuidInSession = [];
         internal static PromptInserts dataInserts = [];
         internal static readonly Random RNG = new();
+        public static AgentAI Agent { get; private set; } = new AgentAI();
 
         public static void Init()
         {
@@ -207,6 +209,7 @@ namespace AIToolkit.LLM
             Client.TokenReceived += Client_StreamingMessageReceived;
 
             PromptBuilder = Client.GetPromptBuilder();
+            Agent.Start();
 
             Status = SystemStatus.Ready;
         }
@@ -609,6 +612,20 @@ namespace AIToolkit.LLM
             if (Status == SystemStatus.Busy)
                 return;
             await StartGeneration(message.Role, message.Message);
+        }
+
+        /// <summary>
+        /// Sends a message to the bot and logs it to the chat history. Response done through the RaiseOnInferenceStreamed and OnInferenceEnded events.
+        /// </summary>
+        /// <param name="MsgSender"></param>
+        /// <param name="userInput"></param>
+        /// <param name="logtohistory"></param>
+        /// <returns></returns>
+        public static async Task SendMessageToBot(AuthorRole role, string message)
+        {
+            if (Status == SystemStatus.Busy)
+                return;
+            await StartGeneration(role, message);
         }
 
         /// <summary>

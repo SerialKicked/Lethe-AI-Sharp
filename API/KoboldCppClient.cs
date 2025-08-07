@@ -35,7 +35,7 @@ namespace AIToolkit.API
         /// <summary>
         /// HTTP status codes that should trigger a retry
         /// </summary>
-        public HashSet<int> RetryStatusCodes { get; } = new HashSet<int> { 408, 429, 500, 502, 503, 504 };
+        public HashSet<int> RetryStatusCodes { get; } = new HashSet<int> { 404, 408, 429, 500, 502, 503, 504 };
 
         public string BaseUrl
         {
@@ -585,6 +585,28 @@ namespace AIToolkit.API
         }
 
         #endregion
+
+        #region KoboldCpp API - KV State Management
+
+        public virtual async Task<KVStateSaveResult> SaveKVState(int slot, CancellationToken cancellationToken = default)
+        {
+            var arg = new KVStateInput { slot = slot };
+            return await SendRequestAsync<KVStateSaveResult>(_httpClient, HttpMethod.Post, "api/admin/save_state", arg, cancellationToken: cancellationToken);
+        }
+
+        public virtual async Task<KVStateLoadResult> LoadKVState(int slot, CancellationToken cancellationToken = default)
+        {
+            var arg = new KVStateInput { slot = slot };
+            return await SendRequestAsync<KVStateLoadResult>(_httpClient, HttpMethod.Post, "api/admin/load_state", arg, cancellationToken: cancellationToken);
+        }
+
+        public virtual async Task<KVStateClearResult> ClearKVState(CancellationToken cancellationToken = default)
+        {
+            return await SendRequestAsync<KVStateClearResult>(_httpClient, HttpMethod.Post, "api/admin/clear_state", null, cancellationToken: cancellationToken);
+        }
+
+        #endregion
+
 
         #region KoboldCpp API - Image Generation API
 
@@ -1885,6 +1907,30 @@ namespace AIToolkit.API
         public string authorsnote { get; set; }
         public ICollection<object> actions { get; set; }
     }
+
+    public class KVStateInput
+    {
+        public int slot { get; set; } = 0;
+    }
+    
+    public class KVStateClearResult
+    {
+        public bool success { get; set; }
+    }
+
+    public class KVStateLoadResult
+    {
+        public bool success { get; set; }
+        public uint new_tokens { get; set; }
+    }
+
+    public class KVStateSaveResult
+    {
+        public bool success { get; set; }
+        public uint new_tokens { get; set; }
+        public ulong new_state_size { get; set; }
+    }
+
 }
 
 #pragma warning restore IDE1006 // Naming Styles

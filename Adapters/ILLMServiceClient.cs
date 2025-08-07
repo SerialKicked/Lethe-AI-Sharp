@@ -66,11 +66,16 @@ namespace AIToolkit.API
         Task<string> WebSearch(string query);
         Task<string> ImageCaption(byte[] imageData);
 
+        // KV State management (if supported)
+        Task<bool> SaveKVState(int value);
+        Task<bool> LoadKVState(int value);
+        Task<bool> ClearKVStates();
+
         // Information about capabilities
         bool SupportsStreaming { get; }
         bool SupportsTTS { get; }
         bool SupportsVision { get; }
         bool SupportsWebSearch { get; }
-
+        bool SupportsStateSave { get; }
     }
 }

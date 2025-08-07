@@ -138,9 +138,25 @@ namespace AIToolkit.API
             }
         }
 
+        public Task<bool> SaveKVState(int value)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<bool> LoadKVState(int value)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<bool> ClearKVStates()
+        {
+            throw new NotImplementedException();
+        }
+
         public bool SupportsStreaming => true;
         public bool SupportsTTS => false;  // TODO
         public bool SupportsVision => false;  // TODO
         public bool SupportsWebSearch => false; // TODO
+        public bool SupportsStateSave => false; // Not Available
     }
 }
