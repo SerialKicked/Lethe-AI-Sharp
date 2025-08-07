@@ -584,6 +584,17 @@ namespace AIToolkit.API
             }
         }
 
+        /// <summary>
+        /// Turns a JSON schema into a LLM grammar string
+        /// </summary>
+        /// <param name="schema"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        public virtual async Task<string> SchemaToGrammar(string schema, CancellationToken cancellationToken = default)
+        {
+            return await SendRequestAsync<string>(_httpClient, HttpMethod.Post, "api/extra/json_to_grammar", schema, cancellationToken: cancellationToken);
+        }
+
         #endregion
 
         #region KoboldCpp API - KV State Management

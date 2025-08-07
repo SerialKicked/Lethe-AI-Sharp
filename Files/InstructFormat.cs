@@ -1,10 +1,11 @@
-﻿using Newtonsoft.Json;
+﻿using AIToolkit.LLM;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Schema.Generation;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using AIToolkit.LLM;
 
 namespace AIToolkit.Files
 {
@@ -187,7 +188,7 @@ namespace AIToolkit.Files
 
         public List<string> GetStoppingStrings(BasePersona user, BasePersona bot)
         {
-            var res = string.IsNullOrEmpty(ThinkingStart) ? new List<string>() { LLMSystem.NewLine + user.Name + ":", LLMSystem.NewLine + bot.Name + ":" } : new List<string>();
+            var res = string.IsNullOrEmpty(ThinkingStart) ? [LLMSystem.NewLine + user.Name + ":", LLMSystem.NewLine + bot.Name + ":"] : new List<string>();
 
             if (!string.IsNullOrEmpty(BotStart))
                 res.Add(BotStart);

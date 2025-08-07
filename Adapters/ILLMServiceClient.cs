@@ -65,6 +65,7 @@ namespace AIToolkit.API
         Task<byte[]> TextToSpeech(string text, string voice);
         Task<string> WebSearch(string query);
         Task<string> ImageCaption(byte[] imageData);
+        Task<string> SchemaToGrammar(Type jsonclass);
 
         // KV State management (if supported)
         Task<bool> SaveKVState(int value);
@@ -77,5 +78,7 @@ namespace AIToolkit.API
         bool SupportsVision { get; }
         bool SupportsWebSearch { get; }
         bool SupportsStateSave { get; }
+        bool SupportsSchema { get; }
+
     }
 }

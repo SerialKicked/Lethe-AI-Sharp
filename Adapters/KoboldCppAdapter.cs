@@ -1,6 +1,7 @@
 ﻿using AIToolkit.LLM;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Schema.Generation;
 
 namespace AIToolkit.API
 {
@@ -12,6 +13,7 @@ namespace AIToolkit.API
     {
         private readonly KoboldCppClient _client;
         private readonly HttpClient _httpClient;
+        private readonly JSchemaGenerator schemaGenerator = new();
 
         public event EventHandler<LLMTokenStreamingEventArgs>? TokenReceived;
 
@@ -165,11 +167,18 @@ namespace AIToolkit.API
             return res.success;
         }
 
+        public async Task<string> SchemaToGrammar(Type jsonclass)
+        {
+            var schema = schemaGenerator.Generate(jsonclass);
+            var schemaJson = schema.ToString();
+            return await _client.SchemaToGrammar(schemaJson);
+        }
 
         public bool SupportsStreaming => true;
         public bool SupportsTTS { get; private set; } = false;
         public bool SupportsVision { get; private set; } = false;
         public bool SupportsWebSearch { get; private set; } = false;
         public bool SupportsStateSave { get; private set; } = true;
+        public bool SupportsSchema { get; private set; } = true;
     }
 }

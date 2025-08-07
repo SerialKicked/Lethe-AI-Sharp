@@ -140,23 +140,30 @@ namespace AIToolkit.API
 
         public Task<bool> SaveKVState(int value)
         {
-            throw new NotImplementedException();
+            throw new NotSupportedException("OpenAI API does not support KV cache manipulation");
         }
 
         public Task<bool> LoadKVState(int value)
         {
-            throw new NotImplementedException();
+            throw new NotSupportedException("OpenAI API does not support KV cache manipulation");
         }
 
         public Task<bool> ClearKVStates()
         {
-            throw new NotImplementedException();
+            throw new NotSupportedException("OpenAI API does not support KV cache manipulation");
         }
+
+        public Task<string> SchemaToGrammar(Type jsonclass)
+        {
+            throw new NotImplementedException("Schema to grammar conversion not supported yet.");
+        }
+
 
         public bool SupportsStreaming => true;
         public bool SupportsTTS => false;  // TODO
         public bool SupportsVision => false;  // TODO
         public bool SupportsWebSearch => false; // TODO
         public bool SupportsStateSave => false; // Not Available
+        public bool SupportsSchema => false; // TODO
     }
 }

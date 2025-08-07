@@ -45,17 +45,11 @@ namespace AIToolkit.LLM
         }
     }
 
-    class VectorSearchResult
+    class VectorSearchResult(Guid id, EmbedType category, float dist)
     {
-        public Guid ID;
-        public EmbedType Category;
-        public float Distance;
-        public VectorSearchResult(Guid id, EmbedType category, float dist)
-        {
-            ID = id;
-            Category = category;
-            Distance = dist;
-        }
+        public Guid ID = id;
+        public EmbedType Category = category;
+        public float Distance = dist;
     }
 
     public enum EmbedType { Title, Summary, Session, Document, WorldInfo }

@@ -28,8 +28,7 @@ namespace AIToolkit.Agent
 
         public void QueueJob(IAgentAction job, int priority)
         {
-            if (job == null)
-                throw new ArgumentNullException(nameof(job));
+            ArgumentNullException.ThrowIfNull(job);
             if (priority < 0)
                 throw new ArgumentOutOfRangeException(nameof(priority), "Priority must be non-negative.");
             JobQueue.Enqueue(job, priority);
