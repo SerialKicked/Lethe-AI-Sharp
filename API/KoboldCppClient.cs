@@ -5,6 +5,7 @@
 #pragma warning disable 8625 // Disable "CS8625 Cannot convert null literal to non-nullable reference type"
 
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Net.Http.Headers;
 using System.Text;
@@ -105,8 +106,7 @@ namespace AIToolkit.API
         /// <returns></returns>
         /// <exception cref="ApiException"></exception>
         /// <exception cref="ApiException{ServerBusyError}"></exception>
-        private async Task<T> SendRequestAsync<T>(HttpClient selectclient, HttpMethod method, string endpoint,
-            object body = null, CancellationToken cancellationToken = default)
+        private async Task<T> SendRequestAsync<T>(HttpClient selectclient, HttpMethod method, string endpoint, object body = null, CancellationToken cancellationToken = default)
         {
             var client = selectclient;
             int attempt = 0;
@@ -590,9 +590,9 @@ namespace AIToolkit.API
         /// <param name="schema"></param>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public virtual async Task<string> SchemaToGrammar(string schema, CancellationToken cancellationToken = default)
+        public virtual async Task<GrammarResult> SchemaToGrammar(GrammarQuery schema, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<string>(_httpClient, HttpMethod.Post, "api/extra/json_to_grammar", schema, cancellationToken: cancellationToken);
+            return await SendRequestAsync<GrammarResult>(_httpClient, HttpMethod.Post, "api/extra/json_to_grammar", schema, cancellationToken: cancellationToken);
         }
 
         #endregion
@@ -1940,6 +1940,17 @@ namespace AIToolkit.API
         public bool success { get; set; }
         public uint new_tokens { get; set; }
         public ulong new_state_size { get; set; }
+    }
+
+    public class GrammarResult
+    {
+        public string result { get; set; }
+        public bool success { get; set; }
+    }
+
+    public class GrammarQuery
+    {
+        public JObject schema { get; set; }
     }
 
 }

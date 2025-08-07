@@ -171,7 +171,21 @@ namespace AIToolkit.API
         {
             var schema = schemaGenerator.Generate(jsonclass);
             var schemaJson = schema.ToString();
-            return await _client.SchemaToGrammar(schemaJson);
+            var apiPayload = new GrammarQuery
+            {
+                schema = JObject.Parse(schema.ToString())
+            };
+
+            //var finalJson = JsonConvert.SerializeObject(apiPayload, Formatting.Indented);
+            var res = await _client.SchemaToGrammar(apiPayload);
+            if (res.success)
+            {
+                return res.result;
+            }
+            else
+            {
+                throw new Exception($"Failed to convert schema to grammar");
+            }
         }
 
         public bool SupportsStreaming => true;
