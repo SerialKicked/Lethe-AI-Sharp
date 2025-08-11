@@ -1,11 +1,12 @@
-﻿using Newtonsoft.Json;
+﻿using AIToolkit.Agent;
+using AIToolkit.API;
+using AIToolkit.LLM;
+using CommunityToolkit.HighPerformance;
+using Newtonsoft.Json;
+using OpenAI.Chat;
+using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
-using AIToolkit.LLM;
-using AIToolkit.API;
-using System.Collections.Generic;
-using OpenAI.Chat;
-using CommunityToolkit.HighPerformance;
 
 namespace AIToolkit.Files
 {
@@ -54,6 +55,7 @@ namespace AIToolkit.Files
         public bool FirstPersonSummary { get; set; } = true;
 
         public SessionMetaInfo MetaData { get; set; } = new();
+        public LookupClass NewTopics { get; set; } = new();
 
         public string Scenario { get; set; } = string.Empty;
 
@@ -71,7 +73,8 @@ namespace AIToolkit.Files
 
         public async Task<SessionMetaInfo> GetSessionInfo()
         {
-            var grammar = await SessionMetaInfo.GetGrammar();
+            var session = new SessionMetaInfo();
+            var grammar = await session.GetGrammar();
             if (string.IsNullOrWhiteSpace(grammar))
                 throw new Exception("Something went wrong when building summary grammar and json format.");
 
@@ -95,7 +98,7 @@ namespace AIToolkit.Files
                 "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine;
 
 
-            var requestedTask = SessionMetaInfo.GetQuery();
+            var requestedTask = session.GetQuery();
 
             availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
             availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
@@ -110,7 +113,7 @@ namespace AIToolkit.Files
                 input.Grammar = grammar;
             }
             var finalstr = await LLMSystem.SimpleQuery(ct);
-            var res = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
+            session = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
 
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
             {
@@ -118,7 +121,60 @@ namespace AIToolkit.Files
             }
             LLMSystem.NamesInPromptOverride = null;
             LLMSystem.Instruct.PrefillThinking = prefill;
-            return res!;
+            return session!;
+        }
+
+        public async Task<LookupClass> GetResearchTopics()
+        {
+            var session = new LookupClass();
+            var grammar = await session.GetGrammar();
+            if (string.IsNullOrWhiteSpace(grammar))
+                throw new Exception("Something went wrong when building summary grammar and json format.");
+
+            LLMSystem.NamesInPromptOverride = false;
+            var prefill = LLMSystem.Instruct.PrefillThinking;
+            LLMSystem.Instruct.PrefillThinking = false;
+            var replyln = 2048;
+            var availtokens = LLMSystem.MaxContextLength - replyln - 20;
+
+            var promptbuild = LLMSystem.Client!.GetPromptBuilder();
+
+            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMSystem.NewLine +
+                LLMSystem.NewLine +
+                "# Character Information:" + LLMSystem.NewLine +
+                "## Name: {{char}}" + LLMSystem.NewLine +
+                "{{charbio}}" + LLMSystem.NewLine +
+                "## Name: {{user}}" + LLMSystem.NewLine +
+                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
+                "# Chat Session:" + LLMSystem.NewLine +
+                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
+                "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine;
+
+
+            var requestedTask = session.GetQuery();
+
+            availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
+            availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
+
+            var docs = GetRawDialogs(availtokens, false, true, false);
+            promptbuild.AddMessage(AuthorRole.SysPrompt, sysprompt + docs);
+            promptbuild.AddMessage(AuthorRole.User, requestedTask);
+
+            var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.75) ? 0.75 : LLMSystem.Sampler.Temperature, replyln);
+            if (ct is GenerationInput input)
+            {
+                input.Grammar = grammar;
+            }
+            var finalstr = await LLMSystem.SimpleQuery(ct);
+            session = JsonConvert.DeserializeObject<LookupClass>(finalstr);
+
+            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+            {
+                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+            }
+            LLMSystem.NamesInPromptOverride = null;
+            LLMSystem.Instruct.PrefillThinking = prefill;
+            return session!;
         }
 
 
@@ -566,6 +622,8 @@ namespace AIToolkit.Files
             {
                 var meta = await session.GetSessionInfo();
                 session.MetaData = meta;
+                var topics = await session.GetResearchTopics();
+                session.NewTopics = topics;
                 session.FirstPersonSummary = false;
             }
             else

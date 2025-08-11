@@ -1,13 +1,14 @@
 ﻿using AIToolkit.LLM;
+using System.Runtime.CompilerServices;
 
 namespace AIToolkit
 {
     public class LLMExtractableBase<T>
     {
-        public static string GetQuery()
+        public virtual string GetQuery()
         {
             var requestedTask = "Write a JSON file containing the following information based on the data shown above:\n";
-            var schema = DescriptionHelper.GetAllDescriptions<T>();
+            var schema = DescriptionHelper.GetAllDescriptionsRecursive<T>();
 
             foreach (var prop in schema)
             {
@@ -18,7 +19,7 @@ namespace AIToolkit
             return requestedTask;
         }
 
-        public async static Task<string> GetGrammar()
+        public virtual async Task<string> GetGrammar()
         {
             return await LLMSystem.Client!.SchemaToGrammar(typeof(T));
         }
