@@ -309,7 +309,7 @@ namespace AIToolkit.LLM
                 if (item.Category == EmbedType.Summary || item.Category == EmbedType.Title)
                 {
                     var found = LLMSystem.History.GetSessionByID(item.ID);
-                    if (found != null && found.IsRP)
+                    if (found != null && found.MetaData.IsRoleplaySession)
                     {
                         if (RPCheck)
                             item.Distance -= 0.1f; // Boost RP sessions

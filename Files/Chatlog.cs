@@ -49,14 +49,13 @@ namespace AIToolkit.Files
     public class ChatSession : KeywordEntry, IEmbed
     {
         [JsonIgnore] public Guid Guid { get; set; } = Guid.NewGuid();
-        public string Title { get; set; } = string.Empty;
-        public string Summary { get; set; } = string.Empty;
+        [JsonIgnore] public string Title => MetaData.Title;
+        [JsonIgnore] public string Summary => MetaData.Summary;
         public bool FirstPersonSummary { get; set; } = true;
-        public string[] Sentiments { get; set; } = [];
-        public string[] Associations { get; set; } = [];
-        public string Projects { get; set; } = string.Empty;
+
+        public SessionMetaInfo MetaData { get; set; } = new();
+
         public string Scenario { get; set; } = string.Empty;
-        public bool IsRP { get; set; } = false;
 
         public float[] EmbedTitle { get; set; } = [];
         public float[] EmbedSummary { get; set; } = [];
@@ -70,19 +69,19 @@ namespace AIToolkit.Files
         public TimeSpan Duration => EndTime - StartTime;
 
 
-        public async Task<ChatMetaInfo> GetSessionInfo()
+        public async Task<SessionMetaInfo> GetSessionInfo()
         {
-            var grammar = await LLMSystem.Client!.SchemaToGrammar(typeof(ChatMetaInfo));
+            var grammar = await SessionMetaInfo.GetGrammar();
             if (string.IsNullOrWhiteSpace(grammar))
                 throw new Exception("Something went wrong when building summary grammar and json format.");
 
             LLMSystem.NamesInPromptOverride = false;
             var prefill = LLMSystem.Instruct.PrefillThinking;
             LLMSystem.Instruct.PrefillThinking = false;
-            var replyln = 3000;
+            var replyln = 2048;
             var availtokens = LLMSystem.MaxContextLength - replyln - 20;
 
-            var promptbuild = LLMSystem.Client.GetPromptBuilder();
+            var promptbuild = LLMSystem.Client!.GetPromptBuilder();
 
             var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMSystem.NewLine +
                 LLMSystem.NewLine +
@@ -95,8 +94,8 @@ namespace AIToolkit.Files
                 "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
                 "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine;
 
-            //var requestedTask = "Write a JSON file containing the following information based on the chat session:\n- a title\n- a detailed summary.";
-            var requestedTask = "Write a JSON file containing the following information based on the chat session:\n- A title.\n- A detailed summary of the exchange between {{user}} and {{char}}, this should be at least 2 paragraphs long. Do not introduce the characters.\n- A boolean to say if this chat correspond to a roleplay session or a normal chat (roleplay sessions have physical actions and a lot of *narrative text in asterisks like this*). Only mark a session as roleplay if it's practically entirely roleplay.\n- an optional list of future plans set during the discussion, this list should contain between 0 and 5 elements.\n- A list of 4 to 6 keywords for this chat session (used for filtering and searching).";
+
+            var requestedTask = SessionMetaInfo.GetQuery();
 
             availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
             availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
@@ -105,13 +104,13 @@ namespace AIToolkit.Files
             promptbuild.AddMessage(AuthorRole.SysPrompt, sysprompt + docs);
             promptbuild.AddMessage(AuthorRole.User, requestedTask);
 
-            var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.5) ? 0.5 : LLMSystem.Sampler.Temperature, replyln);
+            var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.75) ? 0.75 : LLMSystem.Sampler.Temperature, replyln);
             if (ct is GenerationInput input)
             {
                 input.Grammar = grammar;
             }
             var finalstr = await LLMSystem.SimpleQuery(ct);
-            var res = JsonConvert.DeserializeObject<ChatMetaInfo>(finalstr);
+            var res = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
 
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
             {
@@ -122,16 +121,6 @@ namespace AIToolkit.Files
             return res!;
         }
 
-        /// <summary>
-        /// Mostly placeholder for when proper sentiment analysis is implemented
-        /// </summary>
-        /// <returns></returns>
-        public async Task<string[]> GenerateSentiment()
-        {
-            var query = "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of sentiments or moods {{char}} would associate with this chat. The list must be between 1 and 5 words long." + LLMSystem.NewLine + "Example: happiness, playfulness, surprise";
-            var res = await GenerateTaskRes(query, 512, true, false);
-            return res.Split(',');
-        }
 
         public async Task<string[]> GenerateKeywords()
         {
@@ -576,26 +565,20 @@ namespace AIToolkit.Files
             if (LLMSystem.Client?.SupportsSchema == true)  
             {
                 var meta = await session.GetSessionInfo();
-                session.Summary = meta.Summary;
+                session.MetaData = meta;
                 session.FirstPersonSummary = false;
-                session.Associations = [.. meta.Keywords];
-                session.Projects = string.Empty;
-                foreach (var item in meta.FutureGoals)
-                {
-                    session.Projects += "- " + item + LLMSystem.NewLine;
-                }
-                session.IsRP = meta.IsRoleplaySession;
-                session.Title = meta.Title;
             }
             else
             {
                 var sum = await session.GenerateNewSummary();
-                session.Summary = sum;
+                session.MetaData.Summary = sum;
                 session.FirstPersonSummary = LLMSystem.Bot.FirstPersonSummary;
-                session.Associations = await session.GenerateKeywords();
-                session.Projects = await session.GenerateGoals();
-                session.IsRP = await session.IsRoleplay();
-                session.Title = await ChatSession.GenerateNewTitle(sum);
+                var kw = await session.GenerateKeywords();
+                session.MetaData.Keywords = kw.ToList();
+                var goals = await session.GenerateGoals();
+                session.MetaData.FutureGoals = goals.Split('\n').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x)).ToList();
+                session.MetaData.IsRoleplaySession = await session.IsRoleplay();
+                session.MetaData.Title = await ChatSession.GenerateNewTitle(sum);
             }
             await session.GenerateEmbeds();
             return session;
