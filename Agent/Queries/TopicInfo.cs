@@ -37,7 +37,7 @@ namespace AIToolkit.Agent
             var gramm = """
 root ::= "{" space "\"Unfamiliar_Topics\"" space ":" space topics "}" space
 
-topics ::= "[" space "]" space | "[" space topicitem ("," space topicitem)* "]" space
+topics ::= "[" space "]" space | "[" space topicitem ("," space topicitem){0,2} "]" space
 
 topicitem ::= "{" space topickv "," space contextkv "," space urgencykv "," space querieskv "}" space
 
@@ -63,7 +63,7 @@ space ::= | " " | "\n"{1,2} [ \t]{0,20}
 
         public override string GetQuery()
         {
-            var requestedTask = "Review the conversation log above. Identify topics, or concepts that {{char}} is not already familiar with, based on {{char}}'s bio. Only include topics that are of interest to {{char}} and {{user}}. Respond in valid JSON using this schema:" + LLMSystem.NewLine;
+            var requestedTask = "Review the conversation log above. Identify between 1 and 3 topics or concepts that {{char}} is not familiar with. Inform your choices based on the information presented in the log and the character descriptions. Only include topics that are of interest to {{char}} and {{user}}. Respond in valid JSON using this schema:" + LLMSystem.NewLine;
             var schema = DescriptionHelper.GetAllDescriptionsRecursive<LookupClass>();
             foreach (var prop in schema)
             {
