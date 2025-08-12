@@ -1,7 +1,7 @@
 ﻿using AIToolkit.LLM;
 using System.Runtime.CompilerServices;
 
-namespace AIToolkit
+namespace AIToolkit.LLM
 {
     public class LLMExtractableBase<T>
     {
