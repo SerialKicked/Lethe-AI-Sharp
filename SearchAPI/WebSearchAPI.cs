@@ -3,6 +3,8 @@
 namespace AIToolkit.SearchAPI
 {
 
+    public enum BackendSearchAPI { DuckDuckGo, Brave }
+
     // Common search result model
     public class SearchResult
     {
@@ -15,19 +17,40 @@ namespace AIToolkit.SearchAPI
     // Main service that can switch between providers
     public class WebSearchAPI
     {
+        // Search API Settings
+        public static string BraveAPIKey { get; set; } = string.Empty;
+        public static BackendSearchAPI SearchAPI { get; set; } = BackendSearchAPI.DuckDuckGo;
+        public static bool SearchDetailedResults { get; set; } = true;
+
+
         private readonly HttpClient _httpClient;
         private ISearchProvider _currentProvider;
 
-        public WebSearchAPI(HttpClient httpClient, ISearchProvider defaultProvider)
+
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+        public WebSearchAPI(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _currentProvider = defaultProvider;
+            SwitchProvider(SearchAPI, BraveAPIKey);
         }
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
 
-        public void SwitchProvider(ISearchProvider provider)
+
+        public void SwitchProvider(BackendSearchAPI provider, string apiKey = "")
         {
-            _currentProvider = provider;
-            Console.WriteLine($"Switched to {provider.ProviderName} search provider");
+            BraveAPIKey = apiKey;
+            SearchAPI = provider;
+            switch (provider)
+            {
+                case BackendSearchAPI.DuckDuckGo:
+                    _currentProvider = new DuckDuckGoSearchProvider(_httpClient);
+                    break;
+                case BackendSearchAPI.Brave:
+                    _currentProvider = new BraveSearchProvider(_httpClient, apiKey);
+                    break;
+                default:
+                    throw new ArgumentException("Unsupported search provider");
+            }
         }
 
         public string CurrentProviderName => _currentProvider.ProviderName;
@@ -65,7 +88,7 @@ namespace AIToolkit.SearchAPI
                         SearchProvider = _currentProvider.ProviderName
                     };
 
-                    if (extractContent && !string.IsNullOrEmpty(result.Url))
+                    if (extractContent && !string.IsNullOrEmpty(result.Url) && WebSearchAPI.SearchAPI != BackendSearchAPI.DuckDuckGo)
                     {
                         enriched.FullContent = await ExtractContentWithJinaAsync(result.Url);
                         enriched.ContentExtracted = !string.IsNullOrEmpty(enriched.FullContent);
@@ -148,12 +171,9 @@ namespace AIToolkit.SearchAPI
         {
             using var httpClient = new HttpClient();
 
-            // Set up both providers
-            var braveProvider = new BraveSearchProvider(httpClient, "YOUR_BRAVE_API_KEY");
-            var duckDuckGoProvider = new DuckDuckGoSearchProvider(httpClient);
-
             // Start with DuckDuckGo (since you prefer their summaries)
-            var searchService = new WebSearchAPI(httpClient, duckDuckGoProvider);
+            WebSearchAPI.SearchAPI = BackendSearchAPI.DuckDuckGo;
+            var searchService = new WebSearchAPI(httpClient);
 
             Console.WriteLine($"Using {searchService.CurrentProviderName} provider");
 
@@ -168,7 +188,7 @@ namespace AIToolkit.SearchAPI
             }
 
             // Switch to Brave if needed
-            searchService.SwitchProvider(braveProvider);
+            searchService.SwitchProvider(BackendSearchAPI.Brave, WebSearchAPI.BraveAPIKey);
             Console.WriteLine($"Switched to {searchService.CurrentProviderName} provider");
 
             // Same search with Brave

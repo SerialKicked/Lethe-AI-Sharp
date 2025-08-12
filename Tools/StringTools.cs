@@ -41,6 +41,51 @@ namespace AIToolkit
                 .Replace("\r", "\\r");
         }
 
+        public static string SanitizeSearchQuery(this string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return "";
+
+            // Remove or replace problematic characters
+            var sanitized = query
+                .Replace("\"", "")           // Remove quotes
+                .Replace("'", "")            // Remove single quotes
+                .Replace("`", "")            // Remove backticks
+                .Replace("[", "")            // Remove brackets
+                .Replace("]", "")
+                .Replace("{", "")            // Remove braces
+                .Replace("}", "")
+                .Replace("(", "")            // Remove parentheses  
+                .Replace(")", "")
+                .Replace("|", " ")           // Replace pipes with spaces
+                .Replace("&", " and ")       // Replace & with "and"
+                .Replace("*", "")            // Remove asterisks
+                .Replace("?", "")            // Remove question marks at end
+                .Replace("!", "")            // Remove exclamation marks
+                .Replace("#", "")            // Remove hashtags
+                .Replace("@", "")            // Remove at symbols
+                .Replace("%", "")            // Remove percent signs
+                .Replace("^", "")            // Remove carets
+                .Replace("~", "")            // Remove tildes
+                .Replace("<", "")            // Remove angle brackets
+                .Replace(">", "")
+                .Trim();
+
+            // Replace multiple spaces with single spaces
+            while (sanitized.Contains("  "))
+            {
+                sanitized = sanitized.Replace("  ", " ");
+            }
+
+            // Limit length to avoid issues
+            if (sanitized.Length > 200)
+            {
+                sanitized = sanitized[..200].Trim();
+            }
+
+            return sanitized;
+        }
+
         public static int CountSubstring(this string text, string substring)
         {
             if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(substring))

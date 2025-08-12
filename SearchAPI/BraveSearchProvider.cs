@@ -21,7 +21,7 @@ namespace AIToolkit.SearchAPI
         {
             try
             {
-                var url = $"https://api.search.brave.com/res/v1/web/search?q={Uri.EscapeDataString(query)}&count={maxResults}";
+                var url = $"https://api.search.brave.com/res/v1/web/search?q={Uri.EscapeDataString(query.SanitizeSearchQuery())}&count={maxResults}";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Add("X-Subscription-Token", _apiKey);

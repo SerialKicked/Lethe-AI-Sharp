@@ -7,8 +7,10 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Net.Http.Headers;
 using System.Text;
+using static AIToolkit.SearchAPI.WebSearchAPI;
 
 
 namespace AIToolkit.API
@@ -433,9 +435,20 @@ namespace AIToolkit.API
         /// </summary>
         /// <param name="body"></param>
         /// <returns></returns>
-        public virtual async Task<WebQueryFullResponse> WebQueryAsync(WebQuery body, CancellationToken cancellationToken = default)
+        public virtual async Task<List<EnrichedSearchResult>> WebQueryAsync(WebQuery body, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<WebQueryFullResponse>(_httpClient, HttpMethod.Post, "api/extra/websearch", body, cancellationToken: cancellationToken);
+            var res = await SendRequestAsync<WebQueryFullResponse>(_httpClient, HttpMethod.Post, "api/extra/websearch", body, cancellationToken: cancellationToken);
+            if (res == null || res.Count == 0)
+                return new List<EnrichedSearchResult>();
+            // Convert WebQueryFullResponse to List<EnrichedSearchResult>
+            return res.Select(r => new EnrichedSearchResult
+            {
+                Title = r.title,
+                Description = r.desc,
+                Url = r.url,
+                FullContent = r.content,
+                ContentExtracted = !string.IsNullOrWhiteSpace(r.content)
+            }).ToList();
         }
 
         /// <summary>

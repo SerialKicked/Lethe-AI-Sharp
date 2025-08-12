@@ -1,22 +1,23 @@
-﻿using System.Text;
-using System.Windows;
-using Microsoft.Extensions.Logging;
-using AIToolkit.Files;
+﻿using AIToolkit.Agent;
 using AIToolkit.API;
-using Newtonsoft.Json;
-using System.IO;
-using Newtonsoft.Json.Linq;
-using System.Globalization;
-using static LLama.Common.ChatHistory;
-using System;
-using System.Threading.Tasks;
+using AIToolkit.Files;
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using OpenAI.Chat;
+using System;
 using System.Collections.ObjectModel;
 using System.Drawing;
-using OpenAI.Chat;
-using Message = OpenAI.Chat.Message;
 using System.Drawing.Drawing2D;
-using AIToolkit.Agent;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using static AIToolkit.SearchAPI.WebSearchAPI;
+using static LLama.Common.ChatHistory;
+using Message = OpenAI.Chat.Message;
 
 namespace AIToolkit.LLM
 {
@@ -764,12 +765,12 @@ namespace AIToolkit.LLM
             return string.IsNullOrEmpty(result) ? string.Empty : result;
         }
 
-        public static async Task<WebQueryFullResponse> WebSearch(string query)
+        public static async Task<List<EnrichedSearchResult>> WebSearch(string query)
         {
             if (Client == null || !SupportsWebSearch)
                 return [];
             var res = await Client.WebSearch(query);
-            var webres = JsonConvert.DeserializeObject<WebQueryFullResponse>(res);
+            var webres = JsonConvert.DeserializeObject<List<EnrichedSearchResult>>(res);
             if (webres is null)
             {
                 logger?.LogError("Failed to parse web search response");

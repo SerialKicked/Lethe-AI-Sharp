@@ -1,4 +1,5 @@
 ﻿using AIToolkit.LLM;
+using AIToolkit.SearchAPI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema.Generation;
@@ -14,6 +15,7 @@ namespace AIToolkit.API
         private readonly KoboldCppClient _client;
         private readonly HttpClient _httpClient;
         private readonly JSchemaGenerator schemaGenerator = new();
+        private readonly WebSearchAPI webSearchClient;
 
         public event EventHandler<LLMTokenStreamingEventArgs>? TokenReceived;
 
@@ -22,6 +24,7 @@ namespace AIToolkit.API
             _httpClient = httpClient;
             _httpClient.BaseAddress = new Uri(LLMSystem.BackendUrl);
             _client = new KoboldCppClient(httpClient);
+            webSearchClient = new WebSearchAPI(httpClient);
 
             // Hook into the KoboldCpp streaming event and adapt it to our interface's event
             _client.StreamingMessageReceived += (sender, e) =>
@@ -65,7 +68,7 @@ namespace AIToolkit.API
                 return "Engine Not Supported";
             SupportsTTS = engine.tts;
             SupportsVision = engine.vision;
-            SupportsWebSearch = engine.websearch;
+            // SupportsWebSearch = engine.websearch;
             return $"{engine.result} {engine.version}";
         }
 
@@ -112,9 +115,12 @@ namespace AIToolkit.API
         {
             if (!SupportsWebSearch)
                 return string.Empty;
-            var results = await _client.WebQueryAsync(new WebQuery { q = query });
+            var res = (WebSearchAPI.SearchAPI != BackendSearchAPI.DuckDuckGo) ?
+                await webSearchClient.SearchAndEnrichAsync(query, 3, WebSearchAPI.SearchDetailedResults) : 
+                await _client.WebQueryAsync(new WebQuery { q = query });
+
             // Convert results to a common format
-            return JsonConvert.SerializeObject(results);
+            return JsonConvert.SerializeObject(res);
         }
 
         public async Task<string> ImageCaption(byte[] imageData)
@@ -191,7 +197,7 @@ namespace AIToolkit.API
         public bool SupportsStreaming => true;
         public bool SupportsTTS { get; private set; } = false;
         public bool SupportsVision { get; private set; } = false;
-        public bool SupportsWebSearch { get; private set; } = false;
+        public bool SupportsWebSearch { get; private set; } = true;
         public bool SupportsStateSave { get; private set; } = true;
         public bool SupportsSchema { get; private set; } = true;
     }
