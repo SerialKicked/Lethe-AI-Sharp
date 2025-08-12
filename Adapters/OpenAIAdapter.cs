@@ -1,4 +1,6 @@
 ﻿using AIToolkit.LLM;
+using AIToolkit.SearchAPI;
+using Newtonsoft.Json;
 using OpenAI.Chat;
 
 namespace AIToolkit.API
@@ -12,6 +14,8 @@ namespace AIToolkit.API
 
         private readonly OpenAI_APIClient _client;
         private readonly HttpClient _httpClient;
+        private readonly WebSearchAPI webSearchClient;
+
         public CompletionType CompletionType => CompletionType.Chat;
 
         public OpenAIAdapter(HttpClient httpClient)
@@ -19,6 +23,7 @@ namespace AIToolkit.API
             _httpClient = httpClient;
             _httpClient.BaseAddress = new Uri(LLMSystem.BackendUrl);
             _client = new OpenAI_APIClient(_httpClient);
+            webSearchClient = new WebSearchAPI(httpClient);
 
             //Hook into the OpenAI streaming event and adapt it to our interface's event
             _client.StreamingMessageReceived += (sender, e) =>
@@ -112,10 +117,13 @@ namespace AIToolkit.API
             return Task.FromResult(Array.Empty<byte>());
         }
 
-        public Task<string> WebSearch(string query)
+        public async Task<string> WebSearch(string query)
         {
-            // OpenAI does not support web search directly
-            return Task.FromResult(string.Empty);
+            if (!SupportsWebSearch)
+                return string.Empty;
+            var res = await webSearchClient.SearchAndEnrichAsync(query, 3, WebSearchAPI.SearchDetailedResults);
+            // Convert results to a common format
+            return JsonConvert.SerializeObject(res);
         }
 
         public Task<string> ImageCaption(byte[] imageData)
@@ -162,7 +170,7 @@ namespace AIToolkit.API
         public bool SupportsStreaming => true;
         public bool SupportsTTS => false;  // TODO
         public bool SupportsVision => false;  // TODO
-        public bool SupportsWebSearch => false; // TODO
+        public bool SupportsWebSearch => true;
         public bool SupportsStateSave => false; // Not Available
         public bool SupportsSchema => false; // TODO
     }
