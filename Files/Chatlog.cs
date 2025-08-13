@@ -21,6 +21,7 @@ namespace AIToolkit.Files
         public string CharID = chara;
         public string UserID = user;
         public bool Hidden = hidden;
+        public string Note = string.Empty;
         [JsonIgnore] public BasePersona User => 
             !string.IsNullOrEmpty(UserID) && LLMSystem.LoadedPersonas.TryGetValue(UserID, out var u) ? u : LLMSystem.User;
         [JsonIgnore] public BasePersona Bot => 
