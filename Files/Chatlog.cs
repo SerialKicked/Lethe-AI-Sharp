@@ -335,29 +335,6 @@ namespace AIToolkit.Files
             return sb.ToString();
         }
 
-        public string GetRawSummary(string title = "Chat Session", bool NaturalLanguage = false)
-        {
-            var sb = new StringBuilder();
-            var tit = LLMSystem.ReplaceMacros(title);
-            if (!NaturalLanguage)
-            {
-                sb.AppendLinuxLine("# " + tit);
-                if (StartTime.Date == EndTime.Date)
-                    sb.AppendLinuxLine("## Date: " + StartTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(StartTime));
-                else
-                    sb.AppendLinuxLine("## From " + StartTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(StartTime) + " to " + EndTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(EndTime));
-                sb.AppendLinuxLine("## Title: " + Title.Trim());
-                sb.AppendLinuxLine("## Summary: " + LLMSystem.NewLine + Summary.Replace("\n\n", " ").Trim() + LLMSystem.NewLine);
-            }
-            else
-            {
-                if (StartTime.Date == EndTime.Date)
-                    sb.AppendLinuxLine($"{tit} on the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)}: *{Title.Trim()}* {Summary.RemoveNewLines()}");
-                else
-                    sb.AppendLinuxLine($"{tit} from the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)}, to the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}: *{Title.Trim()}* {Summary.RemoveNewLines()}");
-            }
-            return sb.ToString();
-        }
 
         public string GetRawMemory(bool Natural = false)
         {
@@ -399,16 +376,6 @@ namespace AIToolkit.Files
             }
 
             return sb.ToString();
-        }
-
-        public string GetFormatedSummary(string title = "Chat Session", bool NaturalLanguage = false)
-        {
-            return LLMSystem.Instruct.FormatSingleMessage(new SingleMessage(AuthorRole.System, DateTime.Now, GetRawSummary(title, NaturalLanguage), LLMSystem.Bot.UniqueName, LLMSystem.User.UniqueName));
-        }
-
-        public int GetFormatedSummaryTokenCount(bool NaturalLanguage = false)
-        {
-            return LLMSystem.GetTokenCount(GetFormatedSummary(NaturalLanguage: NaturalLanguage));
         }
     }
 
@@ -460,14 +427,7 @@ namespace AIToolkit.Files
                     continue;
                 var sb = new StringBuilder();
                 sb.AppendLinuxLine($"{sectionHeader} {session.Title}");
-                if (session.FirstPersonSummary)
-                {
-                    sb.AppendLinuxLine($"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}, the following events took places from {LLMSystem.Bot.Name}'s perspective: {session.Summary.RemoveNewLines()}").AppendLinuxLine();
-                }
-                else
-                {
-                    sb.AppendLinuxLine($"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}: {session.Summary.RemoveNewLines()}").AppendLinuxLine();
-                }
+                sb.AppendLinuxLine(session.GetRawMemory(true));
                 var tks = LLMSystem.GetTokenCount(sb.ToString());
                 if (tks <= tokensleft)
                 {

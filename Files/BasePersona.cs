@@ -230,7 +230,7 @@ namespace AIToolkit.Files
             for (int i = History.Sessions.Count - 2; i >= 0; i--)
             {
                 var session = History.Sessions[i];
-                var details = $"Between {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}: {session.Summary.RemoveNewLines()}" + LLMSystem.NewLine;
+                var details = session.GetRawMemory(true) + LLMSystem.NewLine;
                 var size = LLMSystem.GetTokenCount(details);
                 availtks -= size;
                 maxcount--;
@@ -443,6 +443,7 @@ namespace AIToolkit.Files
                 {
                     var session = History.Sessions[i];
                     var details = $"# Session: {session.Title}\nBetween {session.StartTime.DayOfWeek} {StringExtensions.DateToHumanString(session.StartTime)} and {session.EndTime.DayOfWeek} {StringExtensions.DateToHumanString(session.EndTime)}:\n{session.Summary.RemoveNewLines()}" + LLMSystem.NewLine;
+
                     var size = LLMSystem.GetTokenCount(details);
 
                     if (size <= availtks)
