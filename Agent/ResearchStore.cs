@@ -1,5 +1,4 @@
-﻿using System.Text.Json;
-using System.Text.Json.Serialization;
+﻿using Newtonsoft.Json;
 
 namespace AIToolkit.Agent
 {
@@ -10,18 +9,24 @@ namespace AIToolkit.Agent
         public static bool HasSession(Guid sessionId)
             => File.Exists(FileFor(sessionId));
 
+        public static void Ensure(Guid sessionId)
+        {
+            if (!HasSession(sessionId))
+                Save(new ResearchDoc { SessionId = sessionId });
+        }
+
         public static ResearchDoc Load(Guid sessionId)
         {
             var path = FileFor(sessionId);
             if (!File.Exists(path)) return new ResearchDoc { SessionId = sessionId };
             var json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<ResearchDoc>(json, Options()) ?? new ResearchDoc { SessionId = sessionId };
+            return JsonConvert.DeserializeObject<ResearchDoc>(json, Settings()) ?? new ResearchDoc { SessionId = sessionId };
         }
 
         public static void Save(ResearchDoc doc)
         {
             Directory.CreateDirectory(Root);
-            var json = JsonSerializer.Serialize(doc, Options());
+            var json = JsonConvert.SerializeObject(doc, Settings());
             File.WriteAllText(FileFor(doc.SessionId), json);
         }
 
@@ -44,10 +49,10 @@ namespace AIToolkit.Agent
 
         private static string FileFor(Guid sessionId) => Path.Combine(Root, sessionId + ".json");
 
-        private static JsonSerializerOptions Options() => new()
+        private static JsonSerializerSettings Settings() => new()
         {
-            WriteIndented = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            Formatting = Formatting.Indented,
+            NullValueHandling = NullValueHandling.Ignore
         };
     }
 

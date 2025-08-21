@@ -15,7 +15,7 @@ namespace AIToolkit.Files
 
     public class SingleMessage(AuthorRole role, DateTime date, string mess, string chara, string user, bool hidden = false)
     {
-        [JsonIgnore] public Guid Guid = Guid.NewGuid();
+        public Guid Guid { get; set; } = Guid.NewGuid();
         public AuthorRole Role = role;
         public string Message = mess;
         public DateTime Date = date;
@@ -51,7 +51,7 @@ namespace AIToolkit.Files
 
     public class ChatSession : KeywordEntry, IEmbed
     {
-        [JsonIgnore] public Guid Guid { get; set; } = Guid.NewGuid();
+        public Guid Guid { get; set; } = Guid.NewGuid();
         [JsonIgnore] public string Title => MetaData.Title;
         [JsonIgnore] public string Summary => MetaData.Summary;
         public bool FirstPersonSummary { get; set; } = true;
@@ -752,7 +752,7 @@ namespace AIToolkit.Files
 
         public void SaveToFile(string pPath) 
         {
-            var content = JsonConvert.SerializeObject(this);
+            var content = JsonConvert.SerializeObject(this, new JsonSerializerSettings { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
             File.WriteAllText(pPath, content);
         }
 

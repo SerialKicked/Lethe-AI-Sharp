@@ -15,7 +15,7 @@ namespace AIToolkit.Agent
         public int PersonaUpdateCooldownHours { get; set; } = 6;
         public int StageMessageTTLMinutes { get; set; } = 360;
         public bool AllowAutoMessageSend { get; set; } = false;
-        public string[] Plugins { get; set; } = ["CoreReflection", "WebIntelligence", "PersonaMaintenance"];
+        public string[] Plugins { get; set; } = [ "CoreReflection", "WebIntelligence", "PersonaMaintenance"];
 
         public static AgentConfig Load(string path)
         {

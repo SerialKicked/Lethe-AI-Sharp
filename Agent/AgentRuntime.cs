@@ -61,6 +61,9 @@ namespace AIToolkit.Agent
                     case "CoreReflection":
                         _plugins.Add(new Plugins.CoreReflectionPlugin());
                         break;
+                    case "WebIntelligence":
+                        _plugins.Add(new Plugins.WebIntelligencePlugin());
+                        break;
                 }
             }
         }
@@ -149,8 +152,17 @@ namespace AIToolkit.Agent
         {
             lock (_queueLock)
             {
-                if (_state.Queue.All(x => x.Id != task.Id))
-                    _state.Queue.Add(task);
+                // De-duplicate by Type + CorrelationKey while task is pending
+                if (!string.IsNullOrEmpty(task.CorrelationKey) &&
+                    _state.Queue.Any(t =>
+                        (t.Status == AgentTaskStatus.Queued || t.Status == AgentTaskStatus.Running || t.Status == AgentTaskStatus.Deferred) &&
+                        t.Type == task.Type &&
+                        t.CorrelationKey == task.CorrelationKey))
+                {
+                    return;
+                }
+
+                _state.Queue.Add(task);
             }
         }
 
@@ -172,6 +184,7 @@ namespace AIToolkit.Agent
 
         private async Task ExecuteTask(AgentTask task, CancellationToken ct)
         {
+            System.Diagnostics.Debug.WriteLine($"[Agent] Execute {task.Type} key={task.CorrelationKey} prio={task.Priority}");
             var ctx = BuildContext();
             var plugin = _plugins.FirstOrDefault(p => p.CanHandle(task));
             if (plugin == null)

@@ -19,24 +19,30 @@ namespace AIToolkit.Agent.Plugins
             if (ctx.State.SearchesUsedToday >= ctx.Config.DailySearchBudget)
                 return Task.FromResult<IEnumerable<AgentTask>>(Array.Empty<AgentTask>());
 
-            // Look for the most recent archived session (the one before current)
+            // Need at least one archived session (the one before current)
             var sessions = LLMSystem.History.Sessions;
             if (sessions.Count < 2)
                 return Task.FromResult<IEnumerable<AgentTask>>(Array.Empty<AgentTask>());
 
-            var archived = sessions[^2]; // the session just archived
+            var archived = sessions[^2];
             if (archived.Messages.Count == 0)
                 return Task.FromResult<IEnumerable<AgentTask>>(Array.Empty<AgentTask>());
 
-            // If we already have research stored for this session, skip
-            if (ResearchStore.HasSession(archived.Guid))
+            // Already researched or already planned/in-progress? Skip
+            var key = $"web-{archived.Guid}";
+            var hasPendingForSession = ctx.State.Queue.Any(t =>
+                (t.Status == AgentTaskStatus.Queued || t.Status == AgentTaskStatus.Running || t.Status == AgentTaskStatus.Deferred) &&
+                (t.Type == AgentTaskType.PlanSearch || t.Type == AgentTaskType.ExecuteSearch) &&
+                t.CorrelationKey == key);
+
+            if (hasPendingForSession || ResearchStore.HasSession(archived.Guid))
                 return Task.FromResult<IEnumerable<AgentTask>>(Array.Empty<AgentTask>());
 
-            // If TopicLookup has no topics, skip
+            // No topics, nothing to do
             if (archived.NewTopics?.Unfamiliar_Topics == null || archived.NewTopics.Unfamiliar_Topics.Count == 0)
                 return Task.FromResult<IEnumerable<AgentTask>>(Array.Empty<AgentTask>());
 
-            // If user is idle enough, plan searches
+            // Only when idle
             if (ctx.IdleTime.TotalMinutes < ctx.Config.MinIdleMinutesBeforeBackgroundWork)
                 return Task.FromResult<IEnumerable<AgentTask>>(Array.Empty<AgentTask>());
 
@@ -46,8 +52,9 @@ namespace AIToolkit.Agent.Plugins
                 new AgentTask
                 {
                     Type = AgentTaskType.PlanSearch,
-                    Priority = 2,
+                    Priority = 3,                 // plan later than execution
                     PayloadJson = payload,
+                    CorrelationKey = key,
                 }
             };
             return Task.FromResult<IEnumerable<AgentTask>>(tasks);
@@ -76,11 +83,14 @@ namespace AIToolkit.Agent.Plugins
             if (session == null || session.NewTopics?.Unfamiliar_Topics == null || session.NewTopics.Unfamiliar_Topics.Count == 0)
                 return Task.FromResult(AgentTaskResult.Fail());
 
-            // Create one ExecuteSearch task per query (respect a soft cap)
+            // Mark this session as "planned" right away to block re-planning on next Observe tick
+            ResearchStore.Ensure(plan.SessionId);
+
+            var key = $"web-{plan.SessionId}";
             var newTasks = new List<AgentTask>();
             foreach (var topic in session.NewTopics.Unfamiliar_Topics)
             {
-                // Prioritize higher urgency; drop trivial ones if budget is small
+                // Drop trivial ones if budget nearly exhausted
                 if (topic.Urgency <= 1 && ctx.Config.DailySearchBudget - ctx.State.SearchesUsedToday < 5)
                     continue;
 
@@ -90,9 +100,10 @@ namespace AIToolkit.Agent.Plugins
                     newTasks.Add(new AgentTask
                     {
                         Type = AgentTaskType.ExecuteSearch,
-                        Priority = 3,
+                        Priority = 2, // execute before more planning
                         PayloadJson = JsonSerializer.Serialize(exec),
-                        RequiresLLM = false, // Uses backend web search API, not text generation
+                        CorrelationKey = key,
+                        RequiresLLM = false
                     });
                 }
             }
@@ -115,7 +126,7 @@ namespace AIToolkit.Agent.Plugins
             {
                 Title = h.Title,
                 Url = h.Url,
-                Snippet = h.Description // Ensure this matches your EnrichedSearchResult shape (Description vs Snippet)
+                Snippet = h.Description // Ensure property matches your EnrichedSearchResult
             }).ToList();
 
             // Persist
@@ -131,14 +142,11 @@ namespace AIToolkit.Agent.Plugins
             var sb = new StringBuilder();
             sb.AppendLine($"Topic: {topic}");
             foreach (var it in items.Take(3))
-            {
                 sb.AppendLine($"- {it.Title} – {it.Url}");
-            }
-            var topicKey = $"web-{sessionId}-{San(topic)}";
 
             return new StagedMessage
             {
-                TopicKey = topicKey,
+                TopicKey = $"web-{sessionId}-{San(topic)}",
                 Draft = $"(Background) I researched “{topic}”. I’ve saved links and notes. Ready to use them next time.",
                 Rationale = sb.ToString(),
                 ExpireUtc = DateTime.UtcNow.AddHours(6),

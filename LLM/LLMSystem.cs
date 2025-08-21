@@ -660,7 +660,6 @@ namespace AIToolkit.LLM
         {
             if (Status != SystemStatus.Ready || History.CurrentSession.Messages.Count == 0 || History.LastMessage()?.Role != AuthorRole.Assistant || Client == null || PromptBuilder == null)
                 return;
-            using var _ = await AcquireModelSlotAsync(CancellationToken.None);
             History.RemoveLast();
             if (PromptBuilder.Count == 0)
             {
@@ -668,6 +667,7 @@ namespace AIToolkit.LLM
             }
             else
             {
+                using var _ = await AcquireModelSlotAsync(CancellationToken.None);
                 Status = SystemStatus.Busy;
                 StreamingTextProgress = Instruct.GetThinkPrefill();
                 if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
@@ -685,11 +685,14 @@ namespace AIToolkit.LLM
         /// <param name="systemMessage">Message from sender</param>
         /// <param name="logSystemPrompt">Log the message to the chat history</param>
         /// <returns></returns>
-        public static async Task<string> QuickInferenceForSystemPrompt(string systemMessage, bool logSystemPrompt)
+        public static async Task<string> QuickInferenceForSystemPrompt(string systemMessage, bool logSystemPrompt, CancellationToken ct = default)
         {
-            if (Status == SystemStatus.Busy || Client == null)
+            if (Client == null)
                 return string.Empty;
-            using var _ = await AcquireModelSlotAsync(CancellationToken.None);
+            using var _ = await AcquireModelSlotAsync(ct);
+            if (Status == SystemStatus.Busy)
+                return string.Empty;
+
             var inputText = systemMessage;
             StreamingTextProgress = Instruct.GetThinkPrefill();
             var genparams = await GenerateFullPrompt(AuthorRole.System, inputText, null, 0);

@@ -5,7 +5,7 @@ namespace AIToolkit.Files
 {
     public interface IEmbed
     {
-        [JsonIgnore] Guid Guid { get; set; }
+        Guid Guid { get; set; }
         float[] EmbedSummary { get; set; }
     }
 }
