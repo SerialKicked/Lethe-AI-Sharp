@@ -100,6 +100,7 @@ namespace AIToolkit.LLM
         public static event EventHandler<string>? OnInferenceEnded;
         /// <summary> Called when the system changes states (no init, busy, ready) </summary>
         public static event EventHandler<SystemStatus>? OnStatusChanged;
+        public static event EventHandler<BasePersona>? OnBotChanged;
 
         /// <summary> Set to true if the backend supports text-to-speech </summary>
         public static bool SupportsTTS => Client?.SupportsTTS ?? false;
@@ -191,7 +192,26 @@ namespace AIToolkit.LLM
         internal static HashSet<Guid> usedGuidInSession = [];
         internal static PromptInserts dataInserts = [];
         internal static readonly Random RNG = new();
-        public static AgentAI Agent { get; private set; } = new AgentAI();
+
+        private static readonly SemaphoreSlim ModelSemaphore = new(1, 1);
+
+        public sealed class ModelSlotGuard : IDisposable
+        {
+            private bool _disposed;
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                ModelSemaphore.Release();
+            }
+        }
+
+        public static async Task<ModelSlotGuard> AcquireModelSlotAsync(CancellationToken ct)
+        {
+            await ModelSemaphore.WaitAsync(ct);
+            return new ModelSlotGuard();
+        }
+
 
         public static void Init()
         {
@@ -210,7 +230,6 @@ namespace AIToolkit.LLM
             Client.TokenReceived += Client_StreamingMessageReceived;
 
             PromptBuilder = Client.GetPromptBuilder();
-            Agent.Start();
 
             Status = SystemStatus.Ready;
         }
@@ -315,6 +334,10 @@ namespace AIToolkit.LLM
             if (!string.IsNullOrEmpty(bot.UniqueName))
                 (bot as IFile).SaveToFile("data/chars/" + bot.UniqueName + ".json");
             bot = newbot;
+
+            OnBotChanged?.Invoke(null, bot);
+            EventBus.Publish(new BotChangedEvent(bot.UniqueName));
+
             bot.BeginChat();
             RAGSystem.VectorizeChatBot(Bot);
             // if first time interaction, display welcome message from bot
@@ -637,6 +660,7 @@ namespace AIToolkit.LLM
         {
             if (Status != SystemStatus.Ready || History.CurrentSession.Messages.Count == 0 || History.LastMessage()?.Role != AuthorRole.Assistant || Client == null || PromptBuilder == null)
                 return;
+            using var _ = await AcquireModelSlotAsync(CancellationToken.None);
             History.RemoveLast();
             if (PromptBuilder.Count == 0)
             {
@@ -665,6 +689,7 @@ namespace AIToolkit.LLM
         {
             if (Status == SystemStatus.Busy || Client == null)
                 return string.Empty;
+            using var _ = await AcquireModelSlotAsync(CancellationToken.None);
             var inputText = systemMessage;
             StreamingTextProgress = Instruct.GetThinkPrefill();
             var genparams = await GenerateFullPrompt(AuthorRole.System, inputText, null, 0);
@@ -686,6 +711,7 @@ namespace AIToolkit.LLM
         {
             if (Status == SystemStatus.Busy || Client == null || PromptBuilder == null)
                 return;
+            using var _ = await AcquireModelSlotAsync(CancellationToken.None);
             Status = SystemStatus.Busy;
             var inputText = userInput;
             var lastuserinput = string.IsNullOrEmpty(userInput) ? History.GetLastUserMessageContent() : userInput;
@@ -757,6 +783,7 @@ namespace AIToolkit.LLM
         {
             if (Client == null)
                 return string.Empty;
+            using var _ = await AcquireModelSlotAsync(CancellationToken.None);
             var oldst = status;
             Status = SystemStatus.Busy;
             var result = await Client.GenerateText(chatlog);

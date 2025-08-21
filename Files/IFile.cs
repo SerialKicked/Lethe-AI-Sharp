@@ -10,5 +10,6 @@ namespace AIToolkit.Files
         string ExportToString() => JsonConvert.SerializeObject(this, JsonSettings);
 
         void SaveToFile(string pPath) => File.WriteAllText(pPath, ExportToString());
+
     }
 }

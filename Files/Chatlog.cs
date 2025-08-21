@@ -1,6 +1,7 @@
 ﻿using AIToolkit.Agent;
 using AIToolkit.API;
 using AIToolkit.LLM;
+
 using CommunityToolkit.HighPerformance;
 using Newtonsoft.Json;
 using OpenAI.Chat;
@@ -56,7 +57,7 @@ namespace AIToolkit.Files
         public bool FirstPersonSummary { get; set; } = true;
 
         public SessionMetaInfo MetaData { get; set; } = new();
-        public LookupClass NewTopics { get; set; } = new();
+        public TopicLookup NewTopics { get; set; } = new();
 
         public string Scenario { get; set; } = string.Empty;
 
@@ -125,9 +126,9 @@ namespace AIToolkit.Files
             return session!;
         }
 
-        public async Task<LookupClass> GetResearchTopics()
+        public async Task<TopicLookup> GetResearchTopics()
         {
-            var session = new LookupClass();
+            var session = new TopicLookup();
             var grammar = await session.GetGrammar();
             if (string.IsNullOrWhiteSpace(grammar))
                 throw new Exception("Something went wrong when building summary grammar and json format.");
@@ -167,7 +168,7 @@ namespace AIToolkit.Files
                 input.Grammar = grammar;
             }
             var finalstr = await LLMSystem.SimpleQuery(ct);
-            session = JsonConvert.DeserializeObject<LookupClass>(finalstr);
+            session = JsonConvert.DeserializeObject<TopicLookup>(finalstr);
 
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
             {
@@ -511,6 +512,7 @@ namespace AIToolkit.Files
             var single = new SingleMessage(role, DateTime.Now, stringfix, bot.UniqueName, user.UniqueName);
             CurrentSession.Messages.Add(single);
             RaiseOnMessageAdded(single);
+            EventBus.Publish(new MessageAddedEvent(single.Guid, role == AuthorRole.User, single.Date));
             return single;
         }
 
@@ -520,6 +522,7 @@ namespace AIToolkit.Files
                 Sessions.Add(new ChatSession());
             CurrentSession.Messages.Add(single);
             RaiseOnMessageAdded(single);
+            EventBus.Publish(new MessageAddedEvent(single.Guid, single.Role == AuthorRole.User, single.Date));
             return single;
         }
 
@@ -593,7 +596,7 @@ namespace AIToolkit.Files
                 session.MetaData.Summary = sum;
                 session.FirstPersonSummary = LLMSystem.Bot.FirstPersonSummary;
                 var kw = await session.GenerateKeywords();
-                session.MetaData.Keywords = kw.ToList();
+                session.MetaData.Keywords = [.. kw];
                 var goals = await session.GenerateGoals();
                 session.MetaData.FutureGoals = goals.Split('\n').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x)).ToList();
                 session.MetaData.IsRoleplaySession = await session.IsRoleplay();
@@ -622,6 +625,7 @@ namespace AIToolkit.Files
             {
                 CurrentSession.Scenario = LLMSystem.ScenarioOverride;
                 await UpdateSession(CurrentSession);
+                EventBus.Publish(new SessionArchivedEvent(CurrentSession.Guid, DateTime.UtcNow));
                 // reset session ID
                 CurrentSessionID = -1;
                 // Create new session
