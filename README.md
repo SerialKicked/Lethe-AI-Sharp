@@ -1,7 +1,7 @@
 # AIToolkit - A C# LLM Library
 
-Powerful and general purpose library used to connect a local backend running a Large Language Model (LLM) and a frontend. This is the main library used by [wAIfu.Net](https://github.com/SerialKicked/ChatAI).
-
+Powerful, highly configurable, general purpose library used to connect a local backend running a Large Language Model (LLM) to a front-end. 
+This is the main library used by [wAIfu.Net](https://github.com/SerialKicked/ChatAI), a feature-complete AI chat application for Windows.
 
 ## Compatible Backends
 - **Kobold API:** Used by [KoboldCpp](https://github.com/LostRuins/koboldcpp). This is the recommanded backend with the most features.
@@ -13,16 +13,14 @@ Powerful and general purpose library used to connect a local backend running a L
 - Session-based chatlog with automated summaries for past sessions
 - Streamed (or not) inference / reroll / and impersonate functions
 - Support CoT / "thinking" models out of the box
-- Many useful tools to manipulate text, count tokens, and GBNF grammar generation directly from a class's structure
+- Many useful tools to manipulate text, count tokens
+- GBNF grammar generation directly from a class's structure
 - Tools for reliable Web Search (DuckDuckGo and Brave)
-- Highly Configurable
-  
 
 ## Long Term Memory System
 - Keyword-triggered text insertions (also known as "world info" in many frontends)
 - Customizable RAG System using the Small World implementation
 - Automatic (optional) and configurable insertion of relevant past chat sessions into the context
- 
 
 ## Advanced Features / WIP
 - Basic support for VLM (visual language models) depending on the backend
