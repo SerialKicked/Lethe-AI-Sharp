@@ -1,4 +1,4 @@
-# AIToolkit - A C# LLM Library
+# EsKa's AI Toolkit - A C# Middleware LLM Library
 
 Powerful, highly configurable, general purpose library used to connect a local backend running a Large Language Model (LLM) to a front-end. 
 This is the main library used by [wAIfu.Net](https://github.com/SerialKicked/ChatAI), a feature-complete AI chat application for Windows.
@@ -25,3 +25,11 @@ This is the main library used by [wAIfu.Net](https://github.com/SerialKicked/Cha
 ## Advanced Features / WIP
 - Basic support for VLM (visual language models) depending on the backend
 - Background Agent system (bot can run tasks in the background)
+
+## Third Party Libraries
+
+*AI Toolkit* relies on the following libraries and tools to work
+- [LlamaSharp](https://github.com/SciSharp/LLamaSharp/) - Mostly used for embedding purposes
+- [HNSW.NET](https://github.com/curiosity-ai/hnsw-sharp) - Used for everything related to RAG / Vector Search
+- [Newtonsoft Json](https://www.newtonsoft.com/json) - Practically all the classes can be imported and exported in Json
+- [General Text Embedding - Large](https://huggingface.co/thenlper/gte-large) - Embedding model used as our default (works best in english)
