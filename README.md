@@ -16,6 +16,7 @@ This is the main library used by [wAIfu.Net](https://github.com/SerialKicked/Cha
 - Many useful tools to manipulate text, count tokens
 - GBNF grammar generation directly from a class's structure
 - Tools for reliable Web Search (DuckDuckGo and Brave)
+- Text To Speech support (through the *Kobold API* only)
 
 ## Long Term Memory System
 - Keyword-triggered text insertions (also known as "world info" in many frontends)
