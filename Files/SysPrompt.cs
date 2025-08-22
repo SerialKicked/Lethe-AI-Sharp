@@ -15,7 +15,7 @@ namespace AIToolkit.Files
         public string WorldInfoTitle { get; set; } = "# Important Memories";
         public string ScenarioTitle { get; set; } = "# Scenario";
         public string DialogsTitle { get; set; } = "# Writing Style";
-        public string SessionHistoryTitle { get; set; } = "# Previous Sessions" + LLMSystem.NewLine + "Below is a list of previous chat sessions between {{user}} and {{char}}.";
+        public string SessionHistoryTitle { get; set; } = "# Previous Sessions" + LLMSystem.NewLine + LLMSystem.NewLine + "Below is a list of recent chat sessions between {{user}} and {{char}}.";
         public string CategorySeparator { get; set; } = "#";
         public string SubCategorySeparator { get; set; } = "##";
 
@@ -27,17 +27,17 @@ namespace AIToolkit.Files
 
             if (character.SelfEditTokens > 0 && !string.IsNullOrWhiteSpace(character.SelfEditField))
             {
-                res.AppendLinuxLine().AppendLinuxLine($"{CategorySeparator} {character.Name}'s personal thoughts").AppendLinuxLine("{{selfedit}}");
+                res.AppendLinuxLine().AppendLinuxLine($"{CategorySeparator} {character.Name}'s personal thoughts").AppendLinuxLine().AppendLinuxLine("{{selfedit}}");
             }
 
             if (character.ExampleDialogs.Count > 0 && !string.IsNullOrEmpty(DialogsTitle))
             {
-                res.AppendLinuxLine().AppendLinuxLine(DialogsTitle).AppendLinuxLine("{{examples}}");
+                res.AppendLinuxLine().AppendLinuxLine(DialogsTitle).AppendLinuxLine().AppendLinuxLine("{{examples}}");
             }
 
             if ((!string.IsNullOrEmpty(character.Scenario) || !string.IsNullOrEmpty(LLMSystem.ScenarioOverride)) && !string.IsNullOrEmpty(ScenarioTitle))
             {
-                res.AppendLinuxLine().AppendLinuxLine(ScenarioTitle).AppendLinuxLine("{{scenario}}");
+                res.AppendLinuxLine().AppendLinuxLine(ScenarioTitle).AppendLinuxLine().AppendLinuxLine("{{scenario}}");
             }
 
 

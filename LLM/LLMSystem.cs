@@ -82,6 +82,9 @@ namespace AIToolkit.LLM
         /// <summary> Thinking models only, will move all RAG and WI to the thinking block </summary>
         public static bool PutRAGInThinkingPrompt { get; set; } = false;
 
+        public static bool ForceRAGInSysPrompt { get; set; } = false;
+      
+
         /// <summary> Allow keyword-activated snippets to be inserted in the prompt (see WorldInfo and BasePersona) </summary>
         public static bool WorldInfo { get; set; } = true;
 
@@ -472,10 +475,10 @@ namespace AIToolkit.LLM
             }
 
             // Now add the system prompt entries we gathered
-            var syspromptentries = dataInserts.GetEntriesByPosition(-1);
+            var syspromptentries = ForceRAGInSysPrompt ? dataInserts : dataInserts.GetEntriesByPosition(-1);
             if (syspromptentries.Count > 0)
             {
-                rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle);
+                rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle).AppendLinuxLine();
                 foreach (var item in syspromptentries)
                     rawprompt.AppendLinuxLine(item.Content);
             }
