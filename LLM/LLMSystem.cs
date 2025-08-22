@@ -222,6 +222,68 @@ namespace AIToolkit.LLM
 
         #endregion
 
+        #region *** Operation-scoped cancellation ***
+
+        private static readonly AsyncLocal<CancellationTokenSource?> _currentOpCts = new();
+
+        public sealed class OperationScope : IDisposable
+        {
+            private readonly CancellationTokenSource? _prev;
+            private readonly CancellationTokenSource _mine;
+            private bool _disposed;
+
+            internal OperationScope(CancellationTokenSource? prev, CancellationTokenSource mine)
+            {
+                _prev = prev;
+                _mine = mine;
+            }
+
+            public CancellationToken Token => _mine.Token;
+
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                try { _mine.Dispose(); } catch { /* ignore */ }
+                _currentOpCts.Value = _prev;
+            }
+        }
+
+        public static OperationScope BeginOperation(CancellationToken external = default)
+        {
+            var prev = _currentOpCts.Value;
+            var cts = external.CanBeCanceled
+                ? CancellationTokenSource.CreateLinkedTokenSource(external)
+                : new CancellationTokenSource();
+            _currentOpCts.Value = cts;
+            return new OperationScope(prev, cts);
+        }
+
+        public static CancellationToken CurrentOperationToken => _currentOpCts.Value?.Token ?? CancellationToken.None;
+
+        /// <summary>
+        /// Cancel the currently active logical operation and abort the backend generation.
+        /// This will cooperatively cancel any pending semaphore waits (SimpleQuery/QuickInference)
+        /// and attempt to break an in-flight backend call.
+        /// </summary>
+        public static void CancelActiveOperation(bool abortBackend = true)
+        {
+            try
+            {
+                var cts = _currentOpCts.Value;
+                if (cts is not null && !cts.IsCancellationRequested)
+                    cts.Cancel();
+            }
+            catch { /* ignore */ }
+
+            if (abortBackend)
+            {
+                try { Client?.AbortGenerationSync(); } catch { /* ignore */ }
+                Status = SystemStatus.Ready;
+            }
+        }
+
+        #endregion
 
         public static void Init()
         {
@@ -701,9 +763,11 @@ namespace AIToolkit.LLM
         {
             if (Client == null)
                 return string.Empty;
-            using var _ = await AcquireModelSlotAsync(ct);
-            if (Status == SystemStatus.Busy)
-                return string.Empty;
+
+            using var op = BeginOperation(ct);
+            var token = op.Token;
+
+            using var _ = await AcquireModelSlotAsync(token);
 
             var inputText = systemMessage;
             StreamingTextProgress = Instruct.GetThinkPrefill();
@@ -726,18 +790,24 @@ namespace AIToolkit.LLM
             if (string.IsNullOrWhiteSpace(lastuserinput))
                 return string.Empty;
 
+            var token = CurrentOperationToken;
+            if (token.IsCancellationRequested)
+                return string.Empty;
+
             var insertmessages = new List<string>();
             foreach (var ctxplug in ContextPlugins)
             {
                 if (!ctxplug.Enabled)
                     continue;
-                // Plugins may call LLMSystem.SimpleQuery here. We are intentionally NOT
-                // holding the model semaphore yet to avoid re-entrancy deadlocks.
+                // Plugins may call LLMSystem.SimpleQuery; do NOT hold the model slot here.
                 var plugres = await ctxplug.ReplaceUserInput(ReplaceMacros(lastuserinput));
+                if (token.IsCancellationRequested)
+                    return string.Empty;
+
                 if (plugres.IsHandled && !string.IsNullOrEmpty(plugres.Response))
                 {
                     if (plugres.Replace)
-                        lastuserinput = plugres.Response; // preserve replacement for downstream if needed
+                        lastuserinput = plugres.Response;
                     else
                         insertmessages.Add(plugres.Response);
                 }
@@ -756,11 +826,15 @@ namespace AIToolkit.LLM
             if (Client == null || PromptBuilder == null)
                 return;
 
-            // 1) Plugin pre-pass OUTSIDE the model slot to avoid deadlocks
+            using var op = BeginOperation();
+            var opToken = op.Token;
+
+            // Plugin pre-pass OUTSIDE the model slot
             var lastuserinput = string.IsNullOrEmpty(userInput) ? History.GetLastUserMessageContent() : userInput;
             var pluginmessage = await BuildPluginSystemInsertAsync(lastuserinput);
+            if (opToken.IsCancellationRequested) return;
 
-            using var _ = await AcquireModelSlotAsync(CancellationToken.None);
+            using var _ = await AcquireModelSlotAsync(opToken);
             Status = SystemStatus.Busy;
 
             var inputText = userInput;
@@ -811,11 +885,14 @@ namespace AIToolkit.LLM
             usedGuidInSession.Clear();
         }
 
-        public static async Task<string> SimpleQuery(object chatlog)
+        public static async Task<string> SimpleQuery(object chatlog, CancellationToken ct = default)
         {
             if (Client == null)
                 return string.Empty;
-            using var _ = await AcquireModelSlotAsync(CancellationToken.None);
+
+            var token = ct.CanBeCanceled ? ct : CurrentOperationToken;
+
+            using var _ = await AcquireModelSlotAsync(token);
             var oldst = status;
             Status = SystemStatus.Busy;
             var result = await Client.GenerateText(chatlog);
@@ -824,11 +901,12 @@ namespace AIToolkit.LLM
             return string.IsNullOrEmpty(result) ? string.Empty : result;
         }
 
-        public static async Task<List<EnrichedSearchResult>> WebSearch(string query)
+        public static async Task<List<EnrichedSearchResult>> WebSearch(string query, CancellationToken ct = default)
         {
-            if (Client == null || !SupportsWebSearch)
+            if (Client == null || !SupportsWebSearch || ct.IsCancellationRequested)
                 return [];
             var res = await Client.WebSearch(query);
+            if (ct.IsCancellationRequested) return [];
             var webres = JsonConvert.DeserializeObject<List<EnrichedSearchResult>>(res);
             if (webres is null)
             {
