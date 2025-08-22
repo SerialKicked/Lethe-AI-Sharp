@@ -7,7 +7,7 @@ namespace AIToolkit.Agent.Plugins
 {
     public sealed class WebIntelligencePlugin : IAgentPlugin
     {
-        public string Id => "WebIntelligence";
+        public string Id => "WebIntelligence"; 
         public IEnumerable<AgentTaskType> Supported => new[] { AgentTaskType.Observe, AgentTaskType.PlanSearch, AgentTaskType.ExecuteSearch };
 
         private sealed record PlanPayload(Guid SessionId);
