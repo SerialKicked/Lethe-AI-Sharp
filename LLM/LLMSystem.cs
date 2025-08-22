@@ -193,6 +193,8 @@ namespace AIToolkit.LLM
         internal static PromptInserts dataInserts = [];
         internal static readonly Random RNG = new();
 
+        #region *** Semaphore for model access control ***
+
         private static readonly SemaphoreSlim ModelSemaphore = new(1, 1);
 
         public sealed class ModelSlotGuard : IDisposable
@@ -211,6 +213,14 @@ namespace AIToolkit.LLM
             await ModelSemaphore.WaitAsync(ct);
             return new ModelSlotGuard();
         }
+
+        public static async Task<ModelSlotGuard?> TryAcquireModelSlotAsync(TimeSpan timeout, CancellationToken ct)
+        {
+            var ok = await ModelSemaphore.WaitAsync(timeout, ct).ConfigureAwait(false);
+            return ok ? new ModelSlotGuard() : null;
+        }
+
+        #endregion
 
 
         public static void Init()
@@ -658,7 +668,7 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         public static async Task RerollLastMessage()
         {
-            if (Status != SystemStatus.Ready || History.CurrentSession.Messages.Count == 0 || History.LastMessage()?.Role != AuthorRole.Assistant || Client == null || PromptBuilder == null)
+            if (History.CurrentSession.Messages.Count == 0 || History.LastMessage()?.Role != AuthorRole.Assistant || Client == null || PromptBuilder == null)
                 return;
             History.RemoveLast();
             if (PromptBuilder.Count == 0)
@@ -668,6 +678,8 @@ namespace AIToolkit.LLM
             else
             {
                 using var _ = await AcquireModelSlotAsync(CancellationToken.None);
+                if (Status == SystemStatus.Busy)
+                    return;
                 Status = SystemStatus.Busy;
                 StreamingTextProgress = Instruct.GetThinkPrefill();
                 if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
@@ -705,6 +717,35 @@ namespace AIToolkit.LLM
         }
 
         /// <summary>
+        /// Plugin Handler
+        /// </summary>
+        /// <param name="lastuserinput"></param>
+        /// <returns></returns>
+        private static async Task<string> BuildPluginSystemInsertAsync(string? lastuserinput)
+        {
+            if (string.IsNullOrWhiteSpace(lastuserinput))
+                return string.Empty;
+
+            var insertmessages = new List<string>();
+            foreach (var ctxplug in ContextPlugins)
+            {
+                if (!ctxplug.Enabled)
+                    continue;
+                // Plugins may call LLMSystem.SimpleQuery here. We are intentionally NOT
+                // holding the model semaphore yet to avoid re-entrancy deadlocks.
+                var plugres = await ctxplug.ReplaceUserInput(ReplaceMacros(lastuserinput));
+                if (plugres.IsHandled && !string.IsNullOrEmpty(plugres.Response))
+                {
+                    if (plugres.Replace)
+                        lastuserinput = plugres.Response; // preserve replacement for downstream if needed
+                    else
+                        insertmessages.Add(plugres.Response);
+                }
+            }
+            return string.Join(NewLine, insertmessages).Trim();
+        }
+
+        /// <summary>
         /// Starts the generation process for the bot.
         /// </summary>
         /// <param name="MsgSender">Role of the sender</param>
@@ -712,40 +753,28 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         private static async Task StartGeneration(AuthorRole MsgSender, string userInput)
         {
-            if (Status == SystemStatus.Busy || Client == null || PromptBuilder == null)
+            if (Client == null || PromptBuilder == null)
                 return;
+
+            // 1) Plugin pre-pass OUTSIDE the model slot to avoid deadlocks
+            var lastuserinput = string.IsNullOrEmpty(userInput) ? History.GetLastUserMessageContent() : userInput;
+            var pluginmessage = await BuildPluginSystemInsertAsync(lastuserinput);
+
             using var _ = await AcquireModelSlotAsync(CancellationToken.None);
             Status = SystemStatus.Busy;
-            var inputText = userInput;
-            var lastuserinput = string.IsNullOrEmpty(userInput) ? History.GetLastUserMessageContent() : userInput;
-            var insertmessages = new List<string>();
-            if (!string.IsNullOrEmpty(lastuserinput))
-                foreach (var ctxplug in ContextPlugins)
-                {
-                    if (!ctxplug.Enabled)
-                        continue;
-                    var plugres = await ctxplug.ReplaceUserInput(ReplaceMacros(lastuserinput));
-                    if (plugres.IsHandled && !string.IsNullOrEmpty(plugres.Response))
-                    {
-                        if (plugres.Replace)
-                            lastuserinput = plugres.Response;
-                        else
-                            insertmessages.Add(plugres.Response);
-                    }
-                }
-            var pluginmessage = string.Empty;
-            foreach (var item in insertmessages)
-                pluginmessage += item + NewLine;
-            pluginmessage = pluginmessage.Trim('\n');
 
+            var inputText = userInput;
             var genparams = await GenerateFullPrompt(MsgSender, inputText, pluginmessage, vlm_pictures.Count > 0 ? vlm_pictures.Count * 1024 : 0);
+
             StreamingTextProgress = Instruct.GetThinkPrefill();
             if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
             {
                 RaiseOnInferenceStreamed(StreamingTextProgress);
             }
+
             if (!string.IsNullOrEmpty(userInput))
                 Bot.History.LogMessage(MsgSender, userInput, User, Bot);
+
             RaiseOnFullPromptReady(PromptBuilder.PromptToText());
             await Client.GenerateTextStreaming(genparams);
         }
