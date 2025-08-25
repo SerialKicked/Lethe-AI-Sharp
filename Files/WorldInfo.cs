@@ -1,11 +1,13 @@
-﻿using System;
+﻿using AIToolkit.LLM;
+using AIToolkit.Memory;
+using Newtonsoft.Json;
+using OpenAI;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using AIToolkit.LLM;
-using Newtonsoft.Json;
 
 namespace AIToolkit.Files
 {
@@ -52,22 +54,13 @@ namespace AIToolkit.Files
         }
     }
 
-    public class WorldEntry : KeywordEntry, IEmbed
+    public class WorldEntry : MemoryUnit, IEmbed
     {
-        [JsonIgnore] public Guid Guid { get; set; } = Guid.NewGuid();
-        public string Name = string.Empty;
-        public string Message = string.Empty;
         public int PositionIndex = 0;
         public int Duration = 1;
         public WEPosition Position = WEPosition.SystemPrompt;
         public float TriggerChance = 1;
         public int Priority = 100;
-        public float[] EmbedSummary { get; set; } = [];
-
-        public async Task EmbedText()
-        {
-            EmbedSummary = await RAGSystem.EmbeddingText(Message);
-        }
     }
 
     public class WorldInfo : BaseFile

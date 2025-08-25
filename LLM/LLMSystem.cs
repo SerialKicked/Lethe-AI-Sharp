@@ -489,7 +489,7 @@ namespace AIToolkit.LLM
                 foreach (var entry in _currentWorldEntries)
                 {
                     dataInserts.AddInsert(new PromptInsert(
-                        entry.Guid, entry.Message, entry.Position == WEPosition.SystemPrompt ? -1 : entry.PositionIndex, entry.Duration)
+                        entry.Guid, entry.Content, entry.Position == WEPosition.SystemPrompt ? -1 : entry.PositionIndex, entry.Duration)
                         );
                 }
             }

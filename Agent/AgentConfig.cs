@@ -10,11 +10,8 @@ namespace AIToolkit.Agent
         public int DailyTokenBudget { get; set; } = 8000;
         public int DailySearchBudget { get; set; } = 25;
         public int MinIdleMinutesBeforeBackgroundWork { get; set; } = 3;
-        public int ReflectionMinSessionsGap { get; set; } = 1;
         public int SearchCooldownMinutesPerTopic { get; set; } = 120;
-        public int PersonaUpdateCooldownHours { get; set; } = 6;
         public int StageMessageTTLMinutes { get; set; } = 360;
-        public bool AllowAutoMessageSend { get; set; } = false;
         public string[] Plugins { get; set; } = [ "CoreReflection", "WebIntelligence", "PersonaMaintenance"];
 
         public static AgentConfig Load(string path)

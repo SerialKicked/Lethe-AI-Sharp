@@ -1,7 +1,10 @@
-﻿using System.Text;
-using System.Text.Json;
+﻿using AIToolkit.Files;
 using AIToolkit.LLM;
-using AIToolkit.Files;
+using AIToolkit.Memory;
+using Microsoft.Extensions.Logging;
+using System.Text;
+using System.Text.Json;
+using static AIToolkit.SearchAPI.WebSearchAPI;
 
 namespace AIToolkit.Agent.Plugins
 {
@@ -28,6 +31,10 @@ namespace AIToolkit.Agent.Plugins
             if (archived.Messages.Count == 0)
                 return Task.FromResult<IEnumerable<AgentTask>>([]);
 
+            // No topics, nothing to do
+            if (archived.NewTopics?.Unfamiliar_Topics == null || archived.NewTopics.Unfamiliar_Topics.Count == 0)
+                return Task.FromResult<IEnumerable<AgentTask>>([]);
+            
             // Already researched or already planned/in-progress? Skip
             var key = $"web-{archived.Guid}";
             var hasPendingForSession = ctx.State.Queue.Any(t =>
@@ -35,11 +42,7 @@ namespace AIToolkit.Agent.Plugins
                 (t.Type == AgentTaskType.PlanSearch || t.Type == AgentTaskType.ExecuteSearch) &&
                 t.CorrelationKey == key);
 
-            if (hasPendingForSession || ResearchStore.HasSession(archived.Guid))
-                return Task.FromResult<IEnumerable<AgentTask>>([]);
-
-            // No topics, nothing to do
-            if (archived.NewTopics?.Unfamiliar_Topics == null || archived.NewTopics.Unfamiliar_Topics.Count == 0)
+            if (hasPendingForSession || LLMSystem.Bot.Brain.Has(MemoryType.WebSearch, archived.Guid))
                 return Task.FromResult<IEnumerable<AgentTask>>([]);
 
             // Only when idle
@@ -122,27 +125,36 @@ namespace AIToolkit.Agent.Plugins
 
             // Run web search
             var hits = await LLMSystem.WebSearch(exec.Query);
-            var items = hits.Select(h => new SearchItem
-            {
-                Title = h.Title,
-                Url = h.Url,
-                Snippet = h.Description // Ensure property matches your EnrichedSearchResult
-            }).ToList();
+            if (hits == null || hits.Count == 0)
+                return AgentTaskResult.Fail();
+            // Merge into single memory
+            var merged = await MergeResults(exec.Topic, hits);
+            if (string.IsNullOrWhiteSpace(merged))
+                return AgentTaskResult.Fail();
+            // Add as a new memory item
 
-            // Persist
-            ResearchStore.AppendResults(exec.SessionId, exec.Topic, exec.Query, items);
+            var mem = new MemoryUnit
+            {
+                Category = MemoryType.WebSearch,
+                Insertion = MemoryInsertion.Natural,
+                Name = exec.Topic,
+                Content = merged.CleanupAndTrim(),
+                Added = DateTime.Now,
+                EndTime = DateTime.Now.AddDays(10)
+            };
+
+            await mem.EmbedText();
+            LLMSystem.Bot.Brain.Memories.Add(mem);
 
             // Stage a short note for the user
-            var staged = BuildStagedMessage(exec.SessionId, exec.Topic, items);
+            var staged = BuildStagedMessage(exec.SessionId, exec.Topic, mem);
             return AgentTaskResult.Ok(staged: [staged], searches: 1);
         }
 
-        private static StagedMessage BuildStagedMessage(Guid sessionId, string topic, List<SearchItem> items)
+        private static StagedMessage BuildStagedMessage(Guid sessionId, string topic, MemoryUnit items)
         {
             var sb = new StringBuilder();
             sb.AppendLine($"Topic: {topic}");
-            foreach (var it in items.Take(3))
-                sb.AppendLine($"- {it.Title} – {it.Url}");
 
             return new StagedMessage
             {
@@ -158,5 +170,61 @@ namespace AIToolkit.Agent.Plugins
             var bad = Path.GetInvalidFileNameChars();
             return new string([.. s.Select(c => bad.Contains(c) ? '_' : c)]).ToLowerInvariant();
         }
+
+        private static async Task<string> MergeResults(string topic, List<EnrichedSearchResult> webresults)
+        {
+            LLMSystem.NamesInPromptOverride = false;
+            var fullprompt = BuildMergerPrompt(topic, webresults);
+            var llmparams = LLMSystem.Sampler.GetCopy();
+            if (llmparams.Temperature > 0.75)
+                llmparams.Temperature = 0.75;
+            llmparams.Max_context_length = LLMSystem.MaxContextLength;
+            llmparams.Max_length = LLMSystem.Settings.MaxReplyLength;
+            llmparams.Prompt = fullprompt;
+            var response = await LLMSystem.SimpleQuery(llmparams);
+            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+            {
+                response = response.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+            }
+            LLMSystem.Logger?.LogInformation("WebSearch Plugin Result: {output}", response);
+            LLMSystem.NamesInPromptOverride = null;
+            return response;
+        }
+
+        private static string BuildMergerPrompt(string userinput, List<EnrichedSearchResult> webresults)
+        {
+            var prompt = new StringBuilder();
+            prompt.AppendLinuxLine("Your goal is analyze and merge information from the follow documents regarding the subject of '" + userinput + "'.");
+            prompt.AppendLinuxLine();
+            var cnt = 0;
+            foreach (var item in webresults)
+            {
+                prompt.AppendLinuxLine($"# {item.Title}").AppendLinuxLine();
+                prompt.AppendLinuxLine($"{item.Description}").AppendLinuxLine();
+                if (item.ContentExtracted && LLMSystem.GetTokenCount(item.FullContent) <= 3000)
+                    cnt++;
+            }
+            prompt.AppendLinuxLine();
+            if (cnt > 0)
+            {
+                prompt.AppendLinuxLine($"You can also use the following content to improve your response.").AppendLinuxLine();
+                for (var i = 0; i < webresults.Count; i++)
+                {
+                    var item = webresults[i];
+                    if (item.ContentExtracted && LLMSystem.GetTokenCount(item.FullContent) <= 3000)
+                    {
+                        prompt.AppendLinuxLine($"# {item.Title} (Full Content)");
+                        prompt.AppendLinuxLine($"{item.FullContent.CleanupAndTrim()}").AppendLinuxLine().AppendLinuxLine();
+                    }
+                }
+            }
+            var sysprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, LLMSystem.User, LLMSystem.Bot, prompt.ToString());
+            var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, $"Merge the information available in the system prompt regarding '{userinput}' to offer a detailed explanation on this topic.");
+            LLMSystem.NamesInPromptOverride = false;
+            msg += LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
+            LLMSystem.NamesInPromptOverride = null;
+            return sysprompt + msg;
+        }
+
     }
 }

@@ -6,9 +6,8 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Threading.Tasks;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace AIToolkit.Files
+namespace AIToolkit.GBNF
 {
 
     public class SessionMetaInfo : LLMExtractableBase<SessionMetaInfo>

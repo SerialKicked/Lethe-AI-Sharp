@@ -1,5 +1,6 @@
 ﻿using AIToolkit.Agent;
 using AIToolkit.LLM;
+using AIToolkit.Memory;
 using Newtonsoft.Json;
 using System;
 using System.Reflection.PortableExecutable;
@@ -52,6 +53,8 @@ namespace AIToolkit.Files
         public bool FirstPersonSummary { get; set; } = true;
         /// <summary> If set above 0, this character will be allowed to write this amount of tokens in its system prompt. Altered each new session. </summary>
         public int SelfEditTokens { get; set; } = 0;
+
+        public Brain Brain { get; set; } = new();
 
         [JsonIgnore] public List<WorldInfo> MyWorlds { get; protected set; } = [];
         [JsonIgnore] public Chatlog History { get; protected set; } = new();

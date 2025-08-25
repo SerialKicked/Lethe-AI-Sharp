@@ -1,7 +1,8 @@
 ﻿using AIToolkit.Agent;
 using AIToolkit.API;
+using AIToolkit.GBNF;
 using AIToolkit.LLM;
-
+using AIToolkit.Memory;
 using CommunityToolkit.HighPerformance;
 using Newtonsoft.Json;
 using OpenAI.Chat;
@@ -71,7 +72,6 @@ namespace AIToolkit.Files
         /// </summary>
         public bool Sticky { get; set; } = false;
         public TimeSpan Duration => EndTime - StartTime;
-
 
         public async Task<SessionMetaInfo> GetSessionInfo()
         {

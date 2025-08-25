@@ -76,5 +76,9 @@ namespace AIToolkit.Files
         /// <summary> Toggle RAG functionalities on/off </summary>
         public bool RAGEnabled { get; set; } = true;
 
+        /// <summary> Enable/Disable the background agent on runtime</summary>
+        public bool AgentEnabled { get; set; } = true;
+
+
     }
 }

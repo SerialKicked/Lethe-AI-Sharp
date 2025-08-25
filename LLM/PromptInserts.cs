@@ -64,7 +64,7 @@ namespace AIToolkit.LLM
                 if (embedtype == EmbedType.WorldInfo)
                 {
                     var info = (session as WorldEntry)!;
-                    AddInsert(new PromptInsert(info.Guid, info.Message, info.Position == WEPosition.SystemPrompt ? -1 : info.PositionIndex, info.Duration));
+                    AddInsert(new PromptInsert(info.Guid, info.Content, info.Position == WEPosition.SystemPrompt ? -1 : info.PositionIndex, info.Duration));
                 }
                 else
                 {

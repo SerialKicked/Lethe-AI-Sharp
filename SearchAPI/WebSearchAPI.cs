@@ -1,4 +1,5 @@
 ﻿using AIToolkit.Agent;
+using AIToolkit.GBNF;
 
 namespace AIToolkit.SearchAPI
 {

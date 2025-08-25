@@ -11,6 +11,7 @@ namespace AIToolkit.Agent
     public sealed class AgentRuntime : IAgentRuntime, IDisposable
     {
         public static AgentRuntime Instance { get; } = new();
+        public static AgentConfig Config => Instance._config;
 
         private readonly CancellationTokenSource _cts = new();
         private readonly List<IAgentPlugin> _plugins = [];
