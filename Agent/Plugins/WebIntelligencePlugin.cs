@@ -11,10 +11,7 @@ namespace AIToolkit.Agent.Plugins
     public sealed class WebIntelligencePlugin : IAgentPlugin
     {
         public string Id => "WebIntelligence"; 
-        public IEnumerable<AgentTaskType> Supported => [AgentTaskType.Observe, AgentTaskType.PlanSearch, AgentTaskType.ExecuteSearch];
-
-        private sealed record PlanPayload(Guid SessionId);
-        private sealed record ExecPayload(Guid SessionId, string Topic, string Query);
+        public IEnumerable<AgentTaskType> Supported => [AgentTaskType.Observe, AgentTaskType.ExecuteSearch];
 
         public Task<IEnumerable<AgentTask>> ObserveAsync(IAgentContext ctx, CancellationToken ct)
         {
@@ -35,11 +32,11 @@ namespace AIToolkit.Agent.Plugins
             if (archived.NewTopics?.Unfamiliar_Topics == null || archived.NewTopics.Unfamiliar_Topics.Count == 0)
                 return Task.FromResult<IEnumerable<AgentTask>>([]);
             
-            // Already researched or already planned/in-progress? Skip
+            // Already researched or in progress? Skip
             var key = $"web-{archived.Guid}";
             var hasPendingForSession = ctx.State.Queue.Any(t =>
                 (t.Status == AgentTaskStatus.Queued || t.Status == AgentTaskStatus.Running || t.Status == AgentTaskStatus.Deferred) &&
-                (t.Type == AgentTaskType.PlanSearch || t.Type == AgentTaskType.ExecuteSearch) &&
+                t.Type == AgentTaskType.ExecuteSearch &&
                 t.CorrelationKey == key);
 
             if (hasPendingForSession || LLMSystem.Bot.Brain.Has(MemoryType.WebSearch, archived.Guid))
@@ -49,69 +46,25 @@ namespace AIToolkit.Agent.Plugins
             if (ctx.IdleTime.TotalMinutes < ctx.Config.MinIdleMinutesBeforeBackgroundWork)
                 return Task.FromResult<IEnumerable<AgentTask>>([]);
 
-            var payload = JsonSerializer.Serialize(new PlanPayload(archived.Guid));
-            var tasks = new[]
+            // Create one ExecuteSearch task for the entire session
+            var task = new AgentTask
             {
-                new AgentTask
-                {
-                    Type = AgentTaskType.PlanSearch,
-                    Priority = 3,                 // plan later than execution
-                    PayloadJson = payload,
-                    CorrelationKey = key,
-                }
+                Type = AgentTaskType.ExecuteSearch,
+                Priority = 2,
+                PayloadJson = JsonSerializer.Serialize(new { SessionId = archived.Guid }),
+                CorrelationKey = key,
+                RequiresLLM = true // We'll need LLM for merging results
             };
-            return Task.FromResult<IEnumerable<AgentTask>>(tasks);
+
+            return Task.FromResult<IEnumerable<AgentTask>>([task]);
         }
 
         public async Task<AgentTaskResult> ExecuteAsync(AgentTask task, IAgentContext ctx, CancellationToken ct)
         {
-            switch (task.Type)
-            {
-                case AgentTaskType.PlanSearch:
-                    return await ExecutePlanAsync(task, ctx, ct);
-                case AgentTaskType.ExecuteSearch:
-                    return await ExecuteSearchAsync(task, ctx, ct);
-                default:
-                    return AgentTaskResult.Fail();
-            }
-        }
+            if (task.Type != AgentTaskType.ExecuteSearch)
+                return AgentTaskResult.Fail();
 
-        private static Task<AgentTaskResult> ExecutePlanAsync(AgentTask task, IAgentContext ctx, CancellationToken ct)
-        {
-            var plan = JsonSerializer.Deserialize<PlanPayload>(task.PayloadJson);
-            if (plan == null)
-                return Task.FromResult(AgentTaskResult.Fail());
-
-            var session = LLMSystem.History.GetSessionByID(plan.SessionId);
-            if (session == null || session.NewTopics?.Unfamiliar_Topics == null || session.NewTopics.Unfamiliar_Topics.Count == 0)
-                return Task.FromResult(AgentTaskResult.Fail());
-
-            // Mark this session as "planned" right away to block re-planning on next Observe tick
-            ResearchStore.Ensure(plan.SessionId);
-
-            var key = $"web-{plan.SessionId}";
-            var newTasks = new List<AgentTask>();
-            foreach (var topic in session.NewTopics.Unfamiliar_Topics)
-            {
-                // Drop trivial ones if budget nearly exhausted
-                if (topic.Urgency <= 1 && ctx.Config.DailySearchBudget - ctx.State.SearchesUsedToday < 5)
-                    continue;
-
-                foreach (var q in topic.SearchQueries.Take(3))
-                {
-                    var exec = new ExecPayload(session.Guid, topic.Topic, q);
-                    newTasks.Add(new AgentTask
-                    {
-                        Type = AgentTaskType.ExecuteSearch,
-                        Priority = 2, // execute before more planning
-                        PayloadJson = JsonSerializer.Serialize(exec),
-                        CorrelationKey = key,
-                        RequiresLLM = false
-                    });
-                }
-            }
-
-            return Task.FromResult(AgentTaskResult.Ok(add: newTasks));
+            return await ExecuteSearchAsync(task, ctx, ct);
         }
 
         private static async Task<AgentTaskResult> ExecuteSearchAsync(AgentTask task, IAgentContext ctx, CancellationToken ct)
@@ -119,36 +72,71 @@ namespace AIToolkit.Agent.Plugins
             if (ctx.State.SearchesUsedToday >= ctx.Config.DailySearchBudget)
                 return AgentTaskResult.Fail();
 
-            var exec = JsonSerializer.Deserialize<ExecPayload>(task.PayloadJson);
-            if (exec == null)
+            var payload = JsonSerializer.Deserialize<JsonElement>(task.PayloadJson);
+            var sessionId = Guid.Parse(payload.GetProperty("SessionId").GetString()!);
+            
+            // Get the session and its topics directly
+            var session = LLMSystem.History.GetSessionByID(sessionId);
+            if (session?.NewTopics?.Unfamiliar_Topics == null)
                 return AgentTaskResult.Fail();
 
-            // Run web search
-            var hits = await LLMSystem.WebSearch(exec.Query);
-            if (hits == null || hits.Count == 0)
-                return AgentTaskResult.Fail();
-            // Merge into single memory
-            var merged = await MergeResults(exec.Topic, hits);
-            if (string.IsNullOrWhiteSpace(merged))
-                return AgentTaskResult.Fail();
-            // Add as a new memory item
+            var totalSearchCount = 0;
+            var allStagedMessages = new List<StagedMessage>();
 
-            var mem = new MemoryUnit
+            // Process each topic from the session
+            foreach (var topic in session.NewTopics.Unfamiliar_Topics)
             {
-                Category = MemoryType.WebSearch,
-                Insertion = MemoryInsertion.Natural,
-                Name = exec.Topic,
-                Content = merged.CleanupAndTrim(),
-                Added = DateTime.Now,
-                EndTime = DateTime.Now.AddDays(10)
-            };
+                // Drop trivial ones if budget nearly exhausted
+                if (topic.Urgency <= 1 && ctx.Config.DailySearchBudget - ctx.State.SearchesUsedToday - totalSearchCount < 5)
+                    continue;
 
-            await mem.EmbedText();
-            LLMSystem.Bot.Brain.Memories.Add(mem);
+                var allResults = new List<EnrichedSearchResult>();
+                var searchCount = 0;
 
-            // Stage a short note for the user
-            var staged = BuildStagedMessage(exec.SessionId, exec.Topic, mem);
-            return AgentTaskResult.Ok(staged: [staged], searches: 1);
+                // Execute searches for all queries for this topic
+                foreach (var query in topic.SearchQueries.Take(3))
+                {
+                    if (ctx.State.SearchesUsedToday + totalSearchCount + searchCount >= ctx.Config.DailySearchBudget)
+                        break;
+
+                    var hits = await LLMSystem.WebSearch(query);
+                    if (hits != null && hits.Count > 0)
+                    {
+                        allResults.AddRange(hits);
+                        searchCount++;
+                    }
+                }
+
+                if (allResults.Count == 0)
+                    continue; // Skip this topic if no results
+
+                // Merge all results for this topic into a single memory
+                var merged = await MergeResults(topic.Topic, allResults);
+                if (string.IsNullOrWhiteSpace(merged))
+                    continue; // Skip this topic if merge failed
+
+                // Store directly in Bot Brain
+                var mem = new MemoryUnit
+                {
+                    Category = MemoryType.WebSearch,
+                    Insertion = MemoryInsertion.Natural,
+                    Name = topic.Topic,
+                    Content = merged.CleanupAndTrim(),
+                    Added = DateTime.Now,
+                    EndTime = DateTime.Now.AddDays(10)
+                };
+
+                await mem.EmbedText();
+                LLMSystem.Bot.Brain.Memories.Add(mem);
+
+                // Stage a short note for the user
+                var staged = BuildStagedMessage(sessionId, topic.Topic, mem);
+                allStagedMessages.Add(staged);
+                
+                totalSearchCount += searchCount;
+            }
+
+            return AgentTaskResult.Ok(staged: allStagedMessages, searches: totalSearchCount);
         }
 
         private static StagedMessage BuildStagedMessage(Guid sessionId, string topic, MemoryUnit items)
@@ -159,7 +147,7 @@ namespace AIToolkit.Agent.Plugins
             return new StagedMessage
             {
                 TopicKey = $"web-{sessionId}-{San(topic)}",
-                Draft = $"(Background) I researched “{topic}”. I’ve saved links and notes. Ready to use them next time.",
+                Draft = $"(Background) I researched "{topic}". I've saved links and notes. Ready to use them next time.",
                 Rationale = sb.ToString(),
                 ExpireUtc = DateTime.UtcNow.AddHours(6),
             };
