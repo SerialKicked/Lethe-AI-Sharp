@@ -3,7 +3,7 @@
     public sealed class CoreReflectionPlugin : IAgentPlugin
     {
         public string Id => "CoreReflection";
-        public IEnumerable<AgentTaskType> Supported => new[] { AgentTaskType.Observe, AgentTaskType.Reflect };
+        public IEnumerable<AgentTaskType> Supported => [AgentTaskType.Observe, AgentTaskType.Reflect];
 
         public Task<IEnumerable<AgentTask>> ObserveAsync(IAgentContext ctx, CancellationToken ct)
         {

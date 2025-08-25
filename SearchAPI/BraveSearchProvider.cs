@@ -4,18 +4,9 @@ using System.Text.Json.Serialization;
 namespace AIToolkit.SearchAPI
 {
     // Brave Search Provider
-    public class BraveSearchProvider : ISearchProvider
+    public class BraveSearchProvider(HttpClient httpClient, string apiKey) : ISearchProvider
     {
-        private readonly HttpClient _httpClient;
-        private readonly string _apiKey;
-
         public string ProviderName => "Brave";
-
-        public BraveSearchProvider(HttpClient httpClient, string apiKey)
-        {
-            _httpClient = httpClient;
-            _apiKey = apiKey;
-        }
 
         public async Task<List<SearchResult>> SearchAsync(string query, int maxResults)
         {
@@ -24,10 +15,10 @@ namespace AIToolkit.SearchAPI
                 var url = $"https://api.search.brave.com/res/v1/web/search?q={Uri.EscapeDataString(query.SanitizeSearchQuery())}&count={maxResults}";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.Add("X-Subscription-Token", _apiKey);
+                request.Headers.Add("X-Subscription-Token", apiKey);
                 request.Headers.Add("Accept", "application/json");
 
-                var response = await _httpClient.SendAsync(request);
+                var response = await httpClient.SendAsync(request);
                 response.EnsureSuccessStatusCode();
 
                 var content = await response.Content.ReadAsStringAsync();

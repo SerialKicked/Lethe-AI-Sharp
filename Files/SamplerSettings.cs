@@ -52,7 +52,7 @@ namespace AIToolkit.Files
             var res = (this.MemberwiseClone() as SamplerSettings)!;
             res.UniqueName = UniqueName;
             // Remove duplicates from dry_sequence_breakers
-            res.Dry_sequence_breakers = res.Dry_sequence_breakers.Distinct().ToList();
+            res.Dry_sequence_breakers = [.. res.Dry_sequence_breakers.Distinct()];
             return res;
         }
     }

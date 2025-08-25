@@ -4,16 +4,9 @@ using System.Text.Json.Serialization;
 namespace AIToolkit.SearchAPI
 {
     // DuckDuckGo Search Provider
-    public class DuckDuckGoSearchProvider : ISearchProvider
+    public class DuckDuckGoSearchProvider(HttpClient httpClient) : ISearchProvider
     {
-        private readonly HttpClient _httpClient;
-
         public string ProviderName => "DuckDuckGo";
-
-        public DuckDuckGoSearchProvider(HttpClient httpClient)
-        {
-            _httpClient = httpClient;
-        }
 
         public async Task<List<SearchResult>> SearchAsync(string query, int maxResults)
         {
@@ -22,7 +15,7 @@ namespace AIToolkit.SearchAPI
                 // DuckDuckGo Instant Answer API
                 var url = $"https://api.duckduckgo.com/?q={Uri.EscapeDataString(query)}&format=json&no_html=1&skip_disambig=1";
 
-                var response = await _httpClient.GetAsync(url);
+                var response = await httpClient.GetAsync(url);
                 response.EnsureSuccessStatusCode();
 
                 var content = await response.Content.ReadAsStringAsync();
@@ -60,7 +53,7 @@ namespace AIToolkit.SearchAPI
                     }
                 }
 
-                return results.Take(maxResults).ToList();
+                return [.. results.Take(maxResults)];
             }
             catch (Exception ex)
             {

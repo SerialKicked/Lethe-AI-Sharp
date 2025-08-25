@@ -99,9 +99,9 @@ namespace AIToolkit.LLM
         {
             var parameters = new SmallWorld<float[], float>.Parameters()
             {
-                M = LLMSystem.Settings.MValue,
-                LevelLambda = 1 / Math.Log(LLMSystem.Settings.MValue),
-                NeighbourHeuristic = LLMSystem.Settings.Heuristic,
+                M = LLMSystem.Settings.RAGMValue,
+                LevelLambda = 1 / Math.Log(LLMSystem.Settings.RAGMValue),
+                NeighbourHeuristic = LLMSystem.Settings.RAGHeuristic,
             };
             VectorDB = new SmallWorld<float[], float>(Vector.IsHardwareAccelerated ? CosineDistance.SIMDForUnits : CosineDistance.ForUnits, new RNGPlus(), parameters, false);
             IsVectorDBLoaded = false;
@@ -120,7 +120,7 @@ namespace AIToolkit.LLM
                 GpuLayerCount = 255,
                 Embeddings = true
             };
-            LLMSystem.Settings.EmbeddingSize = 1024;
+            LLMSystem.Settings.RAGEmbeddingSize = 1024;
             EmbedWeights = LLamaWeights.LoadFromFile(EmbedSettings);
             Embedder = new LLamaEmbedder(EmbedWeights, EmbedSettings);
             
@@ -171,8 +171,8 @@ namespace AIToolkit.LLM
                 return [];
             var embed = Embedder ?? LoadEmbedder();
             var emb = textToEmbed;
-            if (emb.Length > LLMSystem.Settings.EmbeddingSize)
-                emb = emb[..LLMSystem.Settings.EmbeddingSize];
+            if (emb.Length > LLMSystem.Settings.RAGEmbeddingSize)
+                emb = emb[..LLMSystem.Settings.RAGEmbeddingSize];
             var tsk = await embed.GetEmbeddings(emb);
             return tsk[0].EuclideanNormalization();
         }
@@ -195,13 +195,13 @@ namespace AIToolkit.LLM
                 var session = log.Sessions[i];
                 if (session.EmbedTitle.Length == 0 || session.EmbedSummary.Length == 0)
                     continue;
-                if (LLMSystem.Settings.UseTitles)
+                if (LLMSystem.Settings.RAGUseTitles)
                 {
                     vectors.Add(session.EmbedTitle);
                     LookupDB[currentID] = (session.Guid, EmbedType.Title);
                     currentID++;
                 }
-                if (LLMSystem.Settings.UseSummaries)
+                if (LLMSystem.Settings.RAGUseSummaries)
                 {
                     vectors.Add(session.EmbedSummary);
                     LookupDB[currentID] = (session.Guid, EmbedType.Summary);
@@ -247,14 +247,14 @@ namespace AIToolkit.LLM
             var RPCheck = message.Contains(" RP", StringComparison.OrdinalIgnoreCase) || message.Contains(" roleplay", StringComparison.OrdinalIgnoreCase);
 
             var emb = await EmbeddingText(message);
-            var subcount = LLMSystem.Settings.MaxRAGEntries + 2;
+            var subcount = LLMSystem.Settings.RAGMaxEntries + 2;
             // If we have both titles and summaries double result count to get a better picture
-            if (LLMSystem.Settings.UseSummaries && LLMSystem.Settings.UseTitles)
-                subcount += LLMSystem.Settings.MaxRAGEntries + 2;
+            if (LLMSystem.Settings.RAGUseSummaries && LLMSystem.Settings.RAGUseTitles)
+                subcount += LLMSystem.Settings.RAGMaxEntries + 2;
             if (LLMSystem.Settings.AllowWorldInfo)
                 subcount += 1;
             var res = Search(emb, subcount);
-            if (LLMSystem.Settings.UseSummaries && LLMSystem.Settings.UseTitles)
+            if (LLMSystem.Settings.RAGUseSummaries && LLMSystem.Settings.RAGUseTitles)
             {
                 // look for ID triggered by both summary and title
                 var newlist = new List<VectorSearchResult>();
@@ -294,9 +294,9 @@ namespace AIToolkit.LLM
             }
             res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
             // Make sure we got the correct amount of results
-            if (res.Count > LLMSystem.Settings.MaxRAGEntries)
-                res = res.GetRange(0, LLMSystem.Settings.MaxRAGEntries);
-            res.RemoveAll(e => e.Distance > LLMSystem.Settings.DistanceCutOff);
+            if (res.Count > LLMSystem.Settings.RAGMaxEntries)
+                res = res.GetRange(0, LLMSystem.Settings.RAGMaxEntries);
+            res.RemoveAll(e => e.Distance > LLMSystem.Settings.RAGDistanceCutOff);
             var list = new List<(IEmbed session, EmbedType category, float distance)>();
             foreach (var item in res)
             {

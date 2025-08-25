@@ -56,12 +56,12 @@ namespace AIToolkit.Files
                 if (!string.IsNullOrWhiteSpace(ThinkingForcedThought))
                     res += LLMSystem.ReplaceMacros(ThinkingForcedThought);
 
-                if (LLMSystem.Settings.PutRAGInThinkingPrompt && LLMSystem.dataInserts.Count > 0)
+                if (LLMSystem.Settings.RAGMoveToThinkBlock && LLMSystem.dataInserts.Count > 0)
                 {
                     if (!res.EndsWith(LLMSystem.NewLine))
                         res += LLMSystem.NewLine;
 
-                    if (LLMSystem.Settings.DisableThinkingPrompt)
+                    if (LLMSystem.Settings.DisableThinking)
                     {
                         // Better formatting to make it easier to read as it won't interfere with the thinking process
                         res += LLMSystem.NewLine + "The following information might be relevant to the conversation:" + LLMSystem.NewLine;
@@ -87,7 +87,7 @@ namespace AIToolkit.Files
                     }
 
                 }
-                if (LLMSystem.Settings.DisableThinkingPrompt)
+                if (LLMSystem.Settings.DisableThinking)
                     res += LLMSystem.NewLine + ThinkingEnd + LLMSystem.NewLine;
             }
             return res;

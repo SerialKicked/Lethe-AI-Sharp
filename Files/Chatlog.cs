@@ -464,7 +464,7 @@ namespace AIToolkit.Files
                     break;
                 LLMSystem.PromptBuilder.InsertMessage(startpos, msg.Item2.Role, msg.Item2.Message);
                 // check if we need to add a memory
-                if (memories?.Count > 0 && !LLMSystem.Settings.ForceRAGInSysPrompt)
+                if (memories?.Count > 0 && !LLMSystem.Settings.RAGMoveToSysPrompt)
                 {
                     var foundmemory = memories.GetContentByPosition(entrydepth);
                     if (!string.IsNullOrEmpty(foundmemory))

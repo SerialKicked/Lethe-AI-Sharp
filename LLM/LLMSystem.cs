@@ -439,7 +439,7 @@ namespace AIToolkit.LLM
             }
 
             // Now add the system prompt entries we gathered
-            var syspromptentries = Settings.ForceRAGInSysPrompt ? dataInserts : dataInserts.GetEntriesByPosition(-1);
+            var syspromptentries = Settings.RAGMoveToSysPrompt ? dataInserts : dataInserts.GetEntriesByPosition(-1);
             if (syspromptentries.Count > 0)
             {
                 rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle).AppendLinuxLine();
@@ -538,7 +538,7 @@ namespace AIToolkit.LLM
                 availtokens -= GetTokenCount(Instruct.GetResponseStart(Bot));
 
             // get the full, formated chat history complemented by the data inserts
-            var addinserts = string.IsNullOrEmpty(Instruct.ThinkingStart) || !Settings.PutRAGInThinkingPrompt;
+            var addinserts = string.IsNullOrEmpty(Instruct.ThinkingStart) || !Settings.RAGMoveToThinkBlock;
             History.AddHistoryToPrompt(Settings.SessionHandling, availtokens, addinserts ? dataInserts : null);
             if (!string.IsNullOrEmpty(newMessage))
             {

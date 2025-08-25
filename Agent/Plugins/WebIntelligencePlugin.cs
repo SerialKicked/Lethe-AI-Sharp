@@ -8,7 +8,7 @@ namespace AIToolkit.Agent.Plugins
     public sealed class WebIntelligencePlugin : IAgentPlugin
     {
         public string Id => "WebIntelligence"; 
-        public IEnumerable<AgentTaskType> Supported => new[] { AgentTaskType.Observe, AgentTaskType.PlanSearch, AgentTaskType.ExecuteSearch };
+        public IEnumerable<AgentTaskType> Supported => [AgentTaskType.Observe, AgentTaskType.PlanSearch, AgentTaskType.ExecuteSearch];
 
         private sealed record PlanPayload(Guid SessionId);
         private sealed record ExecPayload(Guid SessionId, string Topic, string Query);
@@ -17,16 +17,16 @@ namespace AIToolkit.Agent.Plugins
         {
             // Respect daily search budget
             if (ctx.State.SearchesUsedToday >= ctx.Config.DailySearchBudget)
-                return Task.FromResult<IEnumerable<AgentTask>>(Array.Empty<AgentTask>());
+                return Task.FromResult<IEnumerable<AgentTask>>([]);
 
             // Need at least one archived session (the one before current)
             var sessions = LLMSystem.History.Sessions;
             if (sessions.Count < 2)
-                return Task.FromResult<IEnumerable<AgentTask>>(Array.Empty<AgentTask>());
+                return Task.FromResult<IEnumerable<AgentTask>>([]);
 
             var archived = sessions[^2];
             if (archived.Messages.Count == 0)
-                return Task.FromResult<IEnumerable<AgentTask>>(Array.Empty<AgentTask>());
+                return Task.FromResult<IEnumerable<AgentTask>>([]);
 
             // Already researched or already planned/in-progress? Skip
             var key = $"web-{archived.Guid}";
@@ -36,15 +36,15 @@ namespace AIToolkit.Agent.Plugins
                 t.CorrelationKey == key);
 
             if (hasPendingForSession || ResearchStore.HasSession(archived.Guid))
-                return Task.FromResult<IEnumerable<AgentTask>>(Array.Empty<AgentTask>());
+                return Task.FromResult<IEnumerable<AgentTask>>([]);
 
             // No topics, nothing to do
             if (archived.NewTopics?.Unfamiliar_Topics == null || archived.NewTopics.Unfamiliar_Topics.Count == 0)
-                return Task.FromResult<IEnumerable<AgentTask>>(Array.Empty<AgentTask>());
+                return Task.FromResult<IEnumerable<AgentTask>>([]);
 
             // Only when idle
             if (ctx.IdleTime.TotalMinutes < ctx.Config.MinIdleMinutesBeforeBackgroundWork)
-                return Task.FromResult<IEnumerable<AgentTask>>(Array.Empty<AgentTask>());
+                return Task.FromResult<IEnumerable<AgentTask>>([]);
 
             var payload = JsonSerializer.Serialize(new PlanPayload(archived.Guid));
             var tasks = new[]
@@ -156,7 +156,7 @@ namespace AIToolkit.Agent.Plugins
         private static string San(string s)
         {
             var bad = Path.GetInvalidFileNameChars();
-            return new string(s.Select(c => bad.Contains(c) ? '_' : c).ToArray()).ToLowerInvariant();
+            return new string([.. s.Select(c => bad.Contains(c) ? '_' : c)]).ToLowerInvariant();
         }
     }
 }

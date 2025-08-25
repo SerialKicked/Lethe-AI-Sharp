@@ -42,7 +42,7 @@ namespace AIToolkit.Agent
             t.Queries.Add(new QueryResearch
             {
                 Query = query,
-                Results = items.Take(8).ToList()
+                Results = [.. items.Take(8)]
             });
             Save(doc);
         }
