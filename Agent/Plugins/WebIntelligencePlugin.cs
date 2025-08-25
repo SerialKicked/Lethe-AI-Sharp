@@ -185,7 +185,7 @@ namespace AIToolkit.Agent.Plugins
         private static string BuildMergerPrompt(string userinput, string reason, List<EnrichedSearchResult> webresults)
         {
             var prompt = new StringBuilder();
-            prompt.AppendLinuxLine("Your goal is analyze and merge information from the follow documents regarding the subject of '" + userinput + "'.");
+            prompt.AppendLinuxLine($"Your goal is analyze and merge information from the following documents regarding the subject of '{userinput}'.");
             prompt.AppendLinuxLine();
             var cnt = 0;
             foreach (var item in webresults)
@@ -198,11 +198,12 @@ namespace AIToolkit.Agent.Plugins
             prompt.AppendLinuxLine();
             if (cnt > 0)
             {
-                prompt.AppendLinuxLine($"You can also use the following content to improve your response.").AppendLinuxLine();
+                prompt.AppendLinuxLine($"You can also use the following content to improve your response (this is extracted directly from the web pages, meaning there might be clutter in there).").AppendLinuxLine();
                 for (var i = 0; i < webresults.Count; i++)
                 {
                     var item = webresults[i];
-                    if (item.ContentExtracted && LLMSystem.GetTokenCount(item.FullContent) <= 3000)
+                    var tks = LLMSystem.GetTokenCount(item.FullContent);
+                    if (item.ContentExtracted && tks > 100 && tks <= 2500)
                     {
                         prompt.AppendLinuxLine($"# {item.Title} (Full Content)");
                         prompt.AppendLinuxLine($"{item.FullContent.CleanupAndTrim()}").AppendLinuxLine().AppendLinuxLine();
@@ -211,8 +212,7 @@ namespace AIToolkit.Agent.Plugins
             }
             var sysprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, LLMSystem.User, LLMSystem.Bot, prompt.ToString());
 
-            var txt = new StringBuilder($"You are researching '{userinput}' for the following reason: {reason}").AppendLinuxLine().AppendLinuxLine($"Merge the information available in the system prompt to offer a detailed explanation on this topic."); 
-
+            var txt = new StringBuilder($"You are researching '{userinput}' for the following reason: {reason}").AppendLinuxLine().Append($"Merge the information available in the system prompt to offer an explanation on this topic. Don't use markdown formatting, favor natural language. The explanation should be 1 to 3 paragraphs long."); 
             var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, txt.ToString());
             LLMSystem.NamesInPromptOverride = false;
             msg += LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);

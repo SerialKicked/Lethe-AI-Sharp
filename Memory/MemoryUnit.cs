@@ -86,7 +86,7 @@ namespace AIToolkit.Memory
             LastInsertTime = DateTime.Now;
             if (!Eurekas.TryDequeue(out var memory))
                 return;
-            var text = new StringBuilder($"{{char}} remembers something they've researched on the web recently. This was about the following topic: {memory.Name}.").AppendLinuxLine().AppendLinuxLine($"{memory.Content}");
+            var text = new StringBuilder($"You remember something you've researched on the web recently. This was about the following topic: {memory.Name}.").AppendLinuxLine().AppendLinuxLine($"{memory.Content}").AppendLinuxLine().Append("Mention this information when there's a lull in the discussion, or if the user makes a mention of it, or if you feel like it's a good idea to talk about it now.");
             var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, text.ToString(), LLMSystem.Bot.UniqueName, LLMSystem.User.UniqueName, true);
             LLMSystem.History.LogMessage(tosend);
             // High Priority memories are kept and set back to Trigger insertion
