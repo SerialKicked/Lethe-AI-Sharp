@@ -101,6 +101,7 @@ namespace AIToolkit.Files
 
         public virtual void BeginChat()
         {
+            Brain.CharacterLoad();
         }
 
         public virtual void EndChat(bool backup = false)

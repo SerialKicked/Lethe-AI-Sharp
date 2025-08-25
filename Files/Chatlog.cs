@@ -646,7 +646,8 @@ namespace AIToolkit.Files
                     msgtxt += " The last chat was " + ((int)timespan.TotalMinutes).ToString() + " minutes ago.";
             }
             msgtxt += "*";
-            LogMessage(AuthorRole.System, LLMSystem.ReplaceMacros(msgtxt, LLMSystem.User, LLMSystem.Bot), LLMSystem.User, LLMSystem.Bot); 
+            LogMessage(AuthorRole.System, LLMSystem.ReplaceMacros(msgtxt, LLMSystem.User, LLMSystem.Bot), LLMSystem.User, LLMSystem.Bot);
+            LLMSystem.Bot.Brain.OnNewSession();
         }
 
         /// <summary>
@@ -743,6 +744,10 @@ namespace AIToolkit.Files
         public void SaveToFile(string pPath) 
         {
             var content = JsonConvert.SerializeObject(this, new JsonSerializerSettings { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
+            // create directory if it doesn't exist
+            var dir = Path.GetDirectoryName(pPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
             File.WriteAllText(pPath, content);
         }
 

@@ -111,7 +111,7 @@ namespace AIToolkit.Agent.Plugins
                     continue; // Skip this topic if no results
 
                 // Merge all results for this topic into a single memory
-                var merged = await MergeResults(topic.Topic, allResults);
+                var merged = await MergeResults(topic.Topic, topic.Reason, allResults);
                 if (string.IsNullOrWhiteSpace(merged))
                     continue; // Skip this topic if merge failed
 
@@ -123,7 +123,9 @@ namespace AIToolkit.Agent.Plugins
                     Name = topic.Topic,
                     Content = merged.CleanupAndTrim(),
                     Added = DateTime.Now,
-                    EndTime = DateTime.Now.AddDays(10)
+                    EndTime = DateTime.Now.AddDays(10),
+                    Priority = topic.Urgency,
+                    Guid = session.Guid
                 };
 
                 await mem.EmbedText();
@@ -159,27 +161,28 @@ namespace AIToolkit.Agent.Plugins
             return new string([.. s.Select(c => bad.Contains(c) ? '_' : c)]).ToLowerInvariant();
         }
 
-        private static async Task<string> MergeResults(string topic, List<EnrichedSearchResult> webresults)
+        private static async Task<string> MergeResults(string topic, string reason, List<EnrichedSearchResult> webresults)
         {
             LLMSystem.NamesInPromptOverride = false;
-            var fullprompt = BuildMergerPrompt(topic, webresults);
+            var fullprompt = BuildMergerPrompt(topic, reason, webresults);
             var llmparams = LLMSystem.Sampler.GetCopy();
             if (llmparams.Temperature > 0.75)
                 llmparams.Temperature = 0.75;
             llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            llmparams.Max_length = LLMSystem.Settings.MaxReplyLength;
+            llmparams.Max_length = 1024;
             llmparams.Prompt = fullprompt;
             var response = await LLMSystem.SimpleQuery(llmparams);
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
             {
                 response = response.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
             }
+            response = response.RemoveUnfinishedSentence();
             LLMSystem.Logger?.LogInformation("WebSearch Plugin Result: {output}", response);
             LLMSystem.NamesInPromptOverride = null;
             return response;
         }
 
-        private static string BuildMergerPrompt(string userinput, List<EnrichedSearchResult> webresults)
+        private static string BuildMergerPrompt(string userinput, string reason, List<EnrichedSearchResult> webresults)
         {
             var prompt = new StringBuilder();
             prompt.AppendLinuxLine("Your goal is analyze and merge information from the follow documents regarding the subject of '" + userinput + "'.");
@@ -207,7 +210,10 @@ namespace AIToolkit.Agent.Plugins
                 }
             }
             var sysprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, LLMSystem.User, LLMSystem.Bot, prompt.ToString());
-            var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, $"Merge the information available in the system prompt regarding '{userinput}' to offer a detailed explanation on this topic.");
+
+            var txt = new StringBuilder($"You are researching '{userinput}' for the following reason: {reason}").AppendLinuxLine().AppendLinuxLine($"Merge the information available in the system prompt to offer a detailed explanation on this topic."); 
+
+            var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, txt.ToString());
             LLMSystem.NamesInPromptOverride = false;
             msg += LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
             LLMSystem.NamesInPromptOverride = null;

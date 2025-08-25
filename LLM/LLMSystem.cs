@@ -316,6 +316,7 @@ namespace AIToolkit.LLM
             EventBus.Publish(new BotChangedEvent(bot.UniqueName));
 
             bot.BeginChat();
+
             RAGSystem.VectorizeChatBot(Bot);
             // if first time interaction, display welcome message from bot
             if (History.Sessions.Count == 0)
@@ -723,9 +724,13 @@ namespace AIToolkit.LLM
             if (Client == null || PromptBuilder == null)
                 return;
 
-            // 1) Plugin pre-pass OUTSIDE the model slot to avoid deadlocks
+            // Plugin pre-pass OUTSIDE the model slot to avoid deadlocks
             var lastuserinput = string.IsNullOrEmpty(userInput) ? History.GetLastUserMessageContent() : userInput;
             var pluginmessage = await BuildPluginSystemInsertAsync(lastuserinput);
+            if (string.IsNullOrWhiteSpace(pluginmessage) && !string.IsNullOrEmpty(userInput) && MsgSender == AuthorRole.User)
+            {
+                Bot.Brain.OnUserPost(userInput);
+            }
 
             using var _ = await AcquireModelSlotAsync(CancellationToken.None);
             Status = SystemStatus.Busy;

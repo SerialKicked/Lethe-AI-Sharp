@@ -240,7 +240,6 @@ namespace AIToolkit.LLM
                 return [];
             if (!IsVectorDBLoaded || VectorDB == null || VectorDBCount == 0)
             {
-                ResetVectorDB();
                 VectorizeChatBot(LLMSystem.Bot);
             }
             // Check if message contains the words RP or roleplay
