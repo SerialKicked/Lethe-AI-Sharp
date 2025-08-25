@@ -147,7 +147,7 @@ namespace AIToolkit.Agent.Plugins
             return new StagedMessage
             {
                 TopicKey = $"web-{sessionId}-{San(topic)}",
-                Draft = $"(Background) I researched "{topic}". I've saved links and notes. Ready to use them next time.",
+                Draft = $"(Background) I researched '{topic}'. I've saved links and notes. Ready to use them next time.",
                 Rationale = sb.ToString(),
                 ExpireUtc = DateTime.UtcNow.AddHours(6),
             };
