@@ -56,7 +56,7 @@ namespace AIToolkit
                 seed: LLMSystem.Sampler.Sampler_seed != -1 ? LLMSystem.Sampler.Sampler_seed : null,
                 user: LLMSystem.NamesInPromptOverride ?? LLMSystem.Instruct.AddNamesToPrompt ? LLMSystem.User.Name : null,
                 stops: [.. LLMSystem.Instruct.GetStoppingStrings(LLMSystem.User, LLMSystem.Bot)],
-                maxTokens: responseoverride == -1 ? LLMSystem.MaxReplyLength : responseoverride,
+                maxTokens: responseoverride == -1 ? LLMSystem.Settings.MaxReplyLength : responseoverride,
                 temperature: tempoverride >= 0 ? tempoverride : (LLMSystem.ForceTemperature >= 0) ? LLMSystem.ForceTemperature : LLMSystem.Sampler.Temperature);
             return chatrq;
         }

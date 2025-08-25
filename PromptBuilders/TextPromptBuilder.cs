@@ -52,7 +52,7 @@ namespace AIToolkit
             else if (LLMSystem.ForceTemperature >= 0)
                 genparams.Temperature = LLMSystem.ForceTemperature;
             genparams.Max_context_length = LLMSystem.MaxContextLength;
-            genparams.Max_length = responseoverride == -1 ? LLMSystem.MaxReplyLength : responseoverride;
+            genparams.Max_length = responseoverride == -1 ? LLMSystem.Settings.MaxReplyLength : responseoverride;
             genparams.Stop_sequence = LLMSystem.Instruct.GetStoppingStrings(LLMSystem.User, LLMSystem.Bot);
             genparams.Prompt = fullquery;
             genparams.Images = [.. LLMSystem.vlm_pictures];

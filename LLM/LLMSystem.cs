@@ -30,19 +30,7 @@ namespace AIToolkit.LLM
     /// </summary>
     public static class LLMSystem
     {
-        /// <summary> URL of the backend server </summary>
-        public static string BackendUrl { get; set; } = "http://localhost:5001";
-
-        /// <summary> API of the backend server, KoboldAPI (text completion) and OpenAI (chat completion) are both handled </summary>
-        public static BackendAPI BackendAPI { get; set; } = BackendAPI.KoboldAPI;
-
-        public static string OpenAIKey { get; set; } = "123";
-
-        /// <summary> Reserved token space for summaries of previous sessions (0 to disable) </summary>
-        public static int ReservedSessionTokens { get; set; } = 2048;
-
-        /// <summary> Max length for the bot's reply. </summary>
-        public static int MaxReplyLength { get; set; } = 512;
+        public static LLMSettings Settings { get; set; } = new();
 
         /// <summary> Total token context window the model can handle </summary>
         public static int MaxContextLength { 
@@ -64,32 +52,8 @@ namespace AIToolkit.LLM
         /// <summary> If >= 0 it'll override the selected sampler's temperature setting. </summary>
         public static double ForceTemperature { get; set; } = 0.7;
 
-        /// <summary> Overrides the scenario field of the currently loaded character </summary>
-        public static string ScenarioOverride { get; set; } = string.Empty;
-
         /// <summary> Override the Instruct Format setting deciding if character names should be inserted into the prompts (null to disable) </summary>
         public static bool? NamesInPromptOverride { get; set; } = null;
-
-        /// <summary> Should the prompt format the memories and RAG entries into markdown. Some models like it better than others. </summary>
-        public static bool MarkdownMemoryFormating { get; set; } = false;
-
-        /// <summary> Should we stop the generation after the first paragraph? </summary>
-        public static bool StopGenerationOnFirstParagraph { get; set; } = false;
-
-        /// <summary> Thinking models only, attempt to disable the thinking block </summary>
-        public static bool DisableThinkingPrompt { get; set; } = false;
-
-        /// <summary> Thinking models only, will move all RAG and WI to the thinking block </summary>
-        public static bool PutRAGInThinkingPrompt { get; set; } = false;
-
-        public static bool ForceRAGInSysPrompt { get; set; } = false;
-      
-
-        /// <summary> Allow keyword-activated snippets to be inserted in the prompt (see WorldInfo and BasePersona) </summary>
-        public static bool WorldInfo { get; set; } = true;
-
-        /// <summary> Should the prompt contains only the latest chat session or as much dialog as we can fit? </summary>
-        public static SessionHandling SessionHandling { get; set; } = SessionHandling.FitAll;
 
         internal static Dictionary<string, BasePersona> LoadedPersonas = [];
 
@@ -232,14 +196,14 @@ namespace AIToolkit.LLM
                 return;
             // Create the appropriate client based on the selected backend
             var httpClient = new HttpClient();
-            Client = BackendAPI switch
+            Client = Settings.BackendAPI switch
             {
                 BackendAPI.KoboldAPI => new KoboldCppAdapter(httpClient),
                 BackendAPI.OpenAI => new OpenAIAdapter(httpClient),
-                _ => throw new NotSupportedException($"Backend {BackendAPI} is not supported")
+                _ => throw new NotSupportedException($"Backend {Settings.BackendAPI} is not supported")
             };
             // Subscribe to the TokenReceived event
-            Client.BaseUrl = BackendUrl;
+            Client.BaseUrl = Settings.BackendUrl;
             Client.TokenReceived += Client_StreamingMessageReceived;
 
             PromptBuilder = Client.GetPromptBuilder();
@@ -316,7 +280,7 @@ namespace AIToolkit.LLM
                .Replace("{{time}}", DateTime.Now.ToShortTimeString())
                .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
                .Replace("{{selfedit}}", character.SelfEditField)
-               .Replace("{{scenario}}", string.IsNullOrWhiteSpace(ScenarioOverride) ? character.GetScenario(user.Name) : ScenarioOverride);
+               .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? character.GetScenario(user.Name) : Settings.ScenarioOverride);
             return res.ToString();
         }
 
@@ -332,7 +296,7 @@ namespace AIToolkit.LLM
                .Replace("{{time}}", DateTime.Now.ToShortTimeString())
                .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
                .Replace("{{selfedit}}", character.SelfEditField)
-               .Replace("{{scenario}}", string.IsNullOrWhiteSpace(ScenarioOverride) ? character.GetScenario(userName) : ScenarioOverride);
+               .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? character.GetScenario(userName) : Settings.ScenarioOverride);
             return res.ToString().CleanupAndTrim();
         }
 
@@ -410,9 +374,9 @@ namespace AIToolkit.LLM
         public static void Setup(string url, BackendAPI backend, string? key = null)
         {
             Status = SystemStatus.NotInit;
-            BackendUrl = url;
-            BackendAPI = backend;
-            OpenAIKey = key ?? "123";
+            Settings.BackendUrl = url;
+            Settings.BackendAPI = backend;
+            Settings.OpenAIKey = key ?? "123";
             Init();
         }
 
@@ -475,7 +439,7 @@ namespace AIToolkit.LLM
             }
 
             // Now add the system prompt entries we gathered
-            var syspromptentries = ForceRAGInSysPrompt ? dataInserts : dataInserts.GetEntriesByPosition(-1);
+            var syspromptentries = Settings.ForceRAGInSysPrompt ? dataInserts : dataInserts.GetEntriesByPosition(-1);
             if (syspromptentries.Count > 0)
             {
                 rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle).AppendLinuxLine();
@@ -483,10 +447,10 @@ namespace AIToolkit.LLM
                     rawprompt.AppendLinuxLine(item.Content);
             }
 
-            if (Bot.SessionMemorySystem && ReservedSessionTokens > 0 && History.Sessions.Count > 1)
+            if (Bot.SessionMemorySystem && Settings.ReservedSessionTokens > 0 && History.Sessions.Count > 1)
             {
                 usedGuidInSession = dataInserts.GetGuids();
-                var shistory = History.GetPreviousSummaries(ReservedSessionTokens - GetTokenCount(ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator);
+                var shistory = History.GetPreviousSummaries(Settings.ReservedSessionTokens - GetTokenCount(ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator);
                 if (!string.IsNullOrEmpty(shistory))
                 {
                     rawprompt.AppendLinuxLine(NewLine + ReplaceMacros(SystemPrompt.SessionHistoryTitle) + NewLine);
@@ -515,7 +479,7 @@ namespace AIToolkit.LLM
                 dataInserts.AddMemories(search);
             }
             // Check for keyword-activated world info entries
-            if (WorldInfo && Bot.MyWorlds.Count > 0)
+            if (Settings.AllowWorldInfo && Bot.MyWorlds.Count > 0)
             {
                 var _currentWorldEntries = new List<WorldEntry>();
                 foreach (var world in Bot.MyWorlds)
@@ -534,8 +498,8 @@ namespace AIToolkit.LLM
             {
                 if (session.Sticky && session != History.CurrentSession)
                 {
-                    var rawmem = session.GetRawMemory(!MarkdownMemoryFormating);
-                    dataInserts.AddInsert(new PromptInsert(session.Guid, rawmem, RAGSystem.RAGIndex, 1));
+                    var rawmem = session.GetRawMemory(!Settings.MarkdownMemoryFormating);
+                    dataInserts.AddInsert(new PromptInsert(session.Guid, rawmem, Settings.RAGIndex, 1));
                 }
             }
         }
@@ -547,7 +511,7 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         private static async Task<object> GenerateFullPrompt(AuthorRole MsgSender, string newMessage, string? pluginMessage = null, int imgpadding = 0)
         {
-            var availtokens = MaxContextLength - MaxReplyLength - imgpadding;
+            var availtokens = MaxContextLength - Settings.MaxReplyLength - imgpadding;
             PromptBuilder!.ResetPrompt();
 
             // setup user message (+ optional plugin message) and count tokens used
@@ -574,8 +538,8 @@ namespace AIToolkit.LLM
                 availtokens -= GetTokenCount(Instruct.GetResponseStart(Bot));
 
             // get the full, formated chat history complemented by the data inserts
-            var addinserts = string.IsNullOrEmpty(Instruct.ThinkingStart) || !PutRAGInThinkingPrompt;
-            History.AddHistoryToPrompt(SessionHandling, availtokens, addinserts ? dataInserts : null);
+            var addinserts = string.IsNullOrEmpty(Instruct.ThinkingStart) || !Settings.PutRAGInThinkingPrompt;
+            History.AddHistoryToPrompt(Settings.SessionHandling, availtokens, addinserts ? dataInserts : null);
             if (!string.IsNullOrEmpty(newMessage))
             {
                 PromptBuilder.AddMessage(MsgSender, newMessage);
@@ -589,9 +553,9 @@ namespace AIToolkit.LLM
             }
 
             var final = PromptBuilder.GetTokenUsage();
-            if (final > (MaxContextLength - MaxReplyLength))
+            if (final > (MaxContextLength - Settings.MaxReplyLength))
             {
-                var diff = final - (MaxContextLength - MaxReplyLength);
+                var diff = final - (MaxContextLength - Settings.MaxReplyLength);
                 logger?.LogWarning("The prompt is {Diff} tokens over the limit.", diff);
             }
             if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)

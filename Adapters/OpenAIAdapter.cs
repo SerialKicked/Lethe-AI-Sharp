@@ -21,7 +21,7 @@ namespace AIToolkit.API
         public OpenAIAdapter(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _httpClient.BaseAddress = new Uri(LLMSystem.BackendUrl);
+            _httpClient.BaseAddress = new Uri(LLMSystem.Settings.BackendUrl);
             _client = new OpenAI_APIClient(_httpClient);
             webSearchClient = new WebSearchAPI(httpClient);
 
@@ -34,11 +34,11 @@ namespace AIToolkit.API
 
         public string BaseUrl
         {
-            get => LLMSystem.BackendUrl;
+            get => LLMSystem.Settings.BackendUrl;
             set
             {
-                LLMSystem.BackendUrl = value;
-                _httpClient.BaseAddress = new Uri(LLMSystem.BackendUrl);
+                LLMSystem.Settings.BackendUrl = value;
+                _httpClient.BaseAddress = new Uri(LLMSystem.Settings.BackendUrl);
             }
         }
 

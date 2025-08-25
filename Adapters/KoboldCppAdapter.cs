@@ -22,7 +22,7 @@ namespace AIToolkit.API
         public KoboldCppAdapter(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _httpClient.BaseAddress = new Uri(LLMSystem.BackendUrl);
+            _httpClient.BaseAddress = new Uri(LLMSystem.Settings.BackendUrl);
             _client = new KoboldCppClient(httpClient);
             webSearchClient = new WebSearchAPI(httpClient);
 
@@ -38,11 +38,11 @@ namespace AIToolkit.API
 
         public string BaseUrl
         {
-            get => LLMSystem.BackendUrl;
+            get => LLMSystem.Settings.BackendUrl;
             set 
             {
-                LLMSystem.BackendUrl = value;
-                _httpClient.BaseAddress = new Uri(LLMSystem.BackendUrl);
+                LLMSystem.Settings.BackendUrl = value;
+                _httpClient.BaseAddress = new Uri(LLMSystem.Settings.BackendUrl);
             }
         }
 
@@ -176,7 +176,6 @@ namespace AIToolkit.API
         public async Task<string> SchemaToGrammar(Type jsonclass)
         {
             var schema = schemaGenerator.Generate(jsonclass);
-            var schemaJson = schema.ToString();
             var apiPayload = new GrammarQuery
             {
                 schema = JObject.Parse(schema.ToString())

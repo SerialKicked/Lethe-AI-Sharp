@@ -69,7 +69,7 @@ namespace AIToolkit.LLM
                 else
                 {
                     var info = (session as ChatSession)!;
-                    AddInsert(new PromptInsert(session.Guid, info.GetRawMemory(!LLMSystem.MarkdownMemoryFormating), RAGSystem.RAGIndex, 1));
+                    AddInsert(new PromptInsert(session.Guid, info.GetRawMemory(!LLMSystem.Settings.MarkdownMemoryFormating), LLMSystem.Settings.RAGIndex, 1));
                 }
             }
         }

@@ -56,12 +56,12 @@ namespace AIToolkit.Files
                 if (!string.IsNullOrWhiteSpace(ThinkingForcedThought))
                     res += LLMSystem.ReplaceMacros(ThinkingForcedThought);
 
-                if (LLMSystem.PutRAGInThinkingPrompt && LLMSystem.dataInserts.Count > 0)
+                if (LLMSystem.Settings.PutRAGInThinkingPrompt && LLMSystem.dataInserts.Count > 0)
                 {
                     if (!res.EndsWith(LLMSystem.NewLine))
                         res += LLMSystem.NewLine;
 
-                    if (LLMSystem.DisableThinkingPrompt)
+                    if (LLMSystem.Settings.DisableThinkingPrompt)
                     {
                         // Better formatting to make it easier to read as it won't interfere with the thinking process
                         res += LLMSystem.NewLine + "The following information might be relevant to the conversation:" + LLMSystem.NewLine;
@@ -87,7 +87,7 @@ namespace AIToolkit.Files
                     }
 
                 }
-                if (LLMSystem.DisableThinkingPrompt)
+                if (LLMSystem.Settings.DisableThinkingPrompt)
                     res += LLMSystem.NewLine + ThinkingEnd + LLMSystem.NewLine;
             }
             return res;
@@ -205,7 +205,7 @@ namespace AIToolkit.Files
             if (!string.IsNullOrEmpty(StopSequence))
                 res.Add(StopSequence);
             res.AddRange(StopStrings);
-            if (LLMSystem.StopGenerationOnFirstParagraph)
+            if (LLMSystem.Settings.StopGenerationOnFirstParagraph)
                 res.Add(LLMSystem.NewLine);
 
             // Remove duplicates from the list

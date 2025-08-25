@@ -116,11 +116,6 @@ namespace AIToolkit.Files
             }
             var finalstr = await LLMSystem.SimpleQuery(ct);
             session = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
-
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-            {
-                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
-            }
             LLMSystem.NamesInPromptOverride = null;
             LLMSystem.Instruct.PrefillThinking = prefill;
             return session!;
@@ -169,11 +164,6 @@ namespace AIToolkit.Files
             }
             var finalstr = await LLMSystem.SimpleQuery(ct);
             session = JsonConvert.DeserializeObject<TopicLookup>(finalstr);
-
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-            {
-                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
-            }
             LLMSystem.NamesInPromptOverride = null;
             LLMSystem.Instruct.PrefillThinking = prefill;
             return session!;
@@ -474,7 +464,7 @@ namespace AIToolkit.Files
                     break;
                 LLMSystem.PromptBuilder.InsertMessage(startpos, msg.Item2.Role, msg.Item2.Message);
                 // check if we need to add a memory
-                if (memories?.Count > 0 && !LLMSystem.ForceRAGInSysPrompt)
+                if (memories?.Count > 0 && !LLMSystem.Settings.ForceRAGInSysPrompt)
                 {
                     var foundmemory = memories.GetContentByPosition(entrydepth);
                     if (!string.IsNullOrEmpty(foundmemory))
@@ -598,7 +588,7 @@ namespace AIToolkit.Files
                 var kw = await session.GenerateKeywords();
                 session.MetaData.Keywords = [.. kw];
                 var goals = await session.GenerateGoals();
-                session.MetaData.FutureGoals = goals.Split('\n').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x)).ToList();
+                session.MetaData.FutureGoals = [.. goals.Split('\n').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x))];
                 session.MetaData.IsRoleplaySession = await session.IsRoleplay();
                 session.MetaData.Title = await ChatSession.GenerateNewTitle(sum);
             }
@@ -623,7 +613,7 @@ namespace AIToolkit.Files
             // Save current session if it has enough messages otherwise just reset it
             if (archivePreviousSession && CurrentSession.Messages.Count > 2)
             {
-                CurrentSession.Scenario = LLMSystem.ScenarioOverride;
+                CurrentSession.Scenario = LLMSystem.Settings.ScenarioOverride;
                 await UpdateSession(CurrentSession);
                 EventBus.Publish(new SessionArchivedEvent(CurrentSession.Guid, DateTime.UtcNow));
                 // reset session ID

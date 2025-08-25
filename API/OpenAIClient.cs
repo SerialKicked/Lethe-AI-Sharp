@@ -32,7 +32,7 @@ namespace AIToolkit.API
             _httpClient = httpclient;
             _httpClient.DefaultRequestHeaders.ConnectionClose = false;
             _httpClient.Timeout = TimeSpan.FromMinutes(2);
-            var settings = new OpenAISettings(LLMSystem.BackendUrl);
+            var settings = new OpenAISettings(LLMSystem.Settings.BackendUrl);
             API = new OpenAIClient(new OpenAIAuthentication("123"), settings, _httpClient);
         }
 

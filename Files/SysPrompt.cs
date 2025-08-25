@@ -35,7 +35,7 @@ namespace AIToolkit.Files
                 res.AppendLinuxLine().AppendLinuxLine(DialogsTitle).AppendLinuxLine().AppendLinuxLine("{{examples}}");
             }
 
-            if ((!string.IsNullOrEmpty(character.Scenario) || !string.IsNullOrEmpty(LLMSystem.ScenarioOverride)) && !string.IsNullOrEmpty(ScenarioTitle))
+            if ((!string.IsNullOrEmpty(character.Scenario) || !string.IsNullOrEmpty(LLMSystem.Settings.ScenarioOverride)) && !string.IsNullOrEmpty(ScenarioTitle))
             {
                 res.AppendLinuxLine().AppendLinuxLine(ScenarioTitle).AppendLinuxLine().AppendLinuxLine("{{scenario}}");
             }

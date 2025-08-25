@@ -40,17 +40,12 @@ namespace AIToolkit.SearchAPI
         {
             BraveAPIKey = apiKey;
             SearchAPI = provider;
-            switch (provider)
+            _currentProvider = provider switch
             {
-                case BackendSearchAPI.DuckDuckGo:
-                    _currentProvider = new DuckDuckGoSearchProvider(_httpClient);
-                    break;
-                case BackendSearchAPI.Brave:
-                    _currentProvider = new BraveSearchProvider(_httpClient, apiKey);
-                    break;
-                default:
-                    throw new ArgumentException("Unsupported search provider");
-            }
+                BackendSearchAPI.DuckDuckGo => new DuckDuckGoSearchProvider(_httpClient),
+                BackendSearchAPI.Brave => new BraveSearchProvider(_httpClient, apiKey),
+                _ => throw new ArgumentException("Unsupported search provider"),
+            };
         }
 
         public string CurrentProviderName => _currentProvider.ProviderName;
