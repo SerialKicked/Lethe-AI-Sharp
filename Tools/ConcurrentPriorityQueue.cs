@@ -60,7 +60,8 @@ namespace AIToolkit
             _lock.EnterWriteLock();
             try
             {
-                foreach (var kvp in _queues.OrderByDescending(x => x.Key)) // Higher priority first
+                // Use Reverse() on SortedDictionary for efficiency instead of OrderByDescending
+                foreach (var kvp in _queues.Reverse())
                 {
                     if (kvp.Value.Count > 0)
                     {

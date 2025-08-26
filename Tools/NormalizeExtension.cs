@@ -52,7 +52,8 @@ namespace AIToolkit
         public static Span<float> TaxicabNormalization(this Span<float> vector)
         {
             var sumAbs = TensorPrimitives.SumOfMagnitudes(vector);
-            TensorPrimitives.Divide(vector, sumAbs, vector);
+            if (sumAbs > 0f) // Avoid division by zero
+                TensorPrimitives.Divide(vector, sumAbs, vector);
             return vector;
         }
 
@@ -77,7 +78,8 @@ namespace AIToolkit
         public static Span<float> EuclideanNormalization(this Span<float> vector)
         {
             var norm = TensorPrimitives.Norm(vector);
-            TensorPrimitives.Divide(vector, norm, vector);
+            if (norm > 0f) // Avoid division by zero
+                TensorPrimitives.Divide(vector, norm, vector);
             return vector;
         }
 

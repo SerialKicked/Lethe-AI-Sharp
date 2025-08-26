@@ -39,9 +39,9 @@ namespace AIToolkit.LLM
         public int Next(int minValue, int maxValue) => threadLocalRandom.Value!.Next(minValue, maxValue);
         public void NextFloats(Span<float> buffer)
         {
-            var rng = threadLocalRandom.Value;
+            var rng = threadLocalRandom.Value!;
             for (int i = 0; i < buffer.Length; i++)
-                buffer[i] = (float)rng!.NextDouble();
+                buffer[i] = (float)rng.NextDouble();
         }
     }
 
@@ -375,14 +375,44 @@ namespace AIToolkit.LLM
         private static float CosineSimilarityUnit(float[] a, float[] b)
         {
             var len = a.Length;
-            float dot = 0f;
-            for (int i = 0; i < len; i++)
-                dot += a[i] * b[i];
+            
+            // Use SIMD operations for better performance when available
+            if (Vector.IsHardwareAccelerated && len >= Vector<float>.Count)
+            {
+                var vectors = len / Vector<float>.Count;
+                var dot = Vector<float>.Zero;
+                
+                for (int i = 0; i < vectors; i++)
+                {
+                    var offset = i * Vector<float>.Count;
+                    var va = new Vector<float>(a, offset);
+                    var vb = new Vector<float>(b, offset);
+                    dot += va * vb;
+                }
+                
+                float result = Vector.Dot(dot, Vector<float>.One);
+                
+                // Handle remaining elements
+                for (int i = vectors * Vector<float>.Count; i < len; i++)
+                    result += a[i] * b[i];
+                
+                // Clamp for numerical stability
+                if (result > 1f) result = 1f;
+                else if (result < -1f) result = -1f;
+                return result;
+            }
+            else
+            {
+                // Fallback to scalar implementation
+                float dot = 0f;
+                for (int i = 0; i < len; i++)
+                    dot += a[i] * b[i];
 
-            // Clamp for numerical stability
-            if (dot > 1f) dot = 1f;
-            else if (dot < -1f) dot = -1f;
-            return dot;
+                // Clamp for numerical stability
+                if (dot > 1f) dot = 1f;
+                else if (dot < -1f) dot = -1f;
+                return dot;
+            }
         }
 
 

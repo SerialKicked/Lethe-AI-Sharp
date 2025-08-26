@@ -24,6 +24,36 @@ namespace AIToolkit
 
     public static class StringExtensions
     {
+        // Pre-compiled regex patterns for better performance
+        private static readonly Regex QuoteContentRegex = new(@"""([^""]*)""", RegexOptions.Compiled);
+        private static readonly Regex ItalicMatchRegex = new(@"\*[^*]+\*", RegexOptions.Compiled);
+        private static readonly Regex DiscordEmojiRegex = new(@"<:(.*?):\d+>", RegexOptions.Compiled);
+        private static readonly Regex MultipleSpacesRegex = new(@"\s+", RegexOptions.Compiled);
+        
+        // Pre-compiled third person conversion patterns
+        private static readonly (Regex regex, string replacement)[] thirdPersonRegexes = new (Regex, string)[]
+        {
+            // First-person -> {user}
+            (new Regex(@"\bI am\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{user}} is"),
+            (new Regex(@"\bI'm\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{user}} is"),
+            (new Regex(@"\bI have\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{user}} has"),
+            (new Regex(@"\bI've\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{user}} has"),
+            (new Regex(@"\bI'd\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{user}} would"),
+            (new Regex(@"\bI feel\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{user}} feels"),
+            (new Regex(@"\bI think\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{user}} thinks"),
+            (new Regex(@"\bI want\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{user}} wants"),
+            (new Regex(@"\bmy\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{user}}'s"),
+            (new Regex(@"\bme\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{user}}"),
+
+            // Second-person -> {bot}
+            (new Regex(@"\byou are\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{char}} is"),
+            (new Regex(@"\byou're\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{char}} is"),
+            (new Regex(@"\byour\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{char}}'s"),
+
+            // Optional first-person plural
+            (new Regex(@"\bus\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{user}} and {{char}}"),
+            (new Regex(@"\bour\b", RegexOptions.Compiled | RegexOptions.IgnoreCase), "{{user}} and {{char}}'s")
+        };
 
         private static readonly (string pattern, string replacement)[] replacements = new (string, string)[]
         {
@@ -71,36 +101,36 @@ namespace AIToolkit
             if (string.IsNullOrWhiteSpace(query))
                 return "";
 
-            // Remove or replace problematic characters
-            var sanitized = query
-                .Replace("\"", "")           // Remove quotes
-                .Replace("'", "")            // Remove single quotes
-                .Replace("`", "")            // Remove backticks
-                .Replace("[", "")            // Remove brackets
-                .Replace("]", "")
-                .Replace("{", "")            // Remove braces
-                .Replace("}", "")
-                .Replace("(", "")            // Remove parentheses  
-                .Replace(")", "")
-                .Replace("|", " ")           // Replace pipes with spaces
-                .Replace("&", " and ")       // Replace & with "and"
-                .Replace("*", "")            // Remove asterisks
-                .Replace("?", "")            // Remove question marks at end
-                .Replace("!", "")            // Remove exclamation marks
-                .Replace("#", "")            // Remove hashtags
-                .Replace("@", "")            // Remove at symbols
-                .Replace("%", "")            // Remove percent signs
-                .Replace("^", "")            // Remove carets
-                .Replace("~", "")            // Remove tildes
-                .Replace("<", "")            // Remove angle brackets
-                .Replace(">", "")
-                .Trim();
+            // Use StringBuilder for more efficient string operations
+            var sb = new StringBuilder(query);
+            
+            // Remove or replace problematic characters in one pass
+            sb.Replace("\"", "")           // Remove quotes
+              .Replace("'", "")            // Remove single quotes
+              .Replace("`", "")            // Remove backticks
+              .Replace("[", "")            // Remove brackets
+              .Replace("]", "")
+              .Replace("{", "")            // Remove braces
+              .Replace("}", "")
+              .Replace("(", "")            // Remove parentheses  
+              .Replace(")", "")
+              .Replace("|", " ")           // Replace pipes with spaces
+              .Replace("&", " and ")       // Replace & with "and"
+              .Replace("*", "")            // Remove asterisks
+              .Replace("?", "")            // Remove question marks at end
+              .Replace("!", "")            // Remove exclamation marks
+              .Replace("#", "")            // Remove hashtags
+              .Replace("@", "")            // Remove at symbols
+              .Replace("%", "")            // Remove percent signs
+              .Replace("^", "")            // Remove carets
+              .Replace("~", "")            // Remove tildes
+              .Replace("<", "")            // Remove angle brackets
+              .Replace(">", "");
 
-            // Replace multiple spaces with single spaces
-            while (sanitized.Contains("  "))
-            {
-                sanitized = sanitized.Replace("  ", " ");
-            }
+            var sanitized = sb.ToString().Trim();
+            
+            // Replace multiple spaces with single spaces using pre-compiled regex
+            sanitized = MultipleSpacesRegex.Replace(sanitized, " ");
 
             // Limit length to avoid issues
             if (sanitized.Length > 200)
@@ -228,7 +258,7 @@ namespace AIToolkit
             if (fix.FixQuotes && !fix.RemoveAllQuotes)
             {
                 // Remove asterisks if they are between quotes
-                workstring = Regex.Replace(workstring, "\"([^\"]*)\"", match => "\"" + match.Groups[1].Value.Replace("*", "") + "\"");
+                workstring = QuoteContentRegex.Replace(workstring, match => "\"" + match.Groups[1].Value.Replace("*", "") + "\"");
 
                 // Remove asterisks just before and after quotes
                 workstring = workstring.Replace(" **\"", " \"");
@@ -245,7 +275,7 @@ namespace AIToolkit
             {
                 // Doesn't work during streaming so only done at the end.
                 // find all occurences of *some text* and remove them all (asterisks included) according to the ratio
-                var matches = Regex.Matches(workstring, @"\*[^*]+\*");
+                var matches = ItalicMatchRegex.Matches(workstring);
                 foreach (Match match in matches)
                 {
                     if (LLMSystem.RNG.NextDouble() < fix.RemoveItalicRatio)
@@ -356,8 +386,7 @@ namespace AIToolkit
         /// <returns></returns>
         public static string ReplaceDiscordEmojis(this string input)
         {
-            string pattern = @"<:(.*?):\d+>";
-            return Regex.Replace(input, pattern, ":$1:");
+            return DiscordEmojiRegex.Replace(input, ":$1:");
         }
 
         /// <summary>
@@ -410,16 +439,15 @@ namespace AIToolkit
 
         public static string ConvertToThirdPerson(this string userInput)
         {
-
             if (string.IsNullOrWhiteSpace(userInput))
                 return userInput;
 
             string output = userInput;
 
-            foreach (var (pattern, replacement) in replacements)
+            // Use pre-compiled regex patterns for better performance
+            foreach (var (regex, replacement) in thirdPersonRegexes)
             {
-                // RegexOptions.IgnoreCase for case-insensitive matching
-                output = Regex.Replace(output, pattern, replacement, RegexOptions.IgnoreCase);
+                output = regex.Replace(output, replacement);
             }
             return LLMSystem.ReplaceMacros(output);
         }

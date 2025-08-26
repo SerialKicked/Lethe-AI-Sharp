@@ -35,7 +35,6 @@ namespace AIToolkit.Files
             Dry_allowed_length = 2;
             Dry_base = 1.75;
             Dry_multiplier = 0.8;
-            Dry_allowed_length = 2;
             Dry_sequence_breakers = ["\n", ":", "\"", "*", "<|im_end|>", "<|im_start|>" ];
             Sampler_order = [6, 0, 1, 3, 4, 2, 5];
             Mirostat = 0;
@@ -51,8 +50,11 @@ namespace AIToolkit.Files
         {
             var res = (this.MemberwiseClone() as SamplerSettings)!;
             res.UniqueName = UniqueName;
-            // Remove duplicates from dry_sequence_breakers
-            res.Dry_sequence_breakers = [.. res.Dry_sequence_breakers.Distinct()];
+            // Only remove duplicates if they actually exist to avoid unnecessary allocations
+            if (res.Dry_sequence_breakers.Count != res.Dry_sequence_breakers.Distinct().Count())
+            {
+                res.Dry_sequence_breakers = [.. res.Dry_sequence_breakers.Distinct()];
+            }
             return res;
         }
     }
