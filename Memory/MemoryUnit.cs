@@ -3,6 +3,7 @@ using AIToolkit.LLM;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace AIToolkit.Memory
@@ -40,6 +41,16 @@ namespace AIToolkit.Memory
             EmbedSummary = await RAGSystem.EmbeddingText(Content);
             if (!string.IsNullOrWhiteSpace(Name))
                 EmbedName = await RAGSystem.EmbeddingText(Name);
+        }
+
+        public string ToEureka()
+        {
+            var text = 
+                new StringBuilder($"You remember something you've researched on the web recently about '{Name}':").AppendLinuxLine()
+                .AppendLinuxLine($"{Content}")
+                .AppendLinuxLine()
+                .Append("Mention this information when there's a lull in the discussion, or if the user makes a mention of it, or if you feel like it's a good idea to talk about it.");
+            return text.ToString();
         }
     }
 }

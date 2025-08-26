@@ -68,7 +68,7 @@ namespace AIToolkit.Files
         public int RAGMValue { get; set; } = 15;
 
         /// <summary> Max distance for an entry to be retrieved (SmallWorld / HNSW.NET implementation) </summary>
-        public float RAGDistanceCutOff { get; set; } = 0.2f;
+        public float RAGDistanceCutOff { get; set; } = 0.15f;
 
         /// <summary> Search method. Simple tends to be the most consistent method </summary>
         public NeighbourSelectionHeuristic RAGHeuristic { get; set; } = NeighbourSelectionHeuristic.SelectSimple;

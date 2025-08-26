@@ -52,7 +52,7 @@ namespace AIToolkit.LLM
         public float Distance = dist;
     }
 
-    public enum EmbedType { Title, Summary, Session, Document, WorldInfo }
+    public enum EmbedType { Title, Summary, Session, Document, WorldInfo, Brain }
 
     /// <summary>
     /// Retrieval Augmented Generation System
@@ -209,6 +209,15 @@ namespace AIToolkit.LLM
                 }
             }
 
+            foreach (var doc in LLMSystem.Bot.Brain.Memories)
+            {
+                if (doc.EmbedSummary.Length == 0 || doc.Insertion != Memory.MemoryInsertion.Trigger)
+                    continue;
+                vectors.Add(doc.EmbedSummary);
+                LookupDB[currentID] = (doc.Guid, EmbedType.Brain);
+                currentID++;
+            }
+
             foreach (var world in persona.MyWorlds)
             {
                 if (!world.DoEmbeds)
@@ -279,7 +288,7 @@ namespace AIToolkit.LLM
             }
             foreach (var item in res)
             {
-                if (item.Category == EmbedType.Summary || item.Category == EmbedType.Title)
+                if (item.Category == EmbedType.Summary || item.Category == EmbedType.Title || item.Category == EmbedType.Session)
                 {
                     var found = LLMSystem.History.GetSessionByID(item.ID);
                     if (found != null && found.MetaData.IsRoleplaySession)
@@ -304,6 +313,12 @@ namespace AIToolkit.LLM
                 if (item.Category == EmbedType.WorldInfo)
                 {
                     var found = LLMSystem.Bot.GetWIEntryByGUID(item.ID);
+                    if (found != null)
+                        list.Add((found, item.Category, item.Distance));
+                }
+                else if (item.Category == EmbedType.Brain)
+                {
+                    var found = LLMSystem.Bot.Brain.GetMemoryByID(item.ID);
                     if (found != null)
                         list.Add((found, item.Category, item.Distance));
                 }
@@ -361,9 +376,11 @@ namespace AIToolkit.LLM
             OnEmbedSession = null;
         }
 
+        #region Self contained string similarity check
+
         /// <summary>
         /// Compute cosine similarity between two strings using the current embedding model.
-        /// Returns a value in [-1, 1]. Requires RAG to be Enabled.
+        /// Returns a value in [0, 2]. Requires RAG to be Enabled.
         /// </summary>
         public static async Task<float> GetDistanceAsync(string a, string b)
         {
@@ -414,5 +431,6 @@ namespace AIToolkit.LLM
             return d;
         }
 
+        #endregion
     }
 }
