@@ -245,7 +245,7 @@ namespace AIToolkit.LLM
             // Check if message contains the words RP or roleplay
             var RPCheck = message.Contains(" RP", StringComparison.OrdinalIgnoreCase) || message.Contains(" roleplay", StringComparison.OrdinalIgnoreCase);
 
-            var emb = await EmbeddingText(message);
+            var emb = await EmbeddingText(message.ConvertToThirdPerson());
             var subcount = maxRes + 1;
             // If we have both titles and summaries double result count to get a better picture
             if (LLMSystem.Settings.AllowWorldInfo)

@@ -24,6 +24,31 @@ namespace AIToolkit
 
     public static class StringExtensions
     {
+
+        private static readonly (string pattern, string replacement)[] replacements = new (string, string)[]
+        {
+            // First-person -> {user}
+            (@"\bI am\b", "{{user}} is"),
+            (@"\bI'm\b", "{{user}} is"),
+            (@"\bI have\b", "{{user}} has"),
+            (@"\bI've\b", "{{user}} has"),
+            (@"\bI'd\b", "{{user}} would"),
+            (@"\bI feel\b", "{{user}} feels"),
+            (@"\bI think\b", "{{user}} thinks"),
+            (@"\bI want\b", "{{user}} wants"),
+            (@"\bmy\b", "{{user}}'s"),
+            (@"\bme\b", "{{user}}"),
+
+            // Second-person -> {bot}
+            (@"\byou are\b", "{{char}} is"),
+            (@"\byou're\b", "{{char}} is"),
+            (@"\byour\b", "{{char}}'s"),
+
+            // Optional first-person plural
+            (@"\bus\b", "{{user}} and {{char}}"),
+            (@"\bour\b", "{{user}} and {{char}}'s")
+        };
+
         public static StringBuilder AppendLinuxLine(this StringBuilder sb, string? text = null)
         {
             return text == null ? sb.Append(LLMSystem.NewLine) : sb.Append(text).Append(LLMSystem.NewLine);
@@ -382,6 +407,23 @@ namespace AIToolkit
             else
                 return span.Seconds.ToString() + " seconds";
         }
+
+        public static string ConvertToThirdPerson(this string userInput)
+        {
+
+            if (string.IsNullOrWhiteSpace(userInput))
+                return userInput;
+
+            string output = userInput;
+
+            foreach (var (pattern, replacement) in replacements)
+            {
+                // RegexOptions.IgnoreCase for case-insensitive matching
+                output = Regex.Replace(output, pattern, replacement, RegexOptions.IgnoreCase);
+            }
+            return LLMSystem.ReplaceMacros(output);
+        }
+
 
     }
 }
