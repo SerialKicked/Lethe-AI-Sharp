@@ -1,4 +1,5 @@
 ﻿using AIToolkit.Files;
+using AIToolkit.LLM;
 
 namespace AIToolkit.Agent
 {
@@ -93,7 +94,7 @@ namespace AIToolkit.Agent
             {
                 try
                 {
-                    if (!_config.Enabled)
+                    if (!_config.Enabled || !LLMSystem.Settings.AgentEnabled)
                     {
                         await Task.Delay(2000, _cts.Token);
                         continue;

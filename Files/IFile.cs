@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using System.IO;
 
 namespace AIToolkit.Files
 {
@@ -9,7 +10,13 @@ namespace AIToolkit.Files
 
         string ExportToString() => JsonConvert.SerializeObject(this, JsonSettings);
 
-        void SaveToFile(string pPath) => File.WriteAllText(pPath, ExportToString());
+        void SaveToFile(string pPath)
+        {
+            var dir = Path.GetDirectoryName(pPath);
+            if (!string.IsNullOrEmpty(dir))
+                Directory.CreateDirectory(dir);
+            File.WriteAllText(pPath, ExportToString());
+        }
 
     }
 }
