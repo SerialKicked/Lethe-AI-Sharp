@@ -111,7 +111,7 @@ namespace AIToolkit.Agent.Plugins
                     continue; // Skip this topic if no results
 
                 // Merge all results for this topic into a single memory
-                var merged = await MergeResults(topic.Topic, topic.Reason, allResults);
+                var merged = await MergeResults(session, topic.Topic, topic.Reason, allResults);
                 if (string.IsNullOrWhiteSpace(merged))
                     continue; // Skip this topic if merge failed
 
@@ -161,10 +161,10 @@ namespace AIToolkit.Agent.Plugins
             return new string([.. s.Select(c => bad.Contains(c) ? '_' : c)]).ToLowerInvariant();
         }
 
-        private static async Task<string> MergeResults(string topic, string reason, List<EnrichedSearchResult> webresults)
+        private static async Task<string> MergeResults(ChatSession session, string topic, string reason, List<EnrichedSearchResult> webresults)
         {
             LLMSystem.NamesInPromptOverride = false;
-            var fullprompt = BuildMergerPrompt(topic, reason, webresults);
+            var fullprompt = BuildMergerPrompt(session, topic, reason, webresults);
             var llmparams = LLMSystem.Sampler.GetCopy();
             if (llmparams.Temperature > 0.75)
                 llmparams.Temperature = 0.75;
@@ -182,15 +182,21 @@ namespace AIToolkit.Agent.Plugins
             return response;
         }
 
-        private static string BuildMergerPrompt(string userinput, string reason, List<EnrichedSearchResult> webresults)
+        private static string BuildMergerPrompt(ChatSession session, string topic, string reason, List<EnrichedSearchResult> webresults)
         {
             var prompt = new StringBuilder();
-            prompt.AppendLinuxLine($"Your goal is analyze and merge information from the following documents regarding the subject of '{userinput}'.");
+            prompt.AppendLinuxLine($"You are {LLMSystem.Bot.Name} and your goal is to analyze and merge information from the following documents regarding the subject of '{topic}'. This topic was made relevant during the previous chat session.");
+            prompt.AppendLinuxLine();
+            prompt.AppendLinuxLine($"# Previous Chat Session");
+            prompt.AppendLinuxLine();
+            prompt.AppendLinuxLine($"{session.Summary.RemoveNewLines()}");
+            prompt.AppendLinuxLine();
+            prompt.AppendLinuxLine($"# Documents Found:");
             prompt.AppendLinuxLine();
             var cnt = 0;
             foreach (var item in webresults)
             {
-                prompt.AppendLinuxLine($"# {item.Title}").AppendLinuxLine();
+                prompt.AppendLinuxLine($"## {item.Title}").AppendLinuxLine();
                 prompt.AppendLinuxLine($"{item.Description}").AppendLinuxLine();
                 if (item.ContentExtracted && LLMSystem.GetTokenCount(item.FullContent) <= 3000)
                     cnt++;
@@ -205,14 +211,14 @@ namespace AIToolkit.Agent.Plugins
                     var tks = LLMSystem.GetTokenCount(item.FullContent);
                     if (item.ContentExtracted && tks > 100 && tks <= 2500)
                     {
-                        prompt.AppendLinuxLine($"# {item.Title} (Full Content)");
+                        prompt.AppendLinuxLine($"## {item.Title} (Full Content)");
                         prompt.AppendLinuxLine($"{item.FullContent.CleanupAndTrim()}").AppendLinuxLine().AppendLinuxLine();
                     }
                 }
             }
             var sysprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, LLMSystem.User, LLMSystem.Bot, prompt.ToString());
 
-            var txt = new StringBuilder($"You are researching '{userinput}' for the following reason: {reason}").AppendLinuxLine().Append($"Merge the information available in the system prompt to offer an explanation on this topic. Don't use markdown formatting, favor natural language. The explanation should be 1 to 3 paragraphs long."); 
+            var txt = new StringBuilder($"You are researching '{topic}' for the following reason: {reason}").AppendLinuxLine().Append($"Merge the information available in the system prompt to offer an explanation on this topic. Don't use markdown formatting, favor natural language. The explanation should be 1 to 3 paragraphs long."); 
             var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, txt.ToString());
             LLMSystem.NamesInPromptOverride = false;
             msg += LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
