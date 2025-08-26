@@ -58,12 +58,6 @@ namespace AIToolkit.Files
         /// <summary> Embedding size (depends on the embedding model) </summary>
         public int RAGEmbeddingSize { get; set; } = 1024;
 
-        /// <summary> Use summaries' embeddings for RAG </summary>
-        public bool RAGUseSummaries { get; set; } = true;
-
-        /// <summary> Use titles embeddings for RAG </summary>
-        public bool RAGUseTitles { get; set; } = true;
-
         /// <summary> M Value for the Vector Search (SmallWorld / HNSW.NET implementation) </summary>
         public int RAGMValue { get; set; } = 15;
 

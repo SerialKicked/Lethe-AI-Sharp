@@ -52,7 +52,7 @@ namespace AIToolkit.LLM
         public float Distance = dist;
     }
 
-    public enum EmbedType { Title, Summary, Session, Document, WorldInfo, Brain }
+    public enum EmbedType { Session, Document, WorldInfo, Brain }
 
     /// <summary>
     /// Retrieval Augmented Generation System
@@ -193,20 +193,11 @@ namespace AIToolkit.LLM
             for (int i = 0; i < log.Sessions.Count; i++)
             {
                 var session = log.Sessions[i];
-                if (session.EmbedTitle.Length == 0 || session.EmbedSummary.Length == 0)
+                if (session.EmbedSummary.Length == 0)
                     continue;
-                if (LLMSystem.Settings.RAGUseTitles)
-                {
-                    vectors.Add(session.EmbedTitle);
-                    LookupDB[currentID] = (session.Guid, EmbedType.Title);
-                    currentID++;
-                }
-                if (LLMSystem.Settings.RAGUseSummaries)
-                {
-                    vectors.Add(session.EmbedSummary);
-                    LookupDB[currentID] = (session.Guid, EmbedType.Summary);
-                    currentID++;
-                }
+                vectors.Add(session.EmbedSummary);
+                LookupDB[currentID] = (session.Guid, EmbedType.Session);
+                currentID++;
             }
 
             foreach (var doc in LLMSystem.Bot.Brain.Memories)
@@ -255,40 +246,15 @@ namespace AIToolkit.LLM
             var RPCheck = message.Contains(" RP", StringComparison.OrdinalIgnoreCase) || message.Contains(" roleplay", StringComparison.OrdinalIgnoreCase);
 
             var emb = await EmbeddingText(message);
-            var subcount = maxRes + 2;
+            var subcount = maxRes + 1;
             // If we have both titles and summaries double result count to get a better picture
-            if (LLMSystem.Settings.RAGUseSummaries && LLMSystem.Settings.RAGUseTitles)
-                subcount += maxRes + 2;
             if (LLMSystem.Settings.AllowWorldInfo)
-                subcount += 1;
+                subcount += 2;
             var res = Search(emb, subcount);
-            if (LLMSystem.Settings.RAGUseSummaries && LLMSystem.Settings.RAGUseTitles)
-            {
-                // look for ID triggered by both summary and title
-                var newlist = new List<VectorSearchResult>();
-                foreach (var item in res)
-                {
-                    // if no item or item already in newlist, skip
-                    if (item == null || newlist.Find(e => e.ID == item.ID) != null)
-                        continue;
 
-                    // find if other with same GUID
-                    var copy = res.Find(e => e != item && e.ID == item.ID);
-                    if (copy != null)
-                    {
-                        // we have a second candidate in the list, this makes this result a lot more probable
-                        var boosted = new VectorSearchResult(item.ID, EmbedType.Session, (item.Distance + copy.Distance) / 2.5f);
-                        newlist.Add(boosted);
-                    }
-                    else
-                        newlist.Add(item);
-                }
-                res = newlist;
-                res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
-            }
             foreach (var item in res)
             {
-                if (item.Category == EmbedType.Summary || item.Category == EmbedType.Title || item.Category == EmbedType.Session)
+                if (item.Category == EmbedType.Session)
                 {
                     var found = LLMSystem.History.GetSessionByID(item.ID);
                     if (found != null && found.MetaData.IsRoleplaySession)

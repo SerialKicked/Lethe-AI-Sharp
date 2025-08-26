@@ -62,8 +62,8 @@ namespace AIToolkit.Files
 
         public string Scenario { get; set; } = string.Empty;
 
-        public float[] EmbedTitle { get; set; } = [];
         public float[] EmbedSummary { get; set; } = [];
+
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
         public List<SingleMessage> Messages { get; set; } = [];
@@ -168,7 +168,6 @@ namespace AIToolkit.Files
             LLMSystem.Instruct.PrefillThinking = prefill;
             return session!;
         }
-
 
         public async Task<string[]> GenerateKeywords()
         {
@@ -284,8 +283,10 @@ namespace AIToolkit.Files
         {
             if (!RAGSystem.Enabled)
                 return;
-            EmbedTitle = await RAGSystem.EmbeddingText(Title);
-            EmbedSummary = await RAGSystem.EmbeddingText(Summary);
+            var titleembed = await RAGSystem.EmbeddingText(Title);
+            var sumembed = await RAGSystem.EmbeddingText(Summary);
+
+            EmbedSummary = MergeEmbeddings(titleembed, sumembed);
         }
 
         public string GetRawDialogs(int maxTokens, bool ignoresystem, bool lightDialogs = false, bool showHidden = false)
@@ -325,7 +326,6 @@ namespace AIToolkit.Files
             }
             return sb.ToString();
         }
-
 
         public string GetRawMemory(bool Natural = false)
         {
@@ -367,6 +367,23 @@ namespace AIToolkit.Files
             }
 
             return sb.ToString();
+        }
+
+        private float[] MergeEmbeddings(float[] titleembed, float[] sumembed, float titleweight = 0.2f, float summaryweight = 0.8f)
+        {
+
+            if (titleembed.Length != sumembed.Length)
+                throw new ArgumentException("Title and summary embeddings must have the same length.");
+
+            int dim = titleembed.Length;
+            float[] merged = new float[dim];
+
+            // weighted merge
+            for (int i = 0; i < dim; i++)
+            {
+                merged[i] = (titleweight * titleembed[i]) + (summaryweight * sumembed[i]);
+            }
+            return merged.EuclideanNormalization();
         }
     }
 
@@ -538,7 +555,6 @@ namespace AIToolkit.Files
             foreach (var item in Sessions)
             {
                 item.EmbedSummary = [];
-                item.EmbedTitle = [];
             }
         }
 
