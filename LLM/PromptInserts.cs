@@ -1,4 +1,5 @@
 ﻿using AIToolkit.Files;
+using AIToolkit.Memory;
 using System.Text;
 
 namespace AIToolkit.LLM
@@ -59,17 +60,19 @@ namespace AIToolkit.LLM
         {
             if (memories.Count == 0)
                 return;
-            foreach (var (session, embedtype, _) in memories)
+            foreach (var (session, _, _) in memories)
             {
-                if (embedtype == EmbedType.WorldInfo)
+                if (session is WorldEntry entry)
                 {
-                    var info = (session as WorldEntry)!;
-                    AddInsert(new PromptInsert(info.Guid, info.Content, info.Position == WEPosition.SystemPrompt ? -1 : info.PositionIndex, info.Duration));
+                    AddInsert(new PromptInsert(entry.Guid, entry.Content, entry.Position == WEPosition.SystemPrompt ? -1 : entry.PositionIndex, entry.Duration));
                 }
-                else
+                else if (session is ChatSession info)
                 {
-                    var info = (session as ChatSession)!;
                     AddInsert(new PromptInsert(session.Guid, info.GetRawMemory(!LLMSystem.Settings.MarkdownMemoryFormating), LLMSystem.Settings.RAGIndex, 1));
+                }
+                else if (session is MemoryUnit unit)
+                {
+                    AddInsert(new PromptInsert(session.Guid, unit.Content, LLMSystem.Settings.RAGIndex, 1));
                 }
             }
         }

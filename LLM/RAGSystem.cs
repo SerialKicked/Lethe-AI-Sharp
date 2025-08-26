@@ -234,7 +234,7 @@ namespace AIToolkit.LLM
             IsVectorDBLoaded = true;
         }
 
-        public static async Task<List<(IEmbed session, EmbedType category, float distance)>> Search(string message)
+        public static async Task<List<(IEmbed session, EmbedType category, float distance)>> Search(string message, int maxRes, float maxDist)
         {
             if (!Enabled)
                 return [];
@@ -246,10 +246,10 @@ namespace AIToolkit.LLM
             var RPCheck = message.Contains(" RP", StringComparison.OrdinalIgnoreCase) || message.Contains(" roleplay", StringComparison.OrdinalIgnoreCase);
 
             var emb = await EmbeddingText(message);
-            var subcount = LLMSystem.Settings.RAGMaxEntries + 2;
+            var subcount = maxRes + 2;
             // If we have both titles and summaries double result count to get a better picture
             if (LLMSystem.Settings.RAGUseSummaries && LLMSystem.Settings.RAGUseTitles)
-                subcount += LLMSystem.Settings.RAGMaxEntries + 2;
+                subcount += maxRes + 2;
             if (LLMSystem.Settings.AllowWorldInfo)
                 subcount += 1;
             var res = Search(emb, subcount);
@@ -293,9 +293,9 @@ namespace AIToolkit.LLM
             }
             res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
             // Make sure we got the correct amount of results
-            if (res.Count > LLMSystem.Settings.RAGMaxEntries)
-                res = res.GetRange(0, LLMSystem.Settings.RAGMaxEntries);
-            res.RemoveAll(e => e.Distance > LLMSystem.Settings.RAGDistanceCutOff);
+            if (res.Count > maxRes)
+                res = res.GetRange(0, maxRes);
+            res.RemoveAll(e => e.Distance > maxDist);
             var list = new List<(IEmbed session, EmbedType category, float distance)>();
             foreach (var item in res)
             {
@@ -315,6 +315,11 @@ namespace AIToolkit.LLM
                 }
             }
             return list;
+        }
+
+        public static async Task<List<(IEmbed session, EmbedType category, float distance)>> Search(string message)
+        {
+            return await Search(message, LLMSystem.Settings.RAGMaxEntries, LLMSystem.Settings.RAGDistanceCutOff);
         }
 
         private static List<VectorSearchResult> Search(float[] message, int count)
@@ -355,5 +360,59 @@ namespace AIToolkit.LLM
         {
             OnEmbedSession = null;
         }
+
+        /// <summary>
+        /// Compute cosine similarity between two strings using the current embedding model.
+        /// Returns a value in [-1, 1]. Requires RAG to be Enabled.
+        /// </summary>
+        public static async Task<float> GetDistanceAsync(string a, string b)
+        {
+            if (!Enabled)
+                return 0f;
+
+            var ea = await EmbeddingText(a).ConfigureAwait(false);
+            var eb = await EmbeddingText(b).ConfigureAwait(false);
+
+            if (ea.Length == 0 || eb.Length == 0 || ea.Length != eb.Length)
+                return 0f;
+
+            return ToCosineDistance(CosineSimilarityUnit(ea, eb));
+        }
+
+        /// <summary>
+        /// Synchronous wrapper for GetSimilarityAsync. May block the calling thread.
+        /// Prefer the async version when possible.
+        /// </summary>
+        public static float GetDistance(string a, string b)
+            => GetDistanceAsync(a, b).GetAwaiter().GetResult();
+
+        /// <summary>
+        /// Cosine similarity for unit-normalized vectors (EmbeddingText already normalizes).
+        /// </summary>
+        private static float CosineSimilarityUnit(float[] a, float[] b)
+        {
+            var len = a.Length;
+            float dot = 0f;
+            for (int i = 0; i < len; i++)
+                dot += a[i] * b[i];
+
+            // Clamp for numerical stability
+            if (dot > 1f) dot = 1f;
+            else if (dot < -1f) dot = -1f;
+            return dot;
+        }
+
+
+        /// <summary>
+        /// Utility: convert cosine similarity [-1,1] to cosine distance [0,2].
+        /// </summary>
+        private static float ToCosineDistance(float similarity)
+        {
+            var d = 1f - similarity;
+            if (d < 0f) return 0f;
+            if (d > 2f) return 2f;
+            return d;
+        }
+
     }
 }

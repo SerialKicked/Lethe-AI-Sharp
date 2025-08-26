@@ -23,8 +23,6 @@ namespace AIToolkit.Files
         public string Scenario { get; set; } = string.Empty;
         /// <summary> Character Notes (UI) </summary>
         public string Notes { get; set; } = string.Empty;
-        /// <summary> Icon to be displayed in chat </summary>
-        public string Icon { get; set; } = string.Empty;
         /// <summary> First message the character will send when starting a new session </summary>
         public List<string> FirstMessage { get; set; } = [];
         /// <summary> Examples of dialogs from the character to get a more consistent tone </summary>

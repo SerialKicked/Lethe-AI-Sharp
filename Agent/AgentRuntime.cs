@@ -138,7 +138,7 @@ namespace AIToolkit.Agent
 
         private IAgentContext BuildContext()
         {
-            var history = LLM.LLMSystem.History;
+            var history = LLMSystem.History;
             return new AgentContext
             {
                 SessionCount = history.Sessions.Count,

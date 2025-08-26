@@ -60,7 +60,6 @@ namespace AIToolkit.Files
         public int Duration = 1;
         public WEPosition Position = WEPosition.SystemPrompt;
         public float TriggerChance = 1;
-        public int Priority = 100;
     }
 
     public class WorldInfo : BaseFile
