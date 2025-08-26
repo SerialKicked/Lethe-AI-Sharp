@@ -54,7 +54,7 @@ namespace AIToolkit.Files
         /// <summary> If set above 0, this character will be allowed to write this amount of tokens in its system prompt. Altered each new session. </summary>
         public int SelfEditTokens { get; set; } = 0;
 
-        public Brain Brain { get; set; } = new();
+        [JsonIgnore] public Brain Brain { get; set; } = new();
 
         [JsonIgnore] public List<WorldInfo> MyWorlds { get; protected set; } = [];
         [JsonIgnore] public Chatlog History { get; protected set; } = new();
@@ -101,11 +101,13 @@ namespace AIToolkit.Files
 
         public virtual void BeginChat()
         {
+            LoadBrain("data/chars/");
             Brain.CharacterLoad();
         }
 
         public virtual void EndChat(bool backup = false)
         {
+            SaveBrain("data/chars/", backup);
         }
 
         protected void SaveChatHistory(string path, bool backup = false)
@@ -140,6 +142,70 @@ namespace AIToolkit.Files
                 return;
             var f = path + UniqueName;
             if (File.Exists(f + ".json")) File.Delete(f + ".json");
+        }
+
+        protected void SaveBrain(string path, bool backup = false)
+        {
+            if (string.IsNullOrEmpty(UniqueName))
+                return;
+            var brainPath = path + UniqueName + ".brain";
+            if (backup && File.Exists(brainPath))
+            {
+                if (File.Exists(path + UniqueName + ".brain.bak"))
+                    File.Delete(path + UniqueName + ".brain.bak");
+                File.Move(brainPath, path + UniqueName + ".brain.bak");
+            }
+
+            var content = JsonConvert.SerializeObject(Brain, new JsonSerializerSettings { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
+            // create directory if it doesn't exist
+            var dir = Path.GetDirectoryName(brainPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            File.WriteAllText(brainPath, content);
+        }
+
+        public void LoadBrain(string path)
+        {
+            if (string.IsNullOrEmpty(UniqueName))
+            {
+                Brain = new Brain();
+                return;
+            }
+            
+            var brainFilePath = path + UniqueName + ".brain";
+            
+            // If brain file exists, load it
+            if (File.Exists(brainFilePath))
+            {
+                Brain = JsonConvert.DeserializeObject<Brain>(File.ReadAllText(brainFilePath))! ?? new Brain();
+                return;
+            }
+            
+            // If no brain file exists, check if we need to migrate from the persona file
+            var personaFilePath = path + UniqueName + ".json";
+            if (File.Exists(personaFilePath))
+            {
+                try
+                {
+                    var personaJson = File.ReadAllText(personaFilePath);
+                    // Try to extract Brain data using dynamic parsing
+                    var jsonObject = JsonConvert.DeserializeObject<dynamic>(personaJson);
+                    if (jsonObject?.Brain != null)
+                    {
+                        // Migrate brain data from persona file to separate brain file
+                        Brain = JsonConvert.DeserializeObject<Brain>(jsonObject.Brain.ToString())! ?? new Brain();
+                        SaveBrain(path, false);
+                        return;
+                    }
+                }
+                catch
+                {
+                    // If migration fails, just use empty brain
+                }
+            }
+            
+            // Default to empty brain
+            Brain = new Brain();
         }
 
         public WorldEntry? GetWIEntryByGUID(Guid id)
