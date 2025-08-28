@@ -68,7 +68,7 @@ namespace AIToolkit.LLM
                 }
                 else if (session is ChatSession info)
                 {
-                    AddInsert(new PromptInsert(session.Guid, info.GetRawMemory(!LLMSystem.Settings.MarkdownMemoryFormating), LLMSystem.Settings.RAGIndex, 1));
+                    AddInsert(new PromptInsert(session.Guid, info.GetRawMemory(LLMSystem.Settings.MarkdownMemoryFormating, LLMSystem.Bot.DatesInSessionSummaries), LLMSystem.Settings.RAGIndex, 1));
                 }
                 else if (session is MemoryUnit unit)
                 {

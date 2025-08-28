@@ -55,7 +55,6 @@ namespace AIToolkit.Files
         public Guid Guid { get; set; } = Guid.NewGuid();
         [JsonIgnore] public string Title => MetaData.Title;
         [JsonIgnore] public string Summary => MetaData.Summary;
-        public bool FirstPersonSummary { get; set; } = true;
 
         public SessionMetaInfo MetaData { get; set; } = new();
         public TopicLookup NewTopics { get; set; } = new();
@@ -319,42 +318,41 @@ namespace AIToolkit.Files
             return sb.ToString();
         }
 
-        public string GetRawMemory(bool Natural = false)
+        public string GetRawMemory(bool markdown, bool includedates)
         {
             var sb = new StringBuilder();
-            if (!Natural)
+            if (markdown)
             {
-                sb.AppendLinuxLine("# " + Title.Trim());
-                if (StartTime.Date == EndTime.Date)
-                    sb.AppendLinuxLine("## Date: " + StartTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(StartTime));
+                if (includedates)
+                {
+                    sb.AppendLinuxLine("# " + Title.Trim());
+                    if (StartTime.Date == EndTime.Date)
+                        sb.AppendLinuxLine("## Date: " + StartTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(StartTime));
+                    else
+                        sb.AppendLinuxLine("## Date: " + StartTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(StartTime) + " to " + EndTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(EndTime));
+                    sb.AppendLinuxLine("## Memory: " + Summary.RemoveNewLines());
+                }
                 else
-                    sb.AppendLinuxLine("## From " + StartTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(StartTime) + " to " + EndTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(EndTime));
-                sb.AppendLinuxLine("## Memory: " + Summary.RemoveNewLines());
+                {
+                    sb.AppendLinuxLine($"## {Title}:").AppendLinuxLine($"{Summary.RemoveNewLines()}");
+                }
             }
             else
             {
-                if (StartTime.Date == EndTime.Date)
+                if (includedates)
                 {
-                    if (FirstPersonSummary)
-                    {
-                        sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}, the following events took place from {LLMSystem.Bot.Name}'s perspective: {Summary.RemoveNewLines()}");
-                    }
-                    else
+                    if (StartTime.Date == EndTime.Date)
                     {
                         sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}: {Summary.RemoveNewLines()}");
+                    }
+                    else 
+                    {
+                        sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}: {Summary.RemoveNewLines()}");
                     }
                 }
                 else
                 {
-                    if (FirstPersonSummary)
-                    {
-                        sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}, the following events took place from {LLMSystem.Bot.Name}'s perspective: {Summary.RemoveNewLines()}");
-                    }
-                    else
-                    {
-                        sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}: {Summary.RemoveNewLines()}");
-                    }
-
+                    sb.AppendLinuxLine($"{Title}: {Summary.RemoveNewLines()}");
                 }
             }
 
@@ -420,7 +418,7 @@ namespace AIToolkit.Files
                     continue;
                 var sb = new StringBuilder();
                 sb.AppendLinuxLine($"{sectionHeader} {session.Title}");
-                sb.AppendLinuxLine(session.GetRawMemory(true));
+                sb.AppendLinuxLine(session.GetRawMemory(false, LLMSystem.Bot.DatesInSessionSummaries));
                 var tks = LLMSystem.GetTokenCount(sb.ToString());
                 if (tks <= tokensleft)
                 {
@@ -582,7 +580,6 @@ namespace AIToolkit.Files
                     session.MetaData.Summary = sum;
                 var topics = await session.GetResearchTopics();
                 session.NewTopics = topics;
-                session.FirstPersonSummary = false;
             }
             else
             {

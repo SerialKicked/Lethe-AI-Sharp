@@ -21,23 +21,10 @@ namespace AIToolkit.Files
         public string SelfEditField { get; set; } = string.Empty;
         /// <summary> Character's default scenario (used by LLM) </summary>
         public string Scenario { get; set; } = string.Empty;
-        /// <summary> Character Notes (UI) </summary>
-        public string Notes { get; set; } = string.Empty;
         /// <summary> First message the character will send when starting a new session </summary>
         public List<string> FirstMessage { get; set; } = [];
         /// <summary> Examples of dialogs from the character to get a more consistent tone </summary>
         public List<string> ExampleDialogs { get; set; } = [];
-        /// <summary>
-        /// A list of whims that the character may have. 
-        /// These are used to determine the character's mood at the start of a session (or after long AFK periods). 
-        /// They can be used to influence the character's responses to create a more dynamic conversation.
-        /// </summary>
-        public List<string> Whims { get; set; } = [];
-        /// <summary>
-        /// The chance for a whim to change during the session. A percentage chance that the whim will change after each message pair.
-        /// If set to 0, the whim will only change at the start of a session, or after a long AFK period.
-        /// </summary>
-        public float WhimChangeRate { get; set; } = 0.05f;
         /// <summary> Custom system prompt for this character </summary>
         public string SystemPrompt { get; set; } = string.Empty;
         /// <summary> WorldInfo applied to this character </summary>
@@ -48,8 +35,14 @@ namespace AIToolkit.Files
         public bool SessionMemorySystem { get; set; } = false;
         /// <summary> If set to true, this bot will stay informed about the spacing between user messages </summary>
         public bool SenseOfTime { get; set; } = false;
-        /// <summary> If set above 0, this character will be allowed to write this amount of tokens in its system prompt. Altered each new session. </summary>
+        /// <summary> 
+        /// If set above 0, this character will be allowed to write this amount of tokens in its system prompt. Altered each new session. 
+        /// </summary>
         public int SelfEditTokens { get; set; } = 0;
+        /// <summary>
+        /// For better recall accuracy IRL dates are included in session summaries, however for roleplay characters, this might be counter productive. Set this to false to disable dates.
+        /// </summary>
+        public bool DatesInSessionSummaries { get; set; } = true;
 
         [JsonIgnore] public Brain Brain { get; set; } = new();
 
@@ -242,7 +235,7 @@ namespace AIToolkit.Files
             for (int i = History.Sessions.Count - 2; i >= 0; i--)
             {
                 var session = History.Sessions[i];
-                var details = session.GetRawMemory(true) + LLMSystem.NewLine;
+                var details = session.GetRawMemory(false, DatesInSessionSummaries) + LLMSystem.NewLine;
                 var size = LLMSystem.GetTokenCount(details);
                 availtks -= size;
                 maxcount--;
