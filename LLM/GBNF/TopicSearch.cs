@@ -19,7 +19,7 @@ namespace AIToolkit.GBNF
         [Description("The context or reason why this topic is of interest to {{char}}, {{user}}, or both.")]
         public string Reason { get; set; } = string.Empty;
         [Required]
-        [Description("Determine the level of urgency for this search. 1 = tangential curiosity, 2 = moderately relevant, 3 = important to the conversation and to both {{user}} and {{char}}'s interests.")]
+        [Description("Determine the level of urgency for this search, ranging from 1 = tangential curiosity to 10 = very important to the conversation and to both {{user}} and {{char}}'s interests.")]
         public int Urgency { get; set; } = 1;
         [Required]
         [MinLength(1)]
@@ -71,6 +71,20 @@ space ::= | " " | "\n"{1,2} [ \t]{0,20}
             }
             requestedTask = LLMSystem.ReplaceMacros(requestedTask);
             return requestedTask;
+        }
+
+        /// <summary>
+        /// Due to LLM bias, relevance is converted back to 1-3 value manually
+        /// </summary>
+        public void ClampRelevance()
+        {
+            foreach (var item in Unfamiliar_Topics)
+            {
+                int shifted = item.Urgency - 1;
+                // divide into 3 buckets
+                int bucket = (shifted - 1) / 3 + 1;
+                item.Urgency = Math.Clamp(bucket, 1, 3);
+            }
         }
     }
 }

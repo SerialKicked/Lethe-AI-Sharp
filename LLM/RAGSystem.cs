@@ -385,7 +385,6 @@ namespace AIToolkit.LLM
             return dot;
         }
 
-
         /// <summary>
         /// Utility: convert cosine similarity [-1,1] to cosine distance [0,2].
         /// </summary>
@@ -395,6 +394,23 @@ namespace AIToolkit.LLM
             if (d < 0f) return 0f;
             if (d > 2f) return 2f;
             return d;
+        }
+
+        public static float[] MergeEmbeddings(float[] titleembed, float[] sumembed, float titleweight = 0.2f, float summaryweight = 0.8f)
+        {
+
+            if (titleembed.Length != sumembed.Length)
+                throw new ArgumentException("Title and summary embeddings must have the same length.");
+
+            int dim = titleembed.Length;
+            float[] merged = new float[dim];
+
+            // weighted merge
+            for (int i = 0; i < dim; i++)
+            {
+                merged[i] = (titleweight * titleembed[i]) + (summaryweight * sumembed[i]);
+            }
+            return merged.EuclideanNormalization();
         }
 
         #endregion

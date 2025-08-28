@@ -116,6 +116,7 @@ namespace AIToolkit.Files
             }
             var finalstr = await LLMSystem.SimpleQuery(ct);
             session = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
+            session?.ClampRelevance();
             LLMSystem.NamesInPromptOverride = null;
             LLMSystem.Instruct.PrefillThinking = prefill;
             return session!;
@@ -164,6 +165,7 @@ namespace AIToolkit.Files
             }
             var finalstr = await LLMSystem.SimpleQuery(ct);
             session = JsonConvert.DeserializeObject<TopicLookup>(finalstr);
+            session?.ClampRelevance();
             LLMSystem.NamesInPromptOverride = null;
             LLMSystem.Instruct.PrefillThinking = prefill;
             return session!;
@@ -199,11 +201,9 @@ namespace AIToolkit.Files
         public async Task<string> GenerateNewSummary()
         {
          
-            var query = (LLMSystem.Bot.FirstPersonSummary) ?
-                "Identify the most important elements in the the exchange between {{user}} and {{char}} shown above and write a summary of this exchange. The summary must be written from {{char}}'s perspective. Do not introduce the characters. Do not add a title, just write the summary directly." :
-                "Write a detailed summary of the exchange between {{user}} and {{char}} shown above. Do not add a title, just write the summary directly.";
+            var query = "Write a detailed summary of the exchange between {{user}} and {{char}} shown above. Do not add a title, just write the summary directly.";
             
-            if (Messages.Count > 30)
+            if (Messages.Count > 40)
             {
                 query += " The summary should be 2 to 4 paragraphs long.";
             }
@@ -279,15 +279,7 @@ namespace AIToolkit.Files
             return finalstr.CleanupAndTrim();
         }
 
-        public async Task GenerateEmbeds()
-        {
-            if (!RAGSystem.Enabled)
-                return;
-            var titleembed = await RAGSystem.EmbeddingText(Title);
-            var sumembed = await RAGSystem.EmbeddingText(Summary);
 
-            EmbedSummary = MergeEmbeddings(titleembed, sumembed);
-        }
 
         public string GetRawDialogs(int maxTokens, bool ignoresystem, bool lightDialogs = false, bool showHidden = false)
         {
@@ -369,21 +361,14 @@ namespace AIToolkit.Files
             return sb.ToString();
         }
 
-        private float[] MergeEmbeddings(float[] titleembed, float[] sumembed, float titleweight = 0.2f, float summaryweight = 0.8f)
+        public async Task GenerateEmbeds()
         {
+            if (!RAGSystem.Enabled)
+                return;
+            var titleembed = await RAGSystem.EmbeddingText(Title);
+            var sumembed = await RAGSystem.EmbeddingText(Summary);
 
-            if (titleembed.Length != sumembed.Length)
-                throw new ArgumentException("Title and summary embeddings must have the same length.");
-
-            int dim = titleembed.Length;
-            float[] merged = new float[dim];
-
-            // weighted merge
-            for (int i = 0; i < dim; i++)
-            {
-                merged[i] = (titleweight * titleembed[i]) + (summaryweight * sumembed[i]);
-            }
-            return merged.EuclideanNormalization();
+            EmbedSummary = RAGSystem.MergeEmbeddings(titleembed, sumembed);
         }
     }
 
@@ -592,6 +577,9 @@ namespace AIToolkit.Files
             {
                 var meta = await session.GetSessionInfo();
                 session.MetaData = meta;
+                var sum = await session.GenerateNewSummary();
+                if (sum.Length > session.MetaData.Summary.Length)
+                    session.MetaData.Summary = sum;
                 var topics = await session.GetResearchTopics();
                 session.NewTopics = topics;
                 session.FirstPersonSummary = false;
@@ -600,7 +588,6 @@ namespace AIToolkit.Files
             {
                 var sum = await session.GenerateNewSummary();
                 session.MetaData.Summary = sum;
-                session.FirstPersonSummary = LLMSystem.Bot.FirstPersonSummary;
                 var kw = await session.GenerateKeywords();
                 session.MetaData.Keywords = [.. kw];
                 var goals = await session.GenerateGoals();

@@ -1,9 +1,10 @@
 ﻿using AIToolkit.LLM;
+using Newtonsoft.Json;
 using System.Runtime.CompilerServices;
 
 namespace AIToolkit.LLM
 {
-    public class LLMExtractableBase<T>
+    public abstract class LLMExtractableBase<T>
     {
         public virtual string GetQuery()
         {

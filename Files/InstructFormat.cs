@@ -1,6 +1,5 @@
 ﻿using AIToolkit.LLM;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Schema.Generation;
 using System;
 using System.Collections.Generic;
 using System.Linq;

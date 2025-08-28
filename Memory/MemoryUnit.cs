@@ -32,15 +32,15 @@ namespace AIToolkit.Memory
         public DateTime Added { get; set; } = DateTime.Now;
         public DateTime EndTime { get; set; } = DateTime.Now;
         public float[] EmbedSummary { get; set; } = [];
-        public float[] EmbedName { get; set; } = [];
 
         public int Priority { get; set; } = 1;
 
         public async Task EmbedText()
         {
-            EmbedSummary = await RAGSystem.EmbeddingText(Content);
-            if (!string.IsNullOrWhiteSpace(Name))
-                EmbedName = await RAGSystem.EmbeddingText(Name);
+            var titleembed = await RAGSystem.EmbeddingText(Name);
+            var sumembed = await RAGSystem.EmbeddingText(Content);
+
+            EmbedSummary = RAGSystem.MergeEmbeddings(titleembed, sumembed);
         }
 
         public string ToEureka()

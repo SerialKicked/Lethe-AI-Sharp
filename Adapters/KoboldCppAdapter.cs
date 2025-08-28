@@ -3,10 +3,11 @@ using AIToolkit.SearchAPI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema.Generation;
+using System;
 
 namespace AIToolkit.API
 {
-
+    
     /// <summary>
     /// Adapter for KoboldCpp backend
     /// </summary>
@@ -14,8 +15,8 @@ namespace AIToolkit.API
     {
         private readonly KoboldCppClient _client;
         private readonly HttpClient _httpClient;
-        private readonly JSchemaGenerator schemaGenerator = new();
         private readonly WebSearchAPI webSearchClient;
+        private readonly JSchemaGenerator schemaGenerator = new();
 
         public event EventHandler<LLMTokenStreamingEventArgs>? TokenReceived;
 
@@ -175,14 +176,18 @@ namespace AIToolkit.API
 
         public async Task<string> SchemaToGrammar(Type jsonclass)
         {
-            var schema = schemaGenerator.Generate(jsonclass);
-            var apiPayload = new GrammarQuery
+            // Using NewtonSoft
+            var schemanewton = schemaGenerator.Generate(jsonclass);
+            var jsonnewton = schemanewton.ToString(); // <- note it returns a json, it's not the default tostring.
+            var apiPayloadNewton = new GrammarQuery
             {
-                schema = JObject.Parse(schema.ToString())
+                schema = JObject.Parse(jsonnewton!)
             };
+            // works
+            var res = await _client.SchemaToGrammar(apiPayloadNewton);
 
-            //var finalJson = JsonConvert.SerializeObject(apiPayload, Formatting.Indented);
-            var res = await _client.SchemaToGrammar(apiPayload);
+            // I want to use NJsonSchema but it doesn't work because I'm fucking it up, fix.
+
             if (res.success)
             {
                 return res.result;

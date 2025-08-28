@@ -43,6 +43,12 @@ namespace AIToolkit
             (@"\byou are\b", "{{char}} is"),
             (@"\byou're\b", "{{char}} is"),
             (@"\byour\b", "{{char}}'s"),
+            (@"\byou have\b", "{{char}} has"),
+            (@"\byou've\b", "{{char}} has"),
+            (@"\byou'd\b", "{{char}} would"),
+            (@"\byou feel\b", "{{char}} feels"),
+            (@"\byou think\b", "{{char}} thinks"),
+            (@"\byou want\b", "{{char}} wants"),
 
             // Optional first-person plural
             (@"\bus\b", "{{user}} and {{char}}"),

@@ -43,6 +43,68 @@ namespace AIToolkit.Memory
     }
 
 
+    public class MoodState
+    {
+        public double Energy = 0.5;   // 0 = tired, 1 = excitable
+        public double Cheer = 0.5;   // 0 = moody, 1 = joyful
+        public double Curiosity = 0.5; // 0 = disinterested, 1 = curious
+
+        public void Update()
+        {
+            // Natural decay towards neutral state (0.5)
+            Energy += (0.5 - Energy) * 0.005;
+            Cheer += (0.5 - Cheer) * 0.005;
+            Curiosity += (0.5 - Curiosity) * 0.005;
+
+            // Special cases based on time since last message exchanged
+            var msg = LLMSystem.History.LastMessage();
+            if (msg != null)
+            {
+                var timeSinceLast = (DateTime.Now - msg.Date);
+                if (timeSinceLast >= TimeSpan.FromDays(15))
+                {
+                    // Long gap increase energy and curiosity
+                    Energy = 0.5;
+                    Curiosity = 1;
+                    Cheer -= 0.05 * timeSinceLast.TotalDays;
+                }
+                else if (timeSinceLast > TimeSpan.FromDays(1))
+                {
+                    // Recent interaction increases cheer
+                    Energy += 0.2 * timeSinceLast.TotalDays;
+                    Curiosity += 0.02 * timeSinceLast.TotalDays;
+                }
+            }
+
+            // Clamp values between 0 and 1
+            Energy = Math.Clamp(Energy, 0, 1);
+            Cheer = Math.Clamp(Cheer, 0, 1);
+            Curiosity = Math.Clamp(Curiosity, 0, 1);
+        }
+
+        public string Describe()
+        {
+            var sb = new StringBuilder("{{char}} is currently feeling");
+            if (Energy < 0.35)
+                sb.Append(" tired");
+            else if (Energy > 0.65)
+                sb.Append(" energetic");
+            else
+                sb.Append(" neutral in energy");
+            if (Cheer < 0.35)
+                sb.Append(", moody");
+            else if (Cheer > 0.65)
+                sb.Append(", joyful");
+            if (Curiosity < 0.25)
+                sb.Append(", disinterested");
+            else if (Curiosity > 0.65)
+                sb.Append(", curious");
+            sb.Append(".");
+            return sb.ToString();
+        }
+    }
+
+
     public class Brain
     {
         public TimeSpan MinInsertDelay { get; set; } = TimeSpan.FromMinutes(15);
@@ -52,6 +114,7 @@ namespace AIToolkit.Memory
         public int CurrentDelay = 0;
         public List<MemoryUnit> Memories { get; set; } = [];
 
+        public MoodState Mood { get; set; } = new MoodState();
 
         [JsonIgnore] public Queue<MemoryUnit> Eurekas { get; set; } = [];
 
@@ -66,6 +129,15 @@ namespace AIToolkit.Memory
                                 .OrderByDescending(m => m.Added).ToList();
             foreach (var item in recent)
                 Eurekas.Enqueue(item);
+            Mood.Update();
+        }
+
+        public async Task RegenEmbeds()
+        {
+            foreach (var mem in Memories)
+            {
+                await mem.EmbedText();
+            }
         }
 
         public void OnUserPost(string userinput)

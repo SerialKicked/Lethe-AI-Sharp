@@ -48,7 +48,6 @@ namespace AIToolkit.Files
         public bool SessionMemorySystem { get; set; } = false;
         /// <summary> If set to true, this bot will stay informed about the spacing between user messages </summary>
         public bool SenseOfTime { get; set; } = false;
-        public bool FirstPersonSummary { get; set; } = true;
         /// <summary> If set above 0, this character will be allowed to write this amount of tokens in its system prompt. Altered each new session. </summary>
         public int SelfEditTokens { get; set; } = 0;
 
