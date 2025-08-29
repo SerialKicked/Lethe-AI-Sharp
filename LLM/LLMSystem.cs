@@ -499,7 +499,7 @@ namespace AIToolkit.LLM
             {
                 if (session.Sticky && session != History.CurrentSession)
                 {
-                    var rawmem = session.GetRawMemory(Settings.MarkdownMemoryFormating, Bot.DatesInSessionSummaries);
+                    var rawmem = session.GetRawMemory(true, Bot.DatesInSessionSummaries);
                     dataInserts.AddInsert(new PromptInsert(session.Guid, rawmem, Settings.RAGIndex, 1));
                 }
             }

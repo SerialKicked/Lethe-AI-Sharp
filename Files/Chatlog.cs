@@ -318,42 +318,27 @@ namespace AIToolkit.Files
             return sb.ToString();
         }
 
-        public string GetRawMemory(bool markdown, bool includedates)
+        public string GetRawMemory(bool withtitle, bool includedates)
         {
             var sb = new StringBuilder();
-            if (markdown)
+            if (withtitle)
             {
-                if (includedates)
+                sb.Append($"{Title.RemoveNewLines()}: ");
+            }   
+            if (includedates)
+            {
+                if (StartTime.Date == EndTime.Date)
                 {
-                    sb.AppendLinuxLine("# " + Title.Trim());
-                    if (StartTime.Date == EndTime.Date)
-                        sb.AppendLinuxLine("## Date: " + StartTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(StartTime));
-                    else
-                        sb.AppendLinuxLine("## Date: " + StartTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(StartTime) + " to " + EndTime.DayOfWeek.ToString() + " " + StringExtensions.DateToHumanString(EndTime));
-                    sb.AppendLinuxLine("## Memory: " + Summary.RemoveNewLines());
+                    sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}: {Summary.RemoveNewLines()}");
                 }
-                else
+                else 
                 {
-                    sb.AppendLinuxLine($"## {Title}:").AppendLinuxLine($"{Summary.RemoveNewLines()}");
+                    sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}: {Summary.RemoveNewLines()}");
                 }
             }
             else
             {
-                if (includedates)
-                {
-                    if (StartTime.Date == EndTime.Date)
-                    {
-                        sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}: {Summary.RemoveNewLines()}");
-                    }
-                    else 
-                    {
-                        sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}: {Summary.RemoveNewLines()}");
-                    }
-                }
-                else
-                {
-                    sb.AppendLinuxLine($"{Title}: {Summary.RemoveNewLines()}");
-                }
+                sb.AppendLinuxLine($"{Summary.RemoveNewLines()}");
             }
 
             return sb.ToString();

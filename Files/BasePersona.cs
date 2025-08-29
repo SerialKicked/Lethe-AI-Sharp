@@ -235,7 +235,7 @@ namespace AIToolkit.Files
             for (int i = History.Sessions.Count - 2; i >= 0; i--)
             {
                 var session = History.Sessions[i];
-                var details = session.GetRawMemory(false, DatesInSessionSummaries) + LLMSystem.NewLine;
+                var details = session.GetRawMemory(true, DatesInSessionSummaries) + LLMSystem.NewLine;
                 var size = LLMSystem.GetTokenCount(details);
                 availtks -= size;
                 maxcount--;

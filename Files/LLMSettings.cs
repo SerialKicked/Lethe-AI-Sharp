@@ -28,9 +28,6 @@ namespace AIToolkit.Files
         /// <summary> Overrides the scenario field of the currently loaded character </summary>
         public string ScenarioOverride { get; set; } = string.Empty;
 
-        /// <summary> Should the prompt format the memories and RAG entries into markdown. Some models like it better than others. </summary>
-        public bool MarkdownMemoryFormating { get; set; } = false;
-
         /// <summary> Should we stop the generation after the first paragraph? </summary>
         public bool StopGenerationOnFirstParagraph { get; set; } = false;
 
