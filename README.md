@@ -33,6 +33,10 @@ It includes easy-to-use (and easy to build upon) systems to handle most of the o
 - Basic support for VLM (visual language models) depending on the backend
 - Background Agent system (bot can run tasks in the background)
 
+## Usage and Documentations
+
+Check the `Docs/` folder for detailed instructions on how to use this library. The [LLM system docs](Docs/LLMSYSTEM.md) to get you started. You can go further with this doc about [Extending the Chatlog and Persona](Docs/LLMSYSTEM.md) functionalities.
+
 ## Third Party Libraries
 
 *AI Toolkit* relies on the following libraries and tools to work.
