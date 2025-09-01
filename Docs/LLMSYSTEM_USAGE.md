@@ -94,6 +94,14 @@ BasePersona user = LLMSystem.User;
 LLMSystem.Bot.Name = "Assistant";
 LLMSystem.Bot.Bio = "A helpful AI assistant";
 LLMSystem.User.Name = "John";
+
+// Load multiple personas at once
+var personas = new List<BasePersona>
+{
+    new BasePersona { Name = "Doctor", Bio = "A medical professional", UniqueName = "doc01" },
+    new BasePersona { Name = "Assistant", Bio = "A helpful AI", UniqueName = "ai01" }
+};
+LLMSystem.LoadPersona(personas);
 ```
 
 ### Chat History
@@ -157,13 +165,21 @@ string response = await LLMSystem.QuickInferenceForSystemPrompt(
 
 ### Token Management
 
+Token usage is automatically handled by the library based on the `MaxContextLength` value retrieved during the `Connect()` function. Manual token management is primarily useful for custom queries or when you need precise control:
+
 ```csharp
-// Count tokens in text
+// Count tokens in text (mainly for custom queries)
 int tokenCount = LLMSystem.GetTokenCount("Your text here");
 
-// Check context limits
+// Check context limits (automatically managed for regular operations)
 int maxTokens = LLMSystem.MaxContextLength;
 Console.WriteLine($"Max context: {maxTokens} tokens");
+
+// Custom validation before sending non-standard queries
+if (tokenCount > maxTokens - LLMSystem.Settings.MaxReplyLength)
+{
+    Console.WriteLine("Custom query too long for context window");
+}
 ```
 
 ### Cancelling Generation
@@ -454,12 +470,14 @@ if (LLMSystem.Status != SystemStatus.Ready)
 
 ### Token Limit Handling
 
+Token limits are automatically managed for regular chat operations. Manual checking is useful for custom queries:
+
 ```csharp
-// Monitor token usage
-int tokenCount = LLMSystem.GetTokenCount(yourText);
+// Monitor token usage for custom queries (automatic for regular chat)
+int tokenCount = LLMSystem.GetTokenCount(yourCustomText);
 if (tokenCount > LLMSystem.MaxContextLength - LLMSystem.Settings.MaxReplyLength)
 {
-    Console.WriteLine("Text too long for context window");
+    Console.WriteLine("Custom text too long for context window");
     // Consider shortening the text or using summarization
 }
 ```
@@ -625,7 +643,7 @@ Console.WriteLine($"Web Search Support: {LLMSystem.SupportsWebSearch}");
 ### Performance Tips
 
 1. **Use appropriate context lengths** - Don't set MaxContextLength higher than needed
-2. **Monitor token usage** - Use `GetTokenCount()` to avoid context overflow
+2. **Monitor token usage for custom queries** - Use `GetTokenCount()` for custom text (automatic for regular chat)
 3. **Use RAG wisely** - Enable only when you need historical context
 4. **Batch similar operations** - Use `QuickInferenceForSystemPrompt` for non-chat queries
 5. **Handle events efficiently** - Avoid heavy processing in event handlers
@@ -641,7 +659,7 @@ The `LLMSystem` static class provides a comprehensive interface for working with
 3. **Configure settings** appropriate for your use case (context length, sampling, etc.)
 4. **Enable RAG** for better context awareness in longer conversations
 5. **Handle errors gracefully** with try-catch blocks and status checks
-6. **Monitor token usage** to avoid context overflow
+6. **Monitor token usage for custom queries** (automatic for regular chat operations)
 7. **Use appropriate backends** based on your feature requirements
 
 For additional features and advanced use cases, refer to the source code and other documentation files in this repository, particularly:
