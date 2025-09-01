@@ -45,6 +45,7 @@ if (LLMSystem.Status == SystemStatus.Ready)
 }
 ```
 
+
 ### Supported Backends
 
 **KoboldAPI** (Recommended - Full Features)
@@ -95,7 +96,8 @@ LLMSystem.Bot.Name = "Assistant";
 LLMSystem.Bot.Bio = "A helpful AI assistant";
 LLMSystem.User.Name = "John";
 
-// Load multiple personas at once
+// Load multiple personas at once. This allows the system to correctly identify personas that aren't currently 
+// loaded in LLMSystem.Bot and LLMSystem.User, for example when loading chat history with different personas.
 var personas = new List<BasePersona>
 {
     new BasePersona { Name = "Doctor", Bio = "A medical professional", UniqueName = "doc01" },
@@ -104,12 +106,15 @@ var personas = new List<BasePersona>
 LLMSystem.LoadPersona(personas);
 ```
 
+It's a good principle for the app, to manage / store the personas as files, 
+and load them into the LLMSystem via LoadPersonas() when the app starts.
+
 ### Chat History
 
 The chat history is automatically managed:
 
 ```csharp
-// Access chat history
+// Access the currently loaded bot's chat history -> this is a shortcut to LLMSystem.Bot.History
 Chatlog history = LLMSystem.History;
 
 // Get message count
@@ -288,6 +293,8 @@ Available macros:
 
 ### LLM Settings
 
+All the settings can be accessed and modified via the `LLMSettings` object:
+
 ```csharp
 // Access settings object
 LLMSettings settings = LLMSystem.Settings;
@@ -318,6 +325,23 @@ settings.AllowWorldInfo = true;                     // Enable world info/keyword
 settings.ScenarioOverride = "";        // Override character scenario
 settings.DisableThinking = false;     // Disable thinking for thinking models
 ```
+
+You can override LLMSettings so your app and the DLL settings are in the same class. 
+It's recommended to load and save these settings to a file. 
+
+In that case, you can do something like this (this is pseudo code):
+
+```csharp
+// Load settings from file (on app start)
+LLMSystem.Settings = YourAppSettings.Load("settings.json");
+// Connect to backend (without having to set up everything again)
+await LLMSystem.Connect();
+// Your app can now use LLMSystem
+...
+// Save settings to file
+YourAppSettings.Save("settings.json", LLMSystem.Settings);
+```
+
 
 ### Instruction Format
 
