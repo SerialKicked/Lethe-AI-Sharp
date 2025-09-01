@@ -7,6 +7,12 @@ namespace AIToolkit.Agent
     {
         void Start();
         void Stop();
+        void RegisterPlugin(string id, IAgentPlugin plugin);
+        void RegisterPlugin(string id, Func<IAgentPlugin> factory);
+        void UnregisterPlugin(string id);
+        IReadOnlyList<string> GetRegisteredPluginIds();
+        void EnablePlugin(string id);
+        void DisablePlugin(string id);
     }
 
     public sealed class AgentRuntime : IAgentRuntime, IDisposable
@@ -16,6 +22,7 @@ namespace AIToolkit.Agent
 
         private readonly CancellationTokenSource _cts = new();
         private readonly List<IAgentPlugin> _plugins = [];
+        private readonly Dictionary<string, Func<IAgentPlugin>> _pluginRegistry = [];
         private Task? _loop;
         private readonly Lock _queueLock = new();
         private AgentConfig _config = null!;
@@ -26,6 +33,63 @@ namespace AIToolkit.Agent
         private volatile bool _running;
 
         private AgentRuntime() { }
+
+        public void RegisterPlugin(string id, IAgentPlugin plugin)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new ArgumentException("Plugin ID cannot be null or empty", nameof(id));
+            if (plugin == null)
+                throw new ArgumentNullException(nameof(plugin));
+
+            _pluginRegistry[id] = () => plugin;
+        }
+
+        public void RegisterPlugin(string id, Func<IAgentPlugin> factory)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new ArgumentException("Plugin ID cannot be null or empty", nameof(id));
+            if (factory == null)
+                throw new ArgumentNullException(nameof(factory));
+
+            _pluginRegistry[id] = factory;
+        }
+
+        public void UnregisterPlugin(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return;
+
+            _pluginRegistry.Remove(id);
+        }
+
+        public IReadOnlyList<string> GetRegisteredPluginIds()
+        {
+            return _pluginRegistry.Keys.ToList().AsReadOnly();
+        }
+
+        public void EnablePlugin(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return;
+
+            if (_config != null && !_config.Plugins.Contains(id))
+            {
+                var plugins = _config.Plugins.ToList();
+                plugins.Add(id);
+                _config.Plugins = plugins.ToArray();
+            }
+        }
+
+        public void DisablePlugin(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return;
+
+            if (_config != null && _config.Plugins.Contains(id))
+            {
+                _config.Plugins = _config.Plugins.Where(p => p != id).ToArray();
+            }
+        }
 
         public void Start()
         {
@@ -55,9 +119,25 @@ namespace AIToolkit.Agent
         private void LoadPlugins()
         {
             _plugins.Clear();
-            // TODO: More Plugins go here!
+            
             foreach (var id in _config.Plugins.Distinct())
             {
+                // First try to load from plugin registry
+                if (_pluginRegistry.TryGetValue(id, out var factory))
+                {
+                    try
+                    {
+                        var plugin = factory();
+                        _plugins.Add(plugin);
+                        continue;
+                    }
+                    catch
+                    {
+                        // If factory fails, fall through to hardcoded plugins
+                    }
+                }
+
+                // Fall back to hardcoded plugins for backward compatibility
                 switch (id)
                 {
                     case "CoreReflection":
