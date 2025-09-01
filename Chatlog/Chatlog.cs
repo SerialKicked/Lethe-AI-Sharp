@@ -29,7 +29,7 @@ namespace AIToolkit.Files
             {
                 if (Sessions.Count == 0)
                 {
-                    Sessions.Add(new ChatSession());
+                    Sessions.Add(CreateChatSession());
                     CurrentSessionID = 0;
                     return Sessions[0];
                 }
@@ -40,6 +40,15 @@ namespace AIToolkit.Files
         [JsonIgnore] public EventHandler<SingleMessage>? OnMessageAdded;
 
         private void RaiseOnMessageAdded(SingleMessage message) => OnMessageAdded?.Invoke(this, message);
+
+        /// <summary>
+        /// Factory method for creating ChatSession instances. Override this in derived classes to provide custom ChatSession implementations.
+        /// </summary>
+        /// <returns>A new ChatSession instance</returns>
+        protected virtual ChatSession CreateChatSession()
+        {
+            return new ChatSession();
+        }
 
         public string GetPreviousSummaries(int maxTokens, string sectionHeader = "##", bool allowRP = true)
         {
@@ -135,7 +144,7 @@ namespace AIToolkit.Files
         public SingleMessage LogMessage(AuthorRole role, string msg, BasePersona user, BasePersona bot)
         {
             if (Sessions.Count == 0)
-                Sessions.Add(new ChatSession());
+                Sessions.Add(CreateChatSession());
 
             // Remove thinking block if any
             var stringfix = msg;
@@ -156,7 +165,7 @@ namespace AIToolkit.Files
         public SingleMessage LogMessage(SingleMessage single)
         {
             if (Sessions.Count == 0)
-                Sessions.Add(new ChatSession());
+                Sessions.Add(CreateChatSession());
             CurrentSession.Messages.Add(single);
             RaiseOnMessageAdded(single);
             EventBus.Publish(new MessageAddedEvent(single.Guid, single.Role == AuthorRole.User, single.Date));
@@ -212,11 +221,8 @@ namespace AIToolkit.Files
                 // reset session ID
                 CurrentSessionID = -1;
                 // Create new session
-                var newsession = new ChatSession()
-                {
-                    Enabled = false,
-
-                };
+                var newsession = CreateChatSession();
+                newsession.Enabled = false;
                 Sessions.Add(newsession);
             }
             else
@@ -276,7 +282,7 @@ namespace AIToolkit.Files
             // I want to check if msg.Message starts with "*We're " followed by a number to consider it as a new session
             string pattern = @"^\*We're \d+";
             // iterate through Messages, and divide them into sessions by checking the time between messages or the presence of a sentence starting by "*We're [number]" or a "Hello" message from user
-            var currentsession = new ChatSession();
+            var currentsession = CreateChatSession();
             var lastmsg = Messages.First();
             currentsession.StartTime = lastmsg.Date;
             currentsession.Messages.Add(lastmsg);
@@ -298,7 +304,7 @@ namespace AIToolkit.Files
                     currentsession.EndTime = lastmsg.Date;
                     if (currentsession.Messages.Count > 0)
                         Sessions.Add(currentsession);
-                    currentsession = new ChatSession();
+                    currentsession = CreateChatSession();
                     sessionmsgcount = 0;
                     currentsession.StartTime = msg.Date;
                 }

@@ -48,6 +48,24 @@ namespace AIToolkit.Files
 
         [JsonIgnore] public List<WorldInfo> MyWorlds { get; protected set; } = [];
         [JsonIgnore] public Chatlog History { get; protected set; } = new();
+        
+        /// <summary>
+        /// Factory method for creating Chatlog instances. Override this in derived classes to provide custom Chatlog implementations.
+        /// </summary>
+        /// <returns>A new Chatlog instance</returns>
+        protected virtual Chatlog CreateChatlog()
+        {
+            return new Chatlog();
+        }
+        
+        /// <summary>
+        /// Factory method for creating ChatSession instances. Override this in derived classes to provide custom ChatSession implementations.
+        /// </summary>
+        /// <returns>A new ChatSession instance</returns>
+        protected virtual ChatSession CreateChatSession()
+        {
+            return new ChatSession();
+        }
         public string GetBio(string othername)
         {
             if (IsUser)
@@ -118,11 +136,11 @@ namespace AIToolkit.Files
         {
             if (string.IsNullOrEmpty(UniqueName))
             {
-                History = new Chatlog();
+                History = CreateChatlog();
                 return;
             }
             var f = path + UniqueName + ".json";
-            History = File.Exists(f) ? JsonConvert.DeserializeObject<Chatlog>(File.ReadAllText(f))! : new Chatlog();
+            History = File.Exists(f) ? JsonConvert.DeserializeObject<Chatlog>(File.ReadAllText(f))! : CreateChatlog();
         }
 
         public void ClearChatHistory(string path, bool deletefile = true)
