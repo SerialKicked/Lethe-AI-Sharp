@@ -4,12 +4,14 @@ This is a C# based repository for a middleware DLL used between a LLM backend an
 
 ### Base Requirements
 - Never change the target platform or NET version
+- Documentation must be in English and go in the Docs/ folder
 
 ## Repository Structure
 - `Adapters/`: Handles the communication between the backend server and the DLL
 - `Agent/`: Background agent system (run tasks in the background while the user is not active)
 - `API/`: Core clients for the various backends
 - `Chatlog/`: All classes related to the chat log (log itself, sessions, individual messages)
+- `Docs/`: Documentation files
 - `Files/`: Main file formats used to communicate with the LLM some of which (like LLMSettings and BasePersona) are intended to serve as virtual class to be built upon by the actual application
 - `LLM/`: Core functionalities like LLM communications and RAG functionalities
 - `Memory/`: Work in progress unified long term memory system
