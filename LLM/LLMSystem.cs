@@ -321,7 +321,8 @@ namespace AIToolkit.LLM
             // if first time interaction, display welcome message from bot
             if (History.Sessions.Count == 0)
             {
-                History.Sessions.Add(new ChatSession());
+                // Access CurrentSession to trigger automatic session creation via factory method
+                _ = History.CurrentSession;
             }
             if (History.CurrentSession.Messages.Count == 0 && History.Sessions.Count == 1)
             {
