@@ -164,7 +164,7 @@ namespace AIToolkit.LLM
 
         private static readonly SemaphoreSlim ModelSemaphore = new(1, 1);
 
-        public sealed class ModelSlotGuard : IDisposable
+        internal sealed class ModelSlotGuard : IDisposable
         {
             private bool _disposed;
             public void Dispose()
@@ -175,13 +175,13 @@ namespace AIToolkit.LLM
             }
         }
 
-        public static async Task<ModelSlotGuard> AcquireModelSlotAsync(CancellationToken ct)
+        internal static async Task<ModelSlotGuard> AcquireModelSlotAsync(CancellationToken ct)
         {
             await ModelSemaphore.WaitAsync(ct);
             return new ModelSlotGuard();
         }
 
-        public static async Task<ModelSlotGuard?> TryAcquireModelSlotAsync(TimeSpan timeout, CancellationToken ct)
+        internal static async Task<ModelSlotGuard?> TryAcquireModelSlotAsync(TimeSpan timeout, CancellationToken ct)
         {
             var ok = await ModelSemaphore.WaitAsync(timeout, ct).ConfigureAwait(false);
             return ok ? new ModelSlotGuard() : null;
@@ -211,6 +211,10 @@ namespace AIToolkit.LLM
             Status = SystemStatus.Ready;
         }
 
+        /// <summary>
+        /// Preload personas available in the application, so the system can interpret chatlogs from personas that aren't the currently loaded ones.
+        /// </summary>
+        /// <param name="toload"></param>
         public static void LoadPersona(List<BasePersona> toload)
         {
             LoadedPersonas = [];
@@ -254,6 +258,11 @@ namespace AIToolkit.LLM
             }
         }
 
+        /// <summary>
+        /// Replaces the macros in a string with the actual values. Assumes the current user and bot.
+        /// </summary>
+        /// <param name="inputText"></param>
+        /// <returns></returns>
         public static string ReplaceMacros(string inputText)
         {
             return ReplaceMacros(inputText, User, Bot);
@@ -353,26 +362,12 @@ namespace AIToolkit.LLM
             }
         }
 
-        public static bool CancelGeneration()
-        {
-            if (Client == null)
-                return true;
-            try
-            {
-                var mparams = new GenkeyData() { };
-                var success = Client.AbortGenerationSync();
-                if (success)
-                    Status = SystemStatus.Ready;
-                return success;
-            }
-            catch (Exception ex)
-            {
-                //MessageBox.Show($"An error occured while counting tokens, estimate used instead. {ex.Message}");
-                logger?.LogError(ex, "Failed to cancel generation");
-                return false;
-            }
-        }
-
+        /// <summary>
+        /// Sets up the backend connection settings and initializes the system.
+        /// </summary>
+        /// <param name="url"></param>
+        /// <param name="backend"></param>
+        /// <param name="key"></param>
         public static void Setup(string url, BackendAPI backend, string? key = null)
         {
             Status = SystemStatus.NotInit;
@@ -589,6 +584,10 @@ namespace AIToolkit.LLM
             return new Message(TokenTools.InternalRoleToChatRole(role), ReplaceMacros(realprompt, user, bot), selname);
         }
 
+        /// <summary>
+        /// Asks the model to generate a message from the bot and logs it to the chat history. Response done through the OnInferenceStreamed and OnInferenceEnded events.
+        /// </summary>
+        /// <returns></returns>
         public static async Task AddBotMessage()
         {
             if (Status == SystemStatus.Busy)
@@ -596,6 +595,10 @@ namespace AIToolkit.LLM
             await StartGeneration(AuthorRole.Assistant, string.Empty);
         }
 
+        /// <summary>
+        /// Ask the model to impersonate the user and logs it to the chat history. Response done through the OnInferenceStreamed and OnInferenceEnded events.
+        /// </summary>
+        /// <returns></returns>
         public static async Task ImpersonateUser()
         {
             if (Status == SystemStatus.Busy)
@@ -604,7 +607,7 @@ namespace AIToolkit.LLM
         }
 
         /// <summary>
-        /// Sends a message to the bot and logs it to the chat history. Response done through the RaiseOnInferenceStreamed and OnInferenceEnded events.
+        /// Sends a message to the bot and logs it to the chat history. Response done through the OnInferenceStreamed and OnInferenceEnded events.
         /// </summary>
         /// <param name="MsgSender"></param>
         /// <param name="userInput"></param>
@@ -618,7 +621,7 @@ namespace AIToolkit.LLM
         }
 
         /// <summary>
-        /// Sends a message to the bot and logs it to the chat history. Response done through the RaiseOnInferenceStreamed and OnInferenceEnded events.
+        /// Sends a message to the bot and logs it to the chat history. Response done through the OnInferenceStreamed and OnInferenceEnded events.
         /// </summary>
         /// <param name="MsgSender"></param>
         /// <param name="userInput"></param>
@@ -657,6 +660,30 @@ namespace AIToolkit.LLM
                 }
                 RaiseOnFullPromptReady(PromptBuilder.PromptToText());
                 await Client.GenerateTextStreaming(PromptBuilder.PromptToQuery(AuthorRole.Assistant));
+            }
+        }
+
+        /// <summary>
+        /// Cancel the current generation
+        /// </summary>
+        /// <returns></returns>
+        public static bool CancelGeneration()
+        {
+            if (Client == null)
+                return true;
+            try
+            {
+                var mparams = new GenkeyData() { };
+                var success = Client.AbortGenerationSync();
+                if (success)
+                    Status = SystemStatus.Ready;
+                return success;
+            }
+            catch (Exception ex)
+            {
+                //MessageBox.Show($"An error occured while counting tokens, estimate used instead. {ex.Message}");
+                logger?.LogError(ex, "Failed to cancel generation");
+                return false;
             }
         }
 
@@ -777,6 +804,9 @@ namespace AIToolkit.LLM
             return ReplaceMacros(msgtxt);
         }
 
+        /// <summary>
+        /// Called to clear the prompt cache and force a rebuild of the prompt on next generation. Must be called when changing any setting that affects the prompt.
+        /// </summary>
         public static void InvalidatePromptCache()
         {
             PromptBuilder?.ResetPrompt();
@@ -784,6 +814,11 @@ namespace AIToolkit.LLM
             usedGuidInSession.Clear();
         }
 
+        /// <summary>
+        /// Submit a chatlog, get a response from the LLM. No text streaming.
+        /// </summary>
+        /// <param name="chatlog">GenerationInput for Text Completion API or ChatRequest for Chat Completion API. Use Promptbuilder to generate proper class for the currently loaded API automatically.</param>
+        /// <returns>LLM's Response</returns>
         public static async Task<string> SimpleQuery(object chatlog)
         {
             if (Client == null)
@@ -797,6 +832,11 @@ namespace AIToolkit.LLM
             return string.IsNullOrEmpty(result) ? string.Empty : result;
         }
 
+        /// <summary>
+        /// Performs a web search using the backend's web search capabilities.
+        /// </summary>
+        /// <param name="query"></param>
+        /// <returns></returns>
         public static async Task<List<EnrichedSearchResult>> WebSearch(string query)
         {
             if (Client == null || !SupportsWebSearch)
@@ -811,6 +851,12 @@ namespace AIToolkit.LLM
             return webres;
         }
 
+        /// <summary>
+        /// Generates speech audio from text using the backend's TTS capabilities (if available).
+        /// </summary>
+        /// <param name="input">text to convert into audio</param>
+        /// <param name="voiceID">Voice ID for the TTS model</param>
+        /// <returns>byte array of audio data (can be loaded into memory stream and played with SoundPlayer)</returns>
         public static async Task<byte[]> GenerateTTS(string input, string voiceID)
         {
             // female: "Tina", "super chariot of death", "super chariot in death"
@@ -824,23 +870,38 @@ namespace AIToolkit.LLM
             return audioData;
         }
 
+        /// <summary>
+        /// Clears the quick inference event handler.
+        /// </summary>
         public static void RemoveQuickInferenceEventHandler()
         {
             OnQuickInferenceEnded = null;
         }
 
-        #region *** Visual Language Model Management ***
+        #region *** Visual Language Model Management (for supported API) ***
 
+        /// <summary>
+        /// Clears the list of images to be sent to the backend.
+        /// </summary>
         public static void VLM_ClearImages()
         {
             vlm_pictures = [];
         }
 
+        /// <summary>
+        /// Provide a base64 encoded image to be sent to the backend with the next prompt.
+        /// </summary>
+        /// <param name="base64"></param>
         public static void VLM_AddB64Image(string base64)
         {
             vlm_pictures.Add(base64);
         }
 
+        /// <summary>
+        /// Provide an image to be sent to the backend with the next prompt. The image will be resized to fit within the specified size (default 1024px).
+        /// </summary>
+        /// <param name="image">image</param>
+        /// <param name="size">dimension</param>
         public static void VLM_AddImage(Image image, int size = 1024)
         {
             var res = ImageUtils.ImageToBase64(image, size);
