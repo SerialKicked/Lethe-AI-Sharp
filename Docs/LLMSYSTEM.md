@@ -16,8 +16,8 @@ LLMSystem handles:
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   LLMSystem     │    │  ILLMServiceClient │   │   BasePersona   │
-│                 │◄───┤                 │    │                 │
+│   LLMSystem     │    │  ILLMService... │    │   BasePersona   │
+│                 │◄───┤       ...Client │    │                 │
 │  - Setup()      │    │  - KoboldAPI    │    │  - Bot          │
 │  - Connect()    │    │  - OpenAI       │    │  - User         │
 │  - SendMessage()│    └─────────────────┘    └─────────────────┘
