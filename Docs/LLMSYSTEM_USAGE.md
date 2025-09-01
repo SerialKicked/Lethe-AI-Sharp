@@ -632,4 +632,19 @@ Console.WriteLine($"Web Search Support: {LLMSystem.SupportsWebSearch}");
 
 ---
 
-This documentation covers the essential aspects of using the LLMSystem. For additional features and advanced use cases, refer to the source code and other documentation files in this repository.
+## Summary
+
+The `LLMSystem` static class provides a comprehensive interface for working with Large Language Models in C#. Key points to remember:
+
+1. **Always check `LLMSystem.Status`** before sending messages
+2. **Use event handlers** for streaming responses and status updates
+3. **Configure settings** appropriate for your use case (context length, sampling, etc.)
+4. **Enable RAG** for better context awareness in longer conversations
+5. **Handle errors gracefully** with try-catch blocks and status checks
+6. **Monitor token usage** to avoid context overflow
+7. **Use appropriate backends** based on your feature requirements
+
+For additional features and advanced use cases, refer to the source code and other documentation files in this repository, particularly:
+- `EXTENSIBILITY.md` - For extending the system with custom classes
+- `AGENT_SYSTEM.md` - For background agent functionality  
+- `IMPLEMENTATION_SUMMARY.md` - For technical implementation details
