@@ -84,15 +84,15 @@ namespace AIToolkit.Tests
         {
             Console.WriteLine("=== Macro Replacement Test ===");
             
-            var user = new BasePersona { IsUser = true, Name = "TestUser", Bio = "A test user." };
-            var bot1 = new BasePersona { IsUser = false, Name = "Bot1", Bio = "First test bot." };
-            var bot2 = new BasePersona { IsUser = false, Name = "Bot2", Bio = "Second test bot." };
+            var user = new BasePersona { IsUser = true, Name = "TestUser", UniqueName = "user1", Bio = "A test user." };
+            var bot1 = new BasePersona { IsUser = false, Name = "Bot1", UniqueName = "bot1", Bio = "First test bot." };
+            var bot2 = new BasePersona { IsUser = false, Name = "Bot2", UniqueName = "bot2", Bio = "Second test bot." };
             
             LLMSystem.LoadPersona([user, bot1, bot2]);
             
             var group = new GroupPersona();
-            group.AddBot("Bot1");
-            group.AddBot("Bot2");
+            group.AddBot("bot1");
+            group.AddBot("bot2");
             
             var testCases = new[]
             {
@@ -110,6 +110,53 @@ namespace AIToolkit.Tests
             }
             
             Console.WriteLine("=== Macro Test Completed ===");
+        }
+
+        public static void TestBackwardCompatibility()
+        {
+            Console.WriteLine("=== Backward Compatibility Test ===");
+
+            // Create standard 1:1 setup
+            var user = new BasePersona { IsUser = true, Name = "User", UniqueName = "user1", Bio = "A user." };
+            var bot = new BasePersona { IsUser = false, Name = "Bot", UniqueName = "bot1", Bio = "A helpful assistant." };
+
+            LLMSystem.LoadPersona([user, bot]);
+
+            // Test standard macro replacement
+            var template = "Hello {{char}}, I'm {{user}}. Your bio: {{charbio}}";
+            var result = LLMSystem.ReplaceMacros(template, user, bot);
+            Console.WriteLine($"1:1 macro test: {result}");
+
+            // Verify system detection
+            Console.WriteLine($"Is group chat (should be false): {bot is GroupPersona}");
+
+            // Test with group
+            var group = new GroupPersona();
+            group.AddBot("bot1");
+            Console.WriteLine($"Is group chat (should be true): {group is GroupPersona}");
+
+            var groupResult = LLMSystem.ReplaceMacros(template, user, group);
+            Console.WriteLine($"Group macro test: {groupResult}");
+
+            Console.WriteLine("=== Backward Compatibility Test Completed ===");
+        }
+
+        public static void RunAllTests()
+        {
+            try
+            {
+                RunBasicTest();
+                Console.WriteLine();
+                TestMacroReplacement();
+                Console.WriteLine();
+                TestBackwardCompatibility();
+                Console.WriteLine("\n🎉 All tests completed successfully!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Test failed: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
+            }
         }
     }
 }
