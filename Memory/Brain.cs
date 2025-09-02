@@ -90,15 +90,21 @@ namespace AIToolkit.Memory
             else if (Energy > 0.65)
                 sb.Append(" energetic");
             else
-                sb.Append(" neutral in energy");
+                sb.Append(" rested");
+
+            if (Cheer < 0.15)
+                sb.Append(", sad");
             if (Cheer < 0.35)
                 sb.Append(", moody");
             else if (Cheer > 0.65)
                 sb.Append(", joyful");
+            else if (Cheer > 0.85)
+                sb.Append(", excited");
+
             if (Curiosity < 0.25)
-                sb.Append(", disinterested");
+                sb.Append(", and disinterested");
             else if (Curiosity > 0.65)
-                sb.Append(", curious");
+                sb.Append(", and curious");
             sb.Append(".");
             return sb.ToString();
         }
@@ -142,6 +148,7 @@ namespace AIToolkit.Memory
 
         public void OnUserPost(string userinput)
         {
+            CharacterLoad();
             if (!string.IsNullOrWhiteSpace(LLMSystem.Settings.ScenarioOverride) || Eurekas.Count == 0)
                 return;
             CurrentDelay++;
