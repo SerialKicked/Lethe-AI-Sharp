@@ -17,6 +17,7 @@ namespace AIToolkit.API
         private readonly HttpClient _httpClient;
         private readonly WebSearchAPI webSearchClient;
         private readonly JSchemaGenerator schemaGenerator = new();
+        private bool koboldDDGAvailable = false;
 
         public event EventHandler<LLMTokenStreamingEventArgs>? TokenReceived;
 
@@ -69,7 +70,7 @@ namespace AIToolkit.API
                 return "Engine Not Supported";
             SupportsTTS = engine.tts;
             SupportsVision = engine.vision;
-            // SupportsWebSearch = engine.websearch;
+            koboldDDGAvailable = engine.websearch;
             return $"{engine.result} {engine.version}";
         }
 
@@ -116,12 +117,16 @@ namespace AIToolkit.API
         {
             if (!SupportsWebSearch)
                 return string.Empty;
-            var res = (WebSearchAPI.SearchAPI != BackendSearchAPI.DuckDuckGo) ?
-                await webSearchClient.SearchAndEnrichAsync(query, 3, WebSearchAPI.SearchDetailedResults) : 
-                await _client.WebQueryAsync(new WebQuery { q = query });
-
-            // Convert results to a common format
-            return JsonConvert.SerializeObject(res);
+            if (LLMSystem.Settings.WebSearchAPI == BackendSearchAPI.Brave || (LLMSystem.Settings.WebSearchAPI == BackendSearchAPI.DuckDuckGo && !koboldDDGAvailable))
+            {
+                var res = await webSearchClient.SearchAndEnrichAsync(query, 3, LLMSystem.Settings.WebSearchDetailedResults);
+                return JsonConvert.SerializeObject(res);
+            }
+            else
+            {
+                var res = await _client.WebQueryAsync(new WebQuery { q = query });
+                return JsonConvert.SerializeObject(res);
+            }
         }
 
         public async Task<string> ImageCaption(byte[] imageData)

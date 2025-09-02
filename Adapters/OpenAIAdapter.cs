@@ -121,7 +121,7 @@ namespace AIToolkit.API
         {
             if (!SupportsWebSearch)
                 return string.Empty;
-            var res = await webSearchClient.SearchAndEnrichAsync(query, 3, WebSearchAPI.SearchDetailedResults);
+            var res = await webSearchClient.SearchAndEnrichAsync(query, 3, LLMSystem.Settings.WebSearchDetailedResults);
             // Convert results to a common format
             return JsonConvert.SerializeObject(res);
         }
