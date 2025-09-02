@@ -1,6 +1,4 @@
 using AIToolkit.Agent;
-using AIToolkit.Files;
-using AIToolkit.LLM;
 using System.Text.Json;
 
 namespace AIToolkit.Agent.Tests
@@ -118,64 +116,6 @@ namespace AIToolkit.Agent.Tests
             
             Console.WriteLine("✓ Example integration complete!");
             Console.WriteLine("Note: Add 'TestCustomPlugin' to AgentConfig.Plugins array to enable it");
-        }
-
-        /// <summary>
-        /// Quick test of group chat functionality
-        /// </summary>
-        public static void TestGroupChatBasics()
-        {
-            Console.WriteLine("Testing Group Chat Functionality...");
-            
-            // Create test personas
-            var alice = new BasePersona
-            {
-                Name = "Alice",
-                Bio = "Helpful assistant",
-                UniqueName = "alice",
-                IsUser = false
-            };
-
-            var bob = new BasePersona
-            {
-                Name = "Bob", 
-                Bio = "Creative assistant",
-                UniqueName = "bob",
-                IsUser = false
-            };
-
-            var user = new BasePersona
-            {
-                Name = "User",
-                IsUser = true,
-                UniqueName = "user"
-            };
-
-            // Create group persona
-            var group = new GroupPersona
-            {
-                Name = "Team",
-                UniqueName = "team"
-            };
-
-            // Test basic functionality
-            group.AddBotPersona(alice);
-            group.AddBotPersona(bob);
-
-            if (group.BotPersonas.Count != 2)
-                throw new Exception("Failed to add personas to group");
-
-            if (group.CurrentBot?.Name != "Alice")
-                throw new Exception("Current bot should be Alice");
-
-            // Test macro replacement
-            var testString = "Current: {{char}}, User: {{user}}";
-            var result = LLMSystem.ReplaceMacros(testString, user, group);
-
-            if (!result.Contains("Current: Alice"))
-                throw new Exception("Macro replacement failed");
-
-            Console.WriteLine("✓ Group Chat basic functionality working!");
         }
     }
 }
