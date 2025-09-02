@@ -867,13 +867,40 @@ namespace AIToolkit.LLM
                 dataInserts.AddMemories(search);
             }
             // Check for keyword-activated world info entries
-            if (Settings.AllowWorldInfo && Bot.MyWorlds.Count > 0)
+            if (Settings.AllowWorldInfo)
             {
                 var _currentWorldEntries = new List<WorldEntry>();
-                foreach (var world in Bot.MyWorlds)
+                
+                // Add world entries from the group/bot itself
+                if (Bot.MyWorlds.Count > 0)
                 {
-                    _currentWorldEntries.AddRange(world.FindEntries(History, searchmessage));
+                    foreach (var world in Bot.MyWorlds)
+                    {
+                        _currentWorldEntries.AddRange(world.FindEntries(History, searchmessage));
+                    }
                 }
+                
+                // If in group conversation, also add world entries from the current active persona
+                if (IsGroupConversation)
+                {
+                    var currentBot = GetCurrentGroupBot();
+                    if (currentBot?.MyWorlds.Count > 0)
+                    {
+                        foreach (var world in currentBot.MyWorlds)
+                        {
+                            var entries = world.FindEntries(History, searchmessage);
+                            // Only add entries that aren't already included from the group
+                            foreach (var entry in entries)
+                            {
+                                if (!_currentWorldEntries.Any(e => e.Guid == entry.Guid))
+                                {
+                                    _currentWorldEntries.Add(entry);
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 foreach (var entry in _currentWorldEntries)
                 {
                     dataInserts.AddInsert(new PromptInsert(
