@@ -467,107 +467,87 @@ namespace AIToolkit.LLM
             if (string.IsNullOrEmpty(inputText))
                 return string.Empty;
 
-            // Check if character is a GroupPersona and use group-aware replacement
-            if (character is GroupPersona groupPersona)
-            {
-                return ReplaceMacros(inputText, user, groupPersona);
-            }
-
-            StringBuilder res = new(inputText);
-            res.Replace("{{user}}", user.Name)
-               .Replace("{{userbio}}", user.GetBio(character.Name))
-               .Replace("{{char}}", character.Name)
-               .Replace("{{charbio}}", character.GetBio(user.Name))
-               .Replace("{{examples}}", character.GetDialogExamples(user.Name))
-               .Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
-               .Replace("{{time}}", DateTime.Now.ToShortTimeString())
-               .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
-               .Replace("{{selfedit}}", character.SelfEditField)
-               .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? character.GetScenario(user.Name) : Settings.ScenarioOverride);
-            return res.ToString();
+            return ReplaceMacrosInternal(inputText, user.Name, user.GetBio(character.Name), character);
         }
 
+        /// <summary>
+        /// Replaces the macros in a string with the actual values using string userName.
+        /// </summary>
+        /// <param name="inputText"></param>
+        /// <param name="userName"></param>
+        /// <param name="character"></param>
+        /// <returns></returns>
         public static string ReplaceMacros(string inputText, string userName, BasePersona character)
         {
-            StringBuilder res = new(inputText);
-            res.Replace("{{user}}", userName)
-               .Replace("{{userbio}}", "This is the user interacting with you.")
-               .Replace("{{char}}", character.Name)
-               .Replace("{{charbio}}", character.GetBio(userName))
-               .Replace("{{examples}}", character.GetDialogExamples(userName))
-               .Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
-               .Replace("{{time}}", DateTime.Now.ToShortTimeString())
-               .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
-               .Replace("{{selfedit}}", character.SelfEditField)
-               .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? character.GetScenario(userName) : Settings.ScenarioOverride);
-            return res.ToString().CleanupAndTrim();
+            return ReplaceMacrosInternal(inputText, userName, "This is the user interacting with you.", character);
         }
 
         /// <summary>
-        /// Replaces macros in a string with values for group chat context.
-        /// In group context, {{char}} and {{charbio}} refer to the current active bot.
-        /// </summary>
-        /// <param name="inputText">The text to process</param>
-        /// <param name="user">The user persona</param>
-        /// <param name="groupPersona">The group persona container</param>
-        /// <returns>Text with macros replaced</returns>
-        public static string ReplaceMacros(string inputText, BasePersona user, GroupPersona groupPersona)
-        {
-            if (string.IsNullOrEmpty(inputText))
-                return string.Empty;
-
-            var currentBot = groupPersona.CurrentBot ?? groupPersona.BotPersonas.FirstOrDefault();
-            if (currentBot == null)
-                return ReplaceMacros(inputText, user, groupPersona as BasePersona);
-
-            StringBuilder res = new(inputText);
-            res.Replace("{{user}}", user.Name)
-               .Replace("{{userbio}}", user.GetBio(currentBot.Name))
-               .Replace("{{char}}", currentBot.Name)
-               .Replace("{{charbio}}", currentBot.GetBio(user.Name))
-               .Replace("{{currentchar}}", currentBot.Name)
-               .Replace("{{currentcharbio}}", currentBot.GetBio(user.Name))
-               .Replace("{{examples}}", currentBot.GetDialogExamples(user.Name))
-               .Replace("{{group}}", groupPersona.GetGroupPersonasList(user.Name))
-               .Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
-               .Replace("{{time}}", DateTime.Now.ToShortTimeString())
-               .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
-               .Replace("{{selfedit}}", currentBot.SelfEditField)
-               .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? groupPersona.GetScenario(user.Name) : Settings.ScenarioOverride);
-            return res.ToString().CleanupAndTrim();
-        }
-
-        /// <summary>
-        /// Replaces macros in a string with values for group chat context using string userName.
-        /// In group context, {{char}} and {{charbio}} refer to the current active bot.
+        /// Internal method that performs the actual macro replacement logic.
+        /// Handles both regular and group personas in a unified way.
         /// </summary>
         /// <param name="inputText">The text to process</param>
         /// <param name="userName">The user's name</param>
-        /// <param name="groupPersona">The group persona container</param>
+        /// <param name="userBio">The user's bio</param>
+        /// <param name="character">The character persona (can be BasePersona or GroupPersona)</param>
         /// <returns>Text with macros replaced</returns>
-        public static string ReplaceMacros(string inputText, string userName, GroupPersona groupPersona)
+        private static string ReplaceMacrosInternal(string inputText, string userName, string userBio, BasePersona character)
         {
             if (string.IsNullOrEmpty(inputText))
                 return string.Empty;
 
-            var currentBot = groupPersona.CurrentBot ?? groupPersona.BotPersonas.FirstOrDefault();
-            if (currentBot == null)
-                return ReplaceMacros(inputText, userName, groupPersona as BasePersona);
-
             StringBuilder res = new(inputText);
-            res.Replace("{{user}}", userName)
-               .Replace("{{userbio}}", "This is the user interacting with you.")
-               .Replace("{{char}}", currentBot.Name)
-               .Replace("{{charbio}}", currentBot.GetBio(userName))
-               .Replace("{{currentchar}}", currentBot.Name)
-               .Replace("{{currentcharbio}}", currentBot.GetBio(userName))
-               .Replace("{{examples}}", currentBot.GetDialogExamples(userName))
-               .Replace("{{group}}", groupPersona.GetGroupPersonasList(userName))
-               .Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
+
+            // Handle group vs single persona logic
+            if (character is GroupPersona groupPersona)
+            {
+                var currentBot = groupPersona.CurrentBot ?? groupPersona.BotPersonas.FirstOrDefault();
+                if (currentBot != null)
+                {
+                    // In group context, {{char}} and {{charbio}} refer to current bot
+                    res.Replace("{{user}}", userName)
+                       .Replace("{{userbio}}", userBio)
+                       .Replace("{{char}}", currentBot.Name)
+                       .Replace("{{charbio}}", currentBot.GetBio(userName))
+                       .Replace("{{currentchar}}", currentBot.Name)
+                       .Replace("{{currentcharbio}}", currentBot.GetBio(userName))
+                       .Replace("{{examples}}", currentBot.GetDialogExamples(userName))
+                       .Replace("{{group}}", groupPersona.GetGroupPersonasList(userName))
+                       .Replace("{{selfedit}}", currentBot.SelfEditField)
+                       .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? groupPersona.GetScenario(userName) : Settings.ScenarioOverride);
+                }
+                else
+                {
+                    // Fallback to group persona itself if no current bot
+                    res.Replace("{{user}}", userName)
+                       .Replace("{{userbio}}", userBio)
+                       .Replace("{{char}}", character.Name)
+                       .Replace("{{charbio}}", character.GetBio(userName))
+                       .Replace("{{currentchar}}", character.Name)
+                       .Replace("{{currentcharbio}}", character.GetBio(userName))
+                       .Replace("{{examples}}", character.GetDialogExamples(userName))
+                       .Replace("{{group}}", groupPersona.GetGroupPersonasList(userName))
+                       .Replace("{{selfedit}}", character.SelfEditField)
+                       .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? character.GetScenario(userName) : Settings.ScenarioOverride);
+                }
+            }
+            else
+            {
+                // Regular single persona logic
+                res.Replace("{{user}}", userName)
+                   .Replace("{{userbio}}", userBio)
+                   .Replace("{{char}}", character.Name)
+                   .Replace("{{charbio}}", character.GetBio(userName))
+                   .Replace("{{examples}}", character.GetDialogExamples(userName))
+                   .Replace("{{selfedit}}", character.SelfEditField)
+                   .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? character.GetScenario(userName) : Settings.ScenarioOverride);
+            }
+
+            // Common replacements for both group and single
+            res.Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
                .Replace("{{time}}", DateTime.Now.ToShortTimeString())
-               .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
-               .Replace("{{selfedit}}", currentBot.SelfEditField)
-               .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? groupPersona.GetScenario(userName) : Settings.ScenarioOverride);
+               .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString());
+
             return res.ToString().CleanupAndTrim();
         }
 
@@ -976,6 +956,11 @@ namespace AIToolkit.LLM
         {
             var realprompt = prompt;
             var addname = NamesInPromptOverride ?? Instruct.AddNamesToPrompt;
+            
+            // In group conversations, ALWAYS add names so the LLM knows which persona is speaking
+            if (bot is GroupPersona)
+                addname = true;
+                
             if (role != AuthorRole.Assistant && role != AuthorRole.User)
                 addname = false;
             string? selname = null;

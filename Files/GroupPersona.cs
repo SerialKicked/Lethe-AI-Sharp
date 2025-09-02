@@ -146,7 +146,7 @@ namespace AIToolkit.Files
         /// </summary>
         /// <param name="otherName">The other participant's name (typically the user).</param>
         /// <returns>Group bio with participant information.</returns>
-        public new string GetBio(string otherName)
+        public override string GetBio(string otherName)
         {
             var groupBio = base.GetBio(otherName);
             var participantsList = GetGroupPersonasList(otherName);
@@ -157,6 +157,38 @@ namespace AIToolkit.Files
             }
             
             return groupBio;
+        }
+
+        /// <summary>
+        /// Gets the scenario for the group context, which applies to all participants.
+        /// </summary>
+        /// <param name="otherName">The other participant's name (typically the user).</param>
+        /// <returns>Group scenario with macros replaced.</returns>
+        public override string GetScenario(string otherName)
+        {
+            return base.GetScenario(otherName);
+        }
+
+        /// <summary>
+        /// Gets dialog examples from the current active bot in the group.
+        /// </summary>
+        /// <param name="otherName">The other participant's name (typically the user).</param>
+        /// <returns>Dialog examples from the current bot, or empty string if no current bot.</returns>
+        public override string GetDialogExamples(string otherName)
+        {
+            var currentBot = CurrentBot ?? BotPersonas.FirstOrDefault();
+            return currentBot?.GetDialogExamples(otherName) ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Gets welcome line from the current active bot in the group.
+        /// </summary>
+        /// <param name="otherName">The other participant's name (typically the user).</param>
+        /// <returns>Welcome line from the current bot, or empty string if no current bot.</returns>
+        public override string GetWelcomeLine(string otherName)
+        {
+            var currentBot = CurrentBot ?? BotPersonas.FirstOrDefault();
+            return currentBot?.GetWelcomeLine(otherName) ?? string.Empty;
         }
 
         /// <summary>
