@@ -21,18 +21,65 @@ namespace AIToolkit.Memory
     public enum MemoryType { General, WorldInfo, WebSearch, Journal, Image, File, Location, Event, ChatSession }
     public enum MemoryInsertion { Trigger, Natural, None }
 
+
+    /// <summary>
+    /// Individual long term and contextual memory entry
+    /// </summary>
     public class MemoryUnit : KeywordEntry, IEmbed
     {
+        /// <summary>
+        /// Unique Identifier
+        /// </summary>
         public Guid Guid { get; set; } = Guid.NewGuid();
+
+        /// <summary>
+        /// Memory category/type - will likely affects how it's used
+        /// </summary>
         public MemoryType Category { get; set; } = MemoryType.General;
+
+        /// <summary>
+        /// Insertion type. Trigger: used as a RAG entry. Natural: inserted into prompt during live conversation when relevant, and then converted to Trigger if of high enough relevance. None: Disabled.
+        /// </summary>
         public MemoryInsertion Insertion { get; set; } = MemoryInsertion.Trigger;
+
+        /// <summary>
+        /// Name or Title for the entry. May be inserted for some Category (like people, file, locations...) and insertion types
+        /// </summary>
         public string Name { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Raw content of the memory
+        /// </summary>
         public string Content { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The context or reason why this topic is of interest to the bot, user, or both.
+        /// </summary>
+        public string Reason { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Should be used files
+        /// </summary>
         public string Path { get; set; } = string.Empty;
+
+        /// <summary>
+        /// When this memory was added
+        /// </summary>
         public DateTime Added { get; set; } = DateTime.Now;
+
+        /// <summary>
+        /// When this memory is meant to be deprecated or turned from Natural to Trigger insertion
+        /// </summary>
         public DateTime EndTime { get; set; } = DateTime.Now;
+
+        /// <summary>
+        /// Embedding data for RAG
+        /// </summary>
         public float[] EmbedSummary { get; set; } = [];
 
+        /// <summary>
+        /// How important this memory is
+        /// </summary>
         public int Priority { get; set; } = 1;
 
         public async Task EmbedText()
@@ -43,13 +90,18 @@ namespace AIToolkit.Memory
             EmbedSummary = RAGSystem.MergeEmbeddings(titleembed, sumembed);
         }
 
+        /// <summary>
+        /// Turn a memory into a Eureka prompt for the LLM to use during conversation
+        /// </summary>
+        /// <returns></returns>
         public string ToEureka()
         {
-            var text = 
-                new StringBuilder($"You remember something you've researched on the web recently about '{Name}':").AppendLinuxLine()
-                .AppendLinuxLine($"{Content}")
-                .AppendLinuxLine()
-                .Append("Mention this information when there's a lull in the discussion, or if the user makes a mention of it, or if you feel like it's a good idea to talk about it.");
+            var text = new StringBuilder($"You remember something you've researched on the web recently about '{Name}'.");
+            if (!string.IsNullOrEmpty(Reason))
+            {
+                text.Append($" The reason for that search was: {Reason}.");
+            }
+            text.AppendLinuxLine().AppendLinuxLine($"{Content}").AppendLinuxLine().Append("Mention this information when there's a lull in the discussion, or if the user makes a mention of it, or if you feel like it's a good idea to talk about it.");
             return text.ToString();
         }
     }

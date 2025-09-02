@@ -122,6 +122,7 @@ namespace AIToolkit.Agent.Plugins
                     Insertion = MemoryInsertion.Natural,
                     Name = topic.Topic,
                     Content = merged.CleanupAndTrim(),
+                    Reason = topic.Reason,
                     Added = DateTime.Now,
                     EndTime = DateTime.Now.AddDays(10),
                     Priority = topic.Urgency,
