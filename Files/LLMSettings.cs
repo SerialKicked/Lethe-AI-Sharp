@@ -1,4 +1,5 @@
 ﻿using AIToolkit.LLM;
+using AIToolkit.SearchAPI;
 using HNSW.Net;
 using System;
 using System.Collections.Generic;
@@ -10,6 +11,9 @@ namespace AIToolkit.Files
 {
     public class LLMSettings : BaseFile
     {
+
+        #region *** Backend Connection ***
+
         /// <summary> URL of the backend server (KoboldAPI, OpenAI, etc.) </summary>
         public string BackendUrl { get; set; } = "http://localhost:5001";
 
@@ -18,6 +22,10 @@ namespace AIToolkit.Files
 
         /// <summary> API key for OpenAI (depends on the backend) </summary>
         public string OpenAIKey { get; set; } = "123";
+
+        #endregion
+
+        #region *** Model Settings ***
 
         /// <summary> Max length for the bot's reply. </summary>
         public int MaxReplyLength { get; set; } = 512;
@@ -35,27 +43,32 @@ namespace AIToolkit.Files
         public bool AllowWorldInfo { get; set; } = true;
 
         /// <summary> 
+        /// Move all RAG, WorldInfo, and Brain entries to the system prompt independantly of their respective settings. 
+        /// Some models perform better with such info in the system prompt, while others prefer it in the main dialog.
+        /// </summary>
+        public bool MoveAllInsertsToSysPrompt { get; set; } = false;
+
+        #endregion
+
+        #region *** Long term memory system and summaries ***
+
+        /// <summary> 
         /// If set to true, summaries of previous chat sessions will be insereted in the system prompt to provide extended context.
         /// </summary>
         public bool SessionMemorySystem { get; set; } = false;
 
-        /// <summary> Should the prompt contains only the latest chat session or as much dialog as we can fit? </summary>
+        /// <summary> Should the chatlog contains only the latest/current chat session or as much dialog as we can fit in? </summary>
         public SessionHandling SessionHandling { get; set; } = SessionHandling.FitAll;
 
-        /// <summary> Reserved token space for summaries of previous sessions (0 to disable) </summary>
+        /// <summary> Reserved token space for summaries of previous sessions </summary>
         public int SessionReservedTokens { get; set; } = 2048;
 
-        /// <summary> Thinking models only, will move all RAG and WI to the thinking block </summary>
-        public bool RAGMoveToThinkBlock { get; set; } = false;
+        #endregion
 
-        /// <summary> Move all RAG entries (and WI entries) to the system prompt </summary>
-        public bool RAGMoveToSysPrompt { get; set; } = false;
+        #region *** RAG Settings (retrieval of past information based on text embedding similarity) ***
 
-        /// <summary> Maximum number of entries to be retrieved with RAG </summary>
-        public int RAGMaxEntries { get; set; } = 3;
-
-        /// <summary> Index at which RAG entries will be inserted </summary>
-        public int RAGIndex { get; set; } = 3;
+        /// <summary> Toggle RAG functionalities on/off </summary>
+        public bool RAGEnabled { get; set; } = true;
 
         /// <summary> 
         /// Path to embeddding model. RAG functionalities won't be available if this file is not present. 
@@ -63,6 +76,17 @@ namespace AIToolkit.Files
         /// https://huggingface.co/ChristianAzinn/gte-large-gguf
         /// </summary>
         public string RAGModelPath { get; set; } = "data/models/gte-large.Q6_K.gguf";
+
+        /// <summary> 
+        /// Thinking models only, will move all RAG and WI to the thinking block. This is highly experimental. 
+        /// </summary>
+        public bool RAGMoveToThinkBlock { get; set; } = false;
+
+        /// <summary> Maximum number of entries to be retrieved with RAG </summary>
+        public int RAGMaxEntries { get; set; } = 3;
+
+        /// <summary> Index at which RAG entries will be inserted in the chatlog. -1 to insert in system prompt. </summary>
+        public int RAGIndex { get; set; } = 3;
 
         /// <summary> Embedding size (depends on the embedding model) </summary>
         public int RAGEmbeddingSize { get; set; } = 1024;
@@ -73,15 +97,31 @@ namespace AIToolkit.Files
         /// <summary> Max distance for an entry to be retrieved (SmallWorld / HNSW.NET implementation) </summary>
         public float RAGDistanceCutOff { get; set; } = 0.15f;
 
-        /// <summary> Search method. Simple tends to be the most consistent method </summary>
+        /// <summary> Search method. Simple is the most accurate method (but is very slightly slower). </summary>
         public NeighbourSelectionHeuristic RAGHeuristic { get; set; } = NeighbourSelectionHeuristic.SelectSimple;
 
-        /// <summary> Toggle RAG functionalities on/off </summary>
-        public bool RAGEnabled { get; set; } = true;
+        #endregion
 
-        /// <summary> Enable/Disable the background agent on runtime</summary>
+        #region *** WebSearch API Settings ***
+
+        /// <summary>
+        /// 2 API are available:
+        /// - Brave API (requires manual registration, and an API key on their website). Provides detailed search results.
+        /// - DuckDuckGo: no registration required, free to use. Behaves differently depending on Backend: On OpenAI API, it'll provides only basic AI generated summary for the query. On KoboldAPI, if KoboldCpp is configured correctly, it'll provides very detailed search results.
+        /// </summary>
+        public BackendSearchAPI WebSearchAPI { get; set; } = BackendSearchAPI.DuckDuckGo;
+
+        /// <summary> If using the Brave API, you API key should go there </summary>
+        public string WebSearchBraveAPIKey { get; set; } = string.Empty;
+
+        /// <summary> Attempt to scrape the most relevant search results for their full content. </summary>
+        public bool WebSearchDetailedResults { get; set; } = true;
+
+        #endregion
+
+        /// <summary> 
+        /// Enable/Disable the background agent on runtime
+        /// </summary>
         public bool AgentEnabled { get; set; } = true;
-
-
     }
 }

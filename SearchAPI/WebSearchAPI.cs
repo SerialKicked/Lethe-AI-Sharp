@@ -1,5 +1,6 @@
 ﻿using AIToolkit.Agent;
 using AIToolkit.GBNF;
+using AIToolkit.LLM;
 
 namespace AIToolkit.SearchAPI
 {
@@ -19,9 +20,21 @@ namespace AIToolkit.SearchAPI
     public class WebSearchAPI
     {
         // Search API Settings
-        public static string BraveAPIKey { get; set; } = string.Empty;
-        public static BackendSearchAPI SearchAPI { get; set; } = BackendSearchAPI.DuckDuckGo;
-        public static bool SearchDetailedResults { get; set; } = true;
+        public static string BraveAPIKey
+        {
+            get => LLMSystem.Settings.WebSearchBraveAPIKey;
+            set => LLMSystem.Settings.WebSearchBraveAPIKey = value;
+        }
+        public static BackendSearchAPI SearchAPI
+        {
+            get => LLMSystem.Settings.WebSearchAPI;
+            set => LLMSystem.Settings.WebSearchAPI = value;
+        }
+        public static bool SearchDetailedResults
+        {
+            get => LLMSystem.Settings.WebSearchDetailedResults;
+            set => LLMSystem.Settings.WebSearchDetailedResults = value;
+        }
 
 
         private readonly HttpClient _httpClient;

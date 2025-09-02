@@ -722,7 +722,7 @@ namespace AIToolkit.LLM
             }
 
             // Now add the system prompt entries we gathered
-            var syspromptentries = Settings.RAGMoveToSysPrompt ? dataInserts : dataInserts.GetEntriesByPosition(-1);
+            var syspromptentries = Settings.MoveAllInsertsToSysPrompt ? dataInserts : dataInserts.GetEntriesByPosition(-1);
             if (syspromptentries.Count > 0)
             {
                 rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle).AppendLinuxLine();
