@@ -8,6 +8,15 @@ using System.Threading.Tasks;
 
 namespace AIToolkit.Files
 {
+    /// <summary>
+    /// Represents a configurable instruction formatting system for constructing prompts and messages used in
+    /// conversational AI models. This class is relevant for Text Completion backends (KoboldAPI) models, while 
+    /// Chat Completetion backends (OpenAI) handles the formatting internally.
+    /// </summary>
+    /// <remarks>This class provides properties and methods to define the structure of prompts for instruction models (all models, nowadays), 
+    /// and messages exchanged between users, assistants, and the system. It supports customization of message delimiters, 
+    /// thinking prompts, and stopping sequences, among other features.
+    /// </remarks>
     public class InstructFormat : BaseFile
     {
         public static readonly string[] Properties = [
@@ -25,23 +34,99 @@ namespace AIToolkit.Files
             "NewLinesBetweenMessages",
             "StopStrings"
             ];
+
+        /// <summary>
+        /// BoS token, used by some models to indicate the beginning the whole prompt. Can usually be left empty.
+        /// </summary>
         public string BoSToken { get; set; } = string.Empty;
-        public string SystemStart { get; set; } = string.Empty;
-        public string SystemEnd { get; set; } = string.Empty;
+
+        /// <summary>
+        /// User message start sequence. Inserted just before the user message.
+        /// </summary>
         public string UserStart { get; set; } = string.Empty;
+
+        /// <summary>
+        /// User message end sequence. Inserted just after the user message.
+        /// </summary>
         public string UserEnd { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Bot message start sequence. Inserted just before the bot message.
+        /// </summary>
         public string BotStart { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Bot message end sequence. Inserted just after the bot message.
+        /// </summary>
         public string BotEnd { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Force the bot to end generation when encountering this sequence. Contrary to BotEnd, this one won't be added to the prompt.
+        /// This is not a commonly used feature, and can usually be left empty.
+        /// </summary>
         public string StopSequence { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Start sequence for the main system prompt. Inserted just before the prompt's content.
+        /// </summary>
         public string SysPromptStart { get; set; } = string.Empty;
+
+        /// <summary>
+        /// End sequence for the main system prompt. Inserted just after the prompt's content.
+        /// /summary>
         public string SysPromptEnd { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Start sequence for the system messages that are inserted in the chatlog. 
+        /// Outside of rare models with weird instruction formats, this should usually be the same as SysPromptStart.
+        /// </summary>
+        public string SystemStart { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// End sequence for the system messages that are inserted in the chatlog. 
+        /// Outside of rare models with weird instruction formats, this should usually be the same as SysPromptEnd.
+        /// </summary>
+        public string SystemEnd { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Toggle to add the user and bot names before their respective messages in the prompt. May help some models with role recognition.
+        /// </summary>
         public bool AddNamesToPrompt { get; set; } = true;
+
+        /// <summary>
+        /// Insert a new line between messages in the prompt. Depends on the instruction format. Some models may like it, while others may not.
+        /// </summary>
         public bool NewLinesBetweenMessages { get; set; } = false;
+
+        /// <summary>
+        /// Some badly trained models may require additional stopping strings to properly end generation. This is where you do that.
+        /// </summary>
         public List<string> StopStrings { get; set; } = [];
+
+        /// <summary>
+        /// Start sequence for the thinking prompt block. Only relevant for CoT (or so-called thinking) models.
+        /// </summary>
         public string ThinkingStart { get; set; } = string.Empty;
+
+        /// <summary>
+        /// End sequence for the thinking prompt block. Only relevant for CoT (or so-called thinking) models.
+        /// </summary>
         public string ThinkingEnd { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Force the thinking prompt to start with a specific thought. Only relevant for CoT (or so-called thinking) models.
+        /// </summary>
         public string ThinkingForcedThought { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Some badly trained CoT models need to have the thinking prompt prefilled to properly work. This toggle enables that.
+        /// </summary>
         public bool PrefillThinking { get; set; } = false;
+
+        /// <summary>
+        /// Attempt to insert the RAG entries in the thinking prompt instead of the main prompt. Only relevant for CoT (or so-called thinking) models.
+        /// Highly experimental.
+        /// </summary>
         public bool ForceRAGToThinkingPrompt { get; set; } = false;
 
         [JsonIgnore] private bool RealAddNameToPrompt => LLMSystem.NamesInPromptOverride ?? AddNamesToPrompt;
