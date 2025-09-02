@@ -202,6 +202,9 @@ public async Task UpdateSelfEditSection()
 ### Advanced Features
 
 #### Extensibility
+
+See [Extensibility Guide](EXTENSIBILITY.md) for more information. Makes it possible to override Chatlog and ChatSession classes. Optional.
+
 ```csharp
 // Override factory methods for custom types
 protected virtual Chatlog CreateChatlog()
