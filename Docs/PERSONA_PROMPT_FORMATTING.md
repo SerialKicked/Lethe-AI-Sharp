@@ -1,6 +1,7 @@
 # Persona and Prompt Formatting Documentation
 
-The AIToolkit provides three core classes for managing AI chat personas and prompt formatting: `BasePersona`, `InstructFormat`, and `SystemPrompt`. These classes work together to create rich, customizable AI characters and properly format prompts for different language models.
+The AIToolkit provides three core classes for managing AI chat personas and prompt formatting: `BasePersona`, `InstructFormat`, and `SystemPrompt`. 
+These classes work together to create rich, customizable AI characters and properly format prompts for different language models.
 
 ## Overview
 
@@ -9,29 +10,6 @@ These classes handle:
 - **Prompt Formatting**: Format messages for different instruction-tuned models and backends
 - **System Prompts**: Generate contextual system prompts with character information and dynamic content
 - **Extensibility**: Support for custom implementations and behaviors
-
-## Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   BasePersona   │    │ InstructFormat  │    │  SystemPrompt   │
-│                 │    │                 │    │                 │
-│  - Name/Bio     │───▶│  - UserStart    │───▶│  - Prompt       │
-│  - Scenario     │    │  - BotStart     │    │  - Templates    │
-│  - Examples     │    │  - SystemStart  │    │  - Sections     │
-│  - History      │    │  - Thinking     │    │  - Macros       │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Extension     │    │   Backend       │    │   Dynamic       │
-│   Support       │    │   Specific      │    │   Content       │
-│                 │    │                 │    │                 │
-│  - BeginChat()  │    │  - KoboldAPI    │    │  - WorldInfo    │
-│  - EndChat()    │    │  - OpenAI       │    │  - RAG Data     │
-│  - Custom Types │    │  - ChatML       │    │  - Time Info    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
 
 ## Quick Start
 
@@ -90,6 +68,8 @@ LLMSystem.User = developer;
 // Configure for ChatML format (common for many models)
 var chatMLFormat = new InstructFormat()
 {
+    SysPromptStart = "<|im_start|>system\n",
+    SysPromptEnd = "<|im_end|>\n",
     SystemStart = "<|im_start|>system\n",
     SystemEnd = "<|im_end|>\n",
     UserStart = "<|im_start|>user\n",
@@ -135,8 +115,8 @@ The `BasePersona` class represents a character or user in the chat system, provi
 // Essential character information
 public string Name { get; set; }           // Character's display name
 public string Bio { get; set; }            // Character's background/personality
-public bool IsUser { get; set; }           // true for user, false for bot
-public string UniqueName { get; set; }     // Unique identifier for file operations
+public bool IsUser { get; set; }           // true for user, false for bot (for user, only Name and Bio are really used)
+public string UniqueName { get; set; }     // Unique identifier for file operations (filename without extension should be used)
 ```
 
 #### Character Behavior
@@ -144,18 +124,18 @@ public string UniqueName { get; set; }     // Unique identifier for file operati
 // Conversation behavior
 public string Scenario { get; set; }              // Current scenario context
 public List<string> FirstMessage { get; set; }    // Greeting messages (random selection)
-public List<string> ExampleDialogs { get; set; }  // Style examples for consistency
+public List<string> ExampleDialogs { get; set; }  // Style examples for consistency but can be repurposed for other uses
 
 // Advanced features
 public bool SenseOfTime { get; set; }             // Include time awareness
-public int SelfEditTokens { get; set; }           // Enable self-reflection
-public string SelfEditField { get; set; }         // AI-generated personal thoughts
+public int SelfEditTokens { get; set; }           // Enable self-reflection if > 0 (max amount of tokens to use))
+public string SelfEditField { get; set; }         // AI-generated personal thoughts if SelfEditTokens > 0
 ```
 
 #### Integration
 ```csharp
 // System integration
-public string SystemPrompt { get; set; }      // Override default system prompt
+public string SystemPrompt { get; set; }      // Override the system prompt in LLMSystem (can be useful for very custom bots)
 public List<string> Worlds { get; set; }      // WorldInfo IDs to load
 public List<string> Plugins { get; set; }     // Plugin IDs to activate
 
@@ -169,7 +149,7 @@ public List<WorldInfo> MyWorlds { get; protected set; } // Loaded world info
 #### Session Management
 ```csharp
 // Override these for custom behavior
-public virtual void BeginChat()
+public override void BeginChat()
 {
     // Called when character is loaded
     // Load chat history, world info, plugins
@@ -177,7 +157,7 @@ public virtual void BeginChat()
     // Custom loading logic here
 }
 
-public virtual void EndChat(bool backup = false)
+public override void EndChat(bool backup = false)
 {
     // Called when switching characters or closing
     // Save chat history and other data
@@ -256,7 +236,8 @@ var medievalKnight = new BasePersona()
         "Welcome to Camelot! I trust thy journey was safe and swift."
     },
     
-    SenseOfTime = true,
+    SenseOfTime = false,
+    DatesInSessionSummaries = false,
     SelfEditTokens = 150, // Enable self-reflection
     UniqueName = "sir_gareth"
 };
@@ -279,17 +260,18 @@ var dailyAssistant = new BasePersona()
 
 ## InstructFormat Class
 
-The `InstructFormat` class handles prompt formatting for different instruction-tuned language models. This is primarily used with text completion backends (KoboldAPI), while chat completion backends (OpenAI) handle formatting internally.
+The `InstructFormat` class handles prompt formatting for different instruction-tuned language models. 
+This is primarily used with text completion backends (KoboldAPI), while chat completion backends (OpenAI) handle formatting internally.
 
 ### Core Properties
 
 #### Message Delimiters
 ```csharp
 // System messages
-public string SystemStart { get; set; }    // Before system messages
-public string SystemEnd { get; set; }      // After system messages
 public string SysPromptStart { get; set; } // Before main system prompt
 public string SysPromptEnd { get; set; }   // After main system prompt
+public string SystemStart { get; set; }    // Before system messages (normally, set it the the same value as SysPromptStart)
+public string SystemEnd { get; set; }      // After system messages (normally, set it the the same value as SysPromptEnd)
 
 // User messages
 public string UserStart { get; set; }      // Before user messages
@@ -327,6 +309,8 @@ public bool ForceRAGToThinkingPrompt { get; set; } // Move RAG to thinking
 
 ### Core Methods
 
+Note that while most of those methods are public, they are primarily intended for internal use by LLMSystem.
+
 #### Message Formatting
 ```csharp
 // Format individual messages
@@ -347,18 +331,23 @@ public string GetThinkPrefill()              // Get thinking prefill content
 
 ### Format Presets
 
+The format you need to use depends on the model's family. Many models like Qwen use the ChatML format. Old open source models tend to use Alpaca. 
+You have to check the model's documentation to make sure.
+
 #### ChatML Format
 ```csharp
 var chatML = new InstructFormat()
 {
+    SysPromptStart = "<|im_start|>system\n",
+    SysPromptEnd = "<|im_end|>",
     SystemStart = "<|im_start|>system\n",
-    SystemEnd = "<|im_end|>\n",
+    SystemEnd = "<|im_end|>",
     UserStart = "<|im_start|>user\n", 
-    UserEnd = "<|im_end|>\n",
+    UserEnd = "<|im_end|>",
     BotStart = "<|im_start|>assistant\n",
-    BotEnd = "<|im_end|>\n",
+    BotEnd = "<|im_end|>",
     AddNamesToPrompt = false,
-    NewLinesBetweenMessages = false
+    NewLinesBetweenMessages = true
 };
 ```
 
@@ -366,6 +355,8 @@ var chatML = new InstructFormat()
 ```csharp
 var alpaca = new InstructFormat()
 {
+    SysPromptStart = "### System:\n",
+    SysPromptEnd = "\n\n",
     SystemStart = "### System:\n",
     SystemEnd = "\n\n",
     UserStart = "### Human:\n",
@@ -377,64 +368,29 @@ var alpaca = new InstructFormat()
 };
 ```
 
-#### Vicuna Format
-```csharp
-var vicuna = new InstructFormat()
-{
-    SystemStart = "SYSTEM: ",
-    SystemEnd = "\n",
-    UserStart = "USER: ",
-    UserEnd = "\n",
-    BotStart = "ASSISTANT: ",
-    BotEnd = "\n",
-    AddNamesToPrompt = false,
-    NewLinesBetweenMessages = false
-};
-```
-
-#### Thinking Model Format
+#### ChatML Thinking Model Format (QWQ and Qwen 3)
 ```csharp
 var thinkingModel = new InstructFormat()
 {
     // Standard ChatML
+    SysPromptStart = "<|im_start|>system\n",
+    SysPromptEnd = "<|im_end|>",
     SystemStart = "<|im_start|>system\n",
-    SystemEnd = "<|im_end|>\n",
+    SystemEnd = "<|im_end|>",
     UserStart = "<|im_start|>user\n",
-    UserEnd = "<|im_end|>\n",
+    UserEnd = "<|im_end|>",
     BotStart = "<|im_start|>assistant\n",
-    BotEnd = "<|im_end|>\n",
+    BotEnd = "<|im_end|>",
     
     // Thinking-specific
-    ThinkingStart = "<thinking>",
-    ThinkingEnd = "</thinking>",
+    ThinkingStart = "<think>",
+    ThinkingEnd = "</think>",
     PrefillThinking = true,
-    ThinkingForcedThought = "Let me think about this step by step."
+    NewLinesBetweenMessages = true
+    ThinkingForcedThought = "" // You can set an initial thought prompt here if you really know what you're doing
 };
 ```
 
-### Usage Examples
-
-#### Custom Format for Specific Model
-```csharp
-// For a model that uses specific delimiters
-var customFormat = new InstructFormat()
-{
-    SystemStart = "[SYSTEM]",
-    SystemEnd = "[/SYSTEM]\n",
-    UserStart = "[USER]",
-    UserEnd = "[/USER]\n", 
-    BotStart = "[BOT]",
-    BotEnd = "[/BOT]\n",
-    
-    // Add character names to messages
-    AddNamesToPrompt = true,
-    
-    // Custom stop strings for this model
-    StopStrings = { "[END]", "[STOP]", "<<<" }
-};
-
-LLMSystem.Instruct = customFormat;
-```
 
 ## SystemPrompt Class
 
@@ -550,201 +506,18 @@ The SystemPrompt class automatically processes these macros:
 - `{{time}}` - Current time
 - `{{day}}` - Current day of week
 
-## Common Usage Patterns
-
-### 1. Creating a Complete Character Setup
-
-```csharp
-public class CharacterBuilder
-{
-    public static BasePersona CreateRoleplayCharacter(string name, string personality, string background)
-    {
-        return new BasePersona()
-        {
-            Name = name,
-            Bio = $"{personality}\n\nBackground: {background}",
-            IsUser = false,
-            UniqueName = name.ToLower().Replace(" ", "_"),
-            
-            // Enable rich features
-            SenseOfTime = true,
-            SelfEditTokens = 200,
-            DatesInSessionSummaries = false, // Roleplay often timeless
-            
-            // Set up automatic memory
-            Scenario = "An immersive roleplay environment where you can express your " +
-                      "personality and interact naturally with the user."
-        };
-    }
-    
-    public static void ConfigureForRoleplay()
-    {
-        // Custom system prompt for roleplay
-        LLMSystem.SystemPrompt = new SystemPrompt()
-        {
-            Prompt = "You are {{char}} in an immersive roleplay. Express your personality " +
-                     "authentically and respond naturally to {{user}}.\n\n" +
-                     "# {{char}}\n{{charbio}}\n\n# {{user}}\n{{userbio}}",
-            
-            DialogsTitle = "# Character Voice",
-            ScenarioTitle = "# Setting",
-            WorldInfoTitle = "# World Lore"
-        };
-        
-        // Configure format for natural conversation
-        LLMSystem.Instruct.AddNamesToPrompt = true;
-        LLMSystem.Instruct.NewLinesBetweenMessages = true;
-    }
-}
-
-// Usage
-var knight = CharacterBuilder.CreateRoleplayCharacter(
-    "Sir Lancelot", 
-    "A brave and honorable knight, known for your skill in battle and dedication to justice.",
-    "You grew up as a noble's son and earned your knighthood through valor in combat."
-);
-
-CharacterBuilder.ConfigureForRoleplay();
-LLMSystem.Bot = knight;
-```
-
-### 2. Multi-Character Conversation System
-
-```csharp
-public class MultiCharacterManager
-{
-    private Dictionary<string, BasePersona> characters = new();
-    private BasePersona currentSpeaker;
-    
-    public void AddCharacter(BasePersona character)
-    {
-        characters[character.UniqueName] = character;
-    }
-    
-    public async Task SwitchToCharacter(string uniqueName)
-    {
-        if (characters.TryGetValue(uniqueName, out var character))
-        {
-            // Save current character state
-            currentSpeaker?.EndChat(backup: true);
-            
-            // Switch to new character
-            currentSpeaker = character;
-            LLMSystem.Bot = character;
-            
-            // Load new character state
-            character.BeginChat();
-            
-            Console.WriteLine($"Switched to {character.Name}");
-        }
-    }
-    
-    public async Task CharacterResponse(string input)
-    {
-        if (currentSpeaker != null)
-        {
-            await LLMSystem.SendMessageToBot(AuthorRole.User, input);
-        }
-    }
-}
-```
-
-### 3. Advanced Instruction Format Detection
-
-```csharp
-public class FormatDetector
-{
-    public static InstructFormat DetectFormat(string modelName)
-    {
-        modelName = modelName.ToLower();
-        
-        if (modelName.Contains("gpt") || modelName.Contains("claude"))
-        {
-            // These use chat completion APIs, format handled internally
-            return new InstructFormat(); // Default/empty format
-        }
-        else if (modelName.Contains("llama") || modelName.Contains("mistral"))
-        {
-            return new InstructFormat()
-            {
-                SystemStart = "<|im_start|>system\n",
-                SystemEnd = "<|im_end|>\n",
-                UserStart = "<|im_start|>user\n",
-                UserEnd = "<|im_end|>\n", 
-                BotStart = "<|im_start|>assistant\n",
-                BotEnd = "<|im_end|>\n"
-            };
-        }
-        else if (modelName.Contains("alpaca"))
-        {
-            return new InstructFormat()
-            {
-                SystemStart = "### System:\n",
-                SystemEnd = "\n\n",
-                UserStart = "### Human:\n", 
-                UserEnd = "\n\n",
-                BotStart = "### Assistant:\n",
-                BotEnd = "\n\n"
-            };
-        }
-        
-        return new InstructFormat(); // Default format
-    }
-}
-
-// Auto-configure based on connected model
-var format = FormatDetector.DetectFormat(LLMSystem.CurrentModel);
-LLMSystem.Instruct = format;
-```
-
-### 4. Dynamic System Prompt Generation
-
-```csharp
-public class DynamicPromptBuilder
-{
-    public static SystemPrompt CreateContextualPrompt(string taskType, string expertise)
-    {
-        return taskType.ToLower() switch
-        {
-            "coding" => new SystemPrompt()
-            {
-                Prompt = $"You are {{{{char}}}}, an expert programmer specializing in {expertise}. " +
-                         "Help {{{{user}}}} with coding questions and provide working examples.\n\n" +
-                         "# Your Expertise\n{{{{charbio}}}}\n\n# User Profile\n{{{{userbio}}}}",
-                DialogsTitle = "# Coding Style Guidelines",
-                ScenarioTitle = "# Development Context"
-            },
-            
-            "creative" => new SystemPrompt()
-            {
-                Prompt = "You are {{{{char}}}}, a creative assistant helping with writing and brainstorming. " +
-                         "Inspire {{{{user}}}} with imaginative ideas and engaging content.\n\n" +
-                         "# Your Creative Style\n{{{{charbio}}}}\n\n# User's Interests\n{{{{userbio}}}}",
-                DialogsTitle = "# Creative Approach",
-                ScenarioTitle = "# Creative Challenge"
-            },
-            
-            _ => new SystemPrompt()
-            {
-                Prompt = "You are {{{{char}}}}, ready to help {{{{user}}}} with any questions or tasks.\n\n" +
-                         "# About You\n{{{{charbio}}}}\n\n# About {{{{user}}}}\n{{{{userbio}}}}"
-            }
-        };
-    }
-}
-```
 
 ## Best Practices
 
 ### 1. Character Design
 - **Clear personality**: Define distinct traits, speech patterns, and behaviors
 - **Consistent bio**: Write comprehensive backgrounds that inform responses
-- **Meaningful names**: Use descriptive `UniqueName` values for file organization
+- **UniqueName**: Use filename (without extension) as `UniqueName` values for file organization
 - **Appropriate settings**: Enable `SenseOfTime` for realistic characters, disable for fantasy
 
 ### 2. Instruction Format Configuration
-- **Match your backend**: Use empty format for OpenAI-style APIs, specific formats for text completion
-- **Test thoroughly**: Verify format works with your specific model
+- **Match your backend**: Instruct format is only relevant for Text Completion (KoboldCpp), it's not used for OpenAI-style APIs
+- **Double Check**: Verify that the format is correct for the your specific model, or you'll degrade the output's quality immensely.
 - **Consider names**: Enable `AddNamesToPrompt` for better role recognition in some models
 - **Handle stop strings**: Add model-specific stop sequences to prevent runaway generation
 
@@ -761,109 +534,12 @@ public class DynamicPromptBuilder
 - **Error handling**: Gracefully handle file I/O and serialization errors
 
 ### 5. Memory and Performance
-- **Regular saves**: Call `EndChat()` before switching characters or closing
-- **Backup strategy**: Use backup parameters for important data
-- **History limits**: Monitor chat history size and trim if necessary
-- **Cache invalidation**: Call `LLMSystem.InvalidatePromptCache()` after significant changes
-
-## Troubleshooting
-
-### Common Issues
-
-#### 1. Character Not Responding In-Character
-```csharp
-// Check system prompt generation
-var generatedPrompt = LLMSystem.SystemPrompt.GetSystemPromptRaw(LLMSystem.Bot);
-Console.WriteLine(generatedPrompt);
-
-// Verify persona bio and examples
-if (string.IsNullOrEmpty(LLMSystem.Bot.Bio))
-{
-    Console.WriteLine("Warning: Bot bio is empty");
-}
-
-if (LLMSystem.Bot.ExampleDialogs.Count == 0)
-{
-    Console.WriteLine("Consider adding example dialogs for consistency");
-}
-```
-
-#### 2. Formatting Issues
-```csharp
-// Test message formatting
-var testMessage = LLMSystem.Instruct.FormatSinglePrompt(
-    AuthorRole.User, LLMSystem.User, LLMSystem.Bot, "Hello");
-Console.WriteLine($"Formatted message: '{testMessage}'");
-
-// Check for missing delimiters
-if (string.IsNullOrEmpty(LLMSystem.Instruct.BotStart))
-{
-    Console.WriteLine("Warning: BotStart delimiter is empty");
-}
-```
-
-#### 3. Macro Issues
-```csharp
-// Test macro replacement
-string template = "Hello {{user}}, I'm {{char}}!";
-string processed = LLMSystem.ReplaceMacros(template);
-Console.WriteLine($"Processed: {processed}");
-
-// Verify personas are set
-if (LLMSystem.Bot == null || LLMSystem.User == null)
-{
-    Console.WriteLine("Error: Bot or User persona not set");
-}
-```
-
-#### 4. File I/O Problems
-```csharp
-try
-{
-    LLMSystem.Bot.LoadChatHistory("data/chars/");
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"Failed to load chat history: {ex.Message}");
-    
-    // Create directory if it doesn't exist
-    Directory.CreateDirectory("data/chars/");
-    
-    // Start with fresh history
-    LLMSystem.Bot.History = new Chatlog();
-}
-```
-
-#### 5. Memory and Token Issues
-```csharp
-// Monitor system prompt size
-LLMSystem.OnFullPromptReady += (sender, prompt) =>
-{
-    int tokens = LLMSystem.GetTokenCount(prompt);
-    Console.WriteLine($"Total prompt tokens: {tokens}");
-    
-    if (tokens > LLMSystem.MaxContextLength * 0.8)
-    {
-        Console.WriteLine("Warning: Prompt approaching context limit");
-    }
-};
-
-// Limit self-edit tokens for smaller models
-if (LLMSystem.MaxContextLength < 4000)
-{
-    LLMSystem.Bot.SelfEditTokens = 50; // Reduce for smaller models
-}
-```
-
-This comprehensive documentation covers the essential aspects of using BasePersona, InstructFormat, and SystemPrompt classes in AIToolkit. These classes provide the foundation for creating rich, interactive AI characters with proper prompt formatting for various language models.
+- **Regular saves**: Call `EndChat()` before switching characters or closing the application
+- **Cache invalidation**: Call `LLMSystem.InvalidatePromptCache()` after live changes in prompt, persona, chatlog, or format change
 
 ## Additional Resources
 
 For more information about AIToolkit, see:
 - [LLMSystem Documentation](LLMSYSTEM.md) - Core system functionality
-- [Extensibility Guide](EXTENSIBILITY.md) - Advanced customization patterns
+- [Extensibility Guide](EXTENSIBILITY.md) - Extend BasePersona, Chatlog and ChatSession for your application
 - [Agent System Documentation](AGENT_SYSTEM.md) - AI agent capabilities
-
-The combination of these three classes enables developers to build sophisticated AI chat applications with minimal code while maintaining full control over character behavior and prompt formatting.
-
-This comprehensive documentation covers the essential aspects of using BasePersona, InstructFormat, and SystemPrompt classes in AIToolkit. These classes provide the foundation for creating rich, interactive AI characters with proper prompt formatting for various language models.
