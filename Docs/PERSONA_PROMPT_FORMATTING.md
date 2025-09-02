@@ -69,15 +69,15 @@ LLMSystem.User = developer;
 var chatMLFormat = new InstructFormat()
 {
     SysPromptStart = "<|im_start|>system\n",
-    SysPromptEnd = "<|im_end|>\n",
+    SysPromptEnd = "<|im_end|>",
     SystemStart = "<|im_start|>system\n",
-    SystemEnd = "<|im_end|>\n",
+    SystemEnd = "<|im_end|>,
     UserStart = "<|im_start|>user\n",
-    UserEnd = "<|im_end|>\n",
+    UserEnd = "<|im_end|>",
     BotStart = "<|im_start|>assistant\n",
-    BotEnd = "<|im_end|>\n",
+    BotEnd = "<|im_end|>",
     AddNamesToPrompt = false,
-    NewLinesBetweenMessages = false
+    NewLinesBetweenMessages = true
 };
 
 LLMSystem.Instruct = chatMLFormat;
@@ -146,22 +146,36 @@ public List<WorldInfo> MyWorlds { get; protected set; } // Loaded world info
 
 ### Core Methods
 
+While BasePersona can be used "as is", it's generally meant to be overriden by a class defined at the application level.
+
 #### Session Management
 ```csharp
 // Override these for custom behavior
 public override void BeginChat()
 {
-    // Called when character is loaded
-    // Load chat history, world info, plugins
-    LoadChatHistory("data/chars/");
-    // Custom loading logic here
+    base.BeginChat();
+    if (IsUser)
+        return;
+    // Loading plugins (if using plugin system)
+    foreach (var item in LLMSystem.ContextPlugins)
+    {
+        item.Enabled = Plugins.Contains(item.PluginID);
+    }
+    // Load the chat history automatically on character switch
+    LoadChatHistory("your/path/to/chatlogs/");
+    // Load the WorldInfo tied to this character (example code, obviously)
+    MyWorlds = [.. DataFiles.WorldInfos.Values.Where(wi => Worlds.Contains(wi.UniqueName))];
+    foreach (var item in MyWorlds)
+        item.Reset();
+    // more custom logic if necessary
 }
 
 public override void EndChat(bool backup = false)
 {
+    base.EndChat(backup);
     // Called when switching characters or closing
     // Save chat history and other data
-    SaveChatHistory("data/chars/", backup);
+    SaveChatHistory("your/path/to/chatlogs/", backup);
     // Custom saving logic here
 }
 ```
@@ -188,6 +202,9 @@ public async Task UpdateSelfEditSection()
 ### Advanced Features
 
 #### Extensibility
+
+See [Extensibility Guide](EXTENSIBILITY.md) for more information. Makes it possible to override Chatlog and ChatSession classes. Optional.
+
 ```csharp
 // Override factory methods for custom types
 protected virtual Chatlog CreateChatlog()
