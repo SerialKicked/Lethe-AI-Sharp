@@ -24,7 +24,10 @@ namespace AIToolkit.Agent
         private readonly List<IAgentPlugin> _plugins = [];
         private readonly Dictionary<string, Func<IAgentPlugin>> _pluginRegistry = [];
         private Task? _loop;
-        private readonly Lock _queueLock = new();
+        // Replace this line:
+        // private readonly Lock _queueLock = new();
+        // With the following:
+        private readonly object _queueLock = new();
         private AgentConfig _config = null!;
         private AgentState _state = null!;
         private DateTime _lastUserMessageUtc = DateTime.UtcNow;

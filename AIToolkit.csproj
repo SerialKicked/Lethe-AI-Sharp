@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
@@ -9,7 +9,7 @@
      <FileEncoding>utf-8</FileEncoding>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="HNSW" Version="25.7.60036" />
+    <PackageReference Include="HNSW" Version="25.3.56901" />
     <PackageReference Include="LLamaSharp" Version="0.25.0" />
     <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.25.0" />
     <PackageReference Include="LLamaSharp.Backend.Cuda12" Version="0.25.0" />
