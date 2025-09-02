@@ -512,16 +512,96 @@ var taskTemplate = new SystemPrompt()
 
 The SystemPrompt class automatically processes these macros:
 
-- `{{char}}` - Bot's name
+- `{{char}}` - Bot's name (in group chats, refers to current active bot)
 - `{{user}}` - User's name  
-- `{{charbio}}` - Bot's biography
+- `{{charbio}}` - Bot's biography (in group chats, refers to current active bot)
 - `{{userbio}}` - User's biography
-- `{{examples}}` - Bot's dialog examples
+- `{{examples}}` - Bot's dialog examples (in group chats, refers to current active bot)
 - `{{scenario}}` - Current scenario
-- `{{selfedit}}` - Bot's self-reflection content
+- `{{selfedit}}` - Bot's self-reflection content (in group chats, refers to current active bot)
 - `{{date}}` - Current date
 - `{{time}}` - Current time
 - `{{day}}` - Current day of week
+
+#### Group Chat Specific Macros
+
+When using GroupPersona for group conversations, additional macros are available:
+
+- `{{group}}` - Formatted list of all bot personas (Name + Bio) in the group
+- `{{currentchar}}` - Explicitly refers to the current active bot's name
+- `{{currentcharbio}}` - Explicitly refers to the current active bot's biography
+
+## Group Chat Support
+
+AIToolkit now supports group conversations with multiple AI personas using the `GroupPersona` class.
+
+### Creating a Group Chat
+
+```csharp
+using AIToolkit.Files;
+using AIToolkit.LLM;
+
+// Create individual bot personas
+var alice = new BasePersona
+{
+    Name = "Alice",
+    Bio = "A helpful AI assistant who specializes in problem-solving.",
+    UniqueName = "alice_assistant",
+    IsUser = false
+};
+
+var bob = new BasePersona
+{
+    Name = "Bob", 
+    Bio = "A creative AI assistant who loves storytelling.",
+    UniqueName = "bob_creative",
+    IsUser = false
+};
+
+// Create group persona
+var teamChat = new GroupPersona
+{
+    Name = "AI Support Team",
+    Bio = "A collaborative team of AI assistants",
+    UniqueName = "ai_support_team",
+    Scenario = "Multiple AI assistants collaborate to help users"
+};
+
+// Add bots to the group
+teamChat.AddBotPersona(alice);
+teamChat.AddBotPersona(bob);
+
+// Set as current bot in LLMSystem
+LLMSystem.Bot = teamChat;
+```
+
+### Managing Group Conversations
+
+```csharp
+// Check if currently in group mode
+if (LLMSystem.IsGroupConversation)
+{
+    // Get all bots in the group
+    var bots = LLMSystem.GetGroupBots();
+    
+    // Get current active bot
+    var currentBot = LLMSystem.GetCurrentGroupBot();
+    
+    // Switch to a different bot
+    LLMSystem.SetCurrentGroupBot("bob_creative");
+    
+    // Get the group persona
+    var group = LLMSystem.GetGroupPersona();
+}
+```
+
+### Group Chat Features
+
+- **Multiple Personas**: Add multiple bot personas to a single conversation
+- **Current Bot Tracking**: {{char}} and {{charbio}} macros refer to the currently active bot
+- **Group Information**: {{group}} macro provides formatted list of all participants
+- **Dynamic Switching**: Change which bot responds without losing conversation context
+- **Backward Compatibility**: Existing 1:1 conversations continue to work unchanged
 
 
 ## Best Practices
