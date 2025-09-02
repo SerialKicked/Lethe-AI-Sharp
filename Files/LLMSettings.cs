@@ -57,6 +57,13 @@ namespace AIToolkit.Files
         /// <summary> Index at which RAG entries will be inserted </summary>
         public int RAGIndex { get; set; } = 3;
 
+        /// <summary> 
+        /// Path to embeddding model. RAG functionalities won't be available if this file is not present. 
+        /// The model must be in the GGUF format. Default can be downloaded here:
+        /// https://huggingface.co/ChristianAzinn/gte-large-gguf
+        /// </summary>
+        public string RAGModelPath { get; set; } = "data/models/gte-large.Q6_K.gguf";
+
         /// <summary> Embedding size (depends on the embedding model) </summary>
         public int RAGEmbeddingSize { get; set; } = 1024;
 

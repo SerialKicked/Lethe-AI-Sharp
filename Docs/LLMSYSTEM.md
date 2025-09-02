@@ -331,17 +331,8 @@ LLMSystem.Sampler.MaxLength = 200;
 ```
 
 ### Instruction Format
-```csharp
-// Configure instruction format for different models
-LLMSystem.Instruct.InstructionTemplate = "### Instruction:\n{0}\n\n### Response:\n";
-LLMSystem.Instruct.AddNamesToPrompt = true;
-LLMSystem.Instruct.SystemPromptInInstruction = true;
 
-// For thinking models
-LLMSystem.Instruct.ThinkingStart = "<thinking>";
-LLMSystem.Instruct.ThinkingEnd = "</thinking>";
-LLMSystem.Instruct.PrefillThinking = true;
-```
+See [Documentation](PERSONA_PROMPT_FORMATTING.md) for details on configuring prompt styles.
 
 ### LLM Settings
 ```csharp
@@ -349,9 +340,11 @@ LLMSystem.Instruct.PrefillThinking = true;
 LLMSystem.Settings.MaxReplyLength = 400;
 LLMSystem.Settings.BackendUrl = "http://localhost:5001";
 LLMSystem.Settings.BackendAPI = BackendAPI.KoboldAPI;
+LLMSystem.Settings.SessionMemorySystem = true; // Enable session memory system
 
 // RAG settings
 LLMSystem.Settings.RAGEnabled = true;
+LLMSystem.Settings.RAGModelPath = "path/to/embeddings/file.gguf"; // Must exists if RAGEnabled = true
 LLMSystem.Settings.RAGMaxEntries = 3;
 LLMSystem.Settings.RAGMoveToSysPrompt = false;
 
@@ -359,9 +352,7 @@ LLMSystem.Settings.RAGMoveToSysPrompt = false;
 LLMSystem.Settings.SessionHandling = SessionHandling.FitAll;
 LLMSystem.Settings.ReservedSessionTokens = 1000;
 
-// World info and plugins
-LLMSystem.Settings.AllowWorldInfo = true;
-LLMSystem.Settings.StopGenerationOnFirstParagraph = false;
+// ... more settings, check the file for a detailed list
 ```
 
 ## Common Usage Patterns
@@ -417,6 +408,10 @@ public async Task<string> AskQuestionAsync(string question)
 ```
 
 ### 3. Advanced Persona Setup
+
+
+See [Documentation](PERSONA_PROMPT_FORMATTING.md) for details on setting up proper characters.
+
 ```csharp
 public void SetupCustomBot()
 {
@@ -433,7 +428,7 @@ public void SetupCustomBot()
         
         // Enable advanced features
         SenseOfTime = true,
-        SessionMemorySystem = true,
+
         DatesInSessionSummaries = true
     };
     
@@ -451,41 +446,10 @@ public void SetupCustomBot()
 }
 ```
 
-### 4. Error Handling
-```csharp
-public async Task SafeSendMessageAsync(string message)
-{
-    try
-    {
-        // Check system status
-        if (LLMSystem.Status != SystemStatus.Ready)
-        {
-            Console.WriteLine("System not ready. Current status: " + LLMSystem.Status);
-            return;
-        }
-        
-        // Check backend connection
-        if (!await LLMSystem.CheckBackend())
-        {
-            Console.WriteLine("Backend connection failed");
-            await LLMSystem.Connect(); // Try to reconnect
-            return;
-        }
-        
-        await LLMSystem.SendMessageToBot(AuthorRole.User, message);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error sending message: {ex.Message}");
-        LLMSystem.Logger?.LogError(ex, "Failed to send message");
-    }
-}
-```
-
 ## Best Practices
 
 ### 1. Always Handle Events
-Set up event handlers before sending messages to ensure you capture all responses:
+Set up event handlers before sending messages to ensure you capture all responses. AIToolkit is heavily event-driven, especially for streaming responses.
 
 ```csharp
 // Set up handlers first
@@ -590,21 +554,6 @@ LLMSystem.OnFullPromptReady += (s, prompt) =>
 };
 ```
 
-#### 4. Memory/Performance Issues
-```csharp
-// Limit chat history size
-LLMSystem.Settings.SessionHandling = SessionHandling.CurrentOnly;
-
-// Disable RAG if not needed
-LLMSystem.Settings.RAGEnabled = false;
-
-// Clear old sessions periodically
-if (LLMSystem.History.Sessions.Count > 10)
-{
-    LLMSystem.History.Sessions.RemoveRange(0, 5);
-}
-```
-
 ## Macro System
 
 LLMSystem includes a powerful macro replacement system for dynamic content:
@@ -631,6 +580,9 @@ string processed = LLMSystem.ReplaceMacros(template);
 ## Integration with Other Systems
 
 ### Working with RAGSystem
+
+Proper documention has yet to be written/
+
 ```csharp
 // Configure RAG integration
 LLMSystem.Settings.RAGEnabled = true;
@@ -641,6 +593,9 @@ LLMSystem.Settings.RAGMaxEntries = 5;
 ```
 
 ### Working with Plugins
+
+Proper documention has yet to be written.
+
 ```csharp
 // Add context plugins
 LLMSystem.ContextPlugins.Add(new MyCustomPlugin());
@@ -648,5 +603,3 @@ LLMSystem.ContextPlugins.Add(new MyCustomPlugin());
 // Plugins can modify user input, add system messages,
 // and post-process responses
 ```
-
-This comprehensive documentation covers all major aspects of the LLMSystem class. For more specific examples or advanced use cases, refer to the source code documentation and other parts of the AIToolkit documentation.

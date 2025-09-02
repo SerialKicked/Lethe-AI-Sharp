@@ -115,12 +115,17 @@ namespace AIToolkit.LLM
         {
             if (EmbedSettings != null)
                 UnloadEmbedder();
-            EmbedSettings = new ModelParams(string.Format("data/models/{0}.gguf", "gte-large.Q6_K"))
+            if (!File.Exists(LLMSystem.Settings.RAGModelPath))
+            {
+                EmbedSettings = null;
+                Enabled = false;
+                throw new FileNotFoundException("Embedding model not found: " + LLMSystem.Settings.RAGModelPath);
+            }
+            EmbedSettings = new ModelParams(LLMSystem.Settings.RAGModelPath)
             { 
                 GpuLayerCount = 255,
                 Embeddings = true
             };
-            LLMSystem.Settings.RAGEmbeddingSize = 1024;
             EmbedWeights = LLamaWeights.LoadFromFile(EmbedSettings);
             Embedder = new LLamaEmbedder(EmbedWeights, EmbedSettings);
             
