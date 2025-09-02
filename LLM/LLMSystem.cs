@@ -540,7 +540,7 @@ namespace AIToolkit.LLM
             else
                 msgtxt += $" The last chat was about {timespan.Hours} hours ago. " + "It is {{time}} now.";
             msgtxt = "*" + msgtxt.Trim() + "*" + NewLine;
-            return ReplaceMacros(msgtxt);
+            return ReplaceMacros(msgtxt + NewLine);
         }
 
         /// <summary>
