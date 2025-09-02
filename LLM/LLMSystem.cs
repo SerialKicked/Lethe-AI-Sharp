@@ -466,6 +466,13 @@ namespace AIToolkit.LLM
         {
             if (string.IsNullOrEmpty(inputText))
                 return string.Empty;
+
+            // Check if character is a GroupPersona and use group-aware replacement
+            if (character is GroupPersona groupPersona)
+            {
+                return ReplaceMacros(inputText, user, groupPersona);
+            }
+
             StringBuilder res = new(inputText);
             res.Replace("{{user}}", user.Name)
                .Replace("{{userbio}}", user.GetBio(character.Name))
@@ -493,6 +500,74 @@ namespace AIToolkit.LLM
                .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
                .Replace("{{selfedit}}", character.SelfEditField)
                .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? character.GetScenario(userName) : Settings.ScenarioOverride);
+            return res.ToString().CleanupAndTrim();
+        }
+
+        /// <summary>
+        /// Replaces macros in a string with values for group chat context.
+        /// In group context, {{char}} and {{charbio}} refer to the current active bot.
+        /// </summary>
+        /// <param name="inputText">The text to process</param>
+        /// <param name="user">The user persona</param>
+        /// <param name="groupPersona">The group persona container</param>
+        /// <returns>Text with macros replaced</returns>
+        public static string ReplaceMacros(string inputText, BasePersona user, GroupPersona groupPersona)
+        {
+            if (string.IsNullOrEmpty(inputText))
+                return string.Empty;
+
+            var currentBot = groupPersona.CurrentBot ?? groupPersona.BotPersonas.FirstOrDefault();
+            if (currentBot == null)
+                return ReplaceMacros(inputText, user, groupPersona as BasePersona);
+
+            StringBuilder res = new(inputText);
+            res.Replace("{{user}}", user.Name)
+               .Replace("{{userbio}}", user.GetBio(currentBot.Name))
+               .Replace("{{char}}", currentBot.Name)
+               .Replace("{{charbio}}", currentBot.GetBio(user.Name))
+               .Replace("{{currentchar}}", currentBot.Name)
+               .Replace("{{currentcharbio}}", currentBot.GetBio(user.Name))
+               .Replace("{{examples}}", currentBot.GetDialogExamples(user.Name))
+               .Replace("{{group}}", groupPersona.GetGroupPersonasList(user.Name))
+               .Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
+               .Replace("{{time}}", DateTime.Now.ToShortTimeString())
+               .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
+               .Replace("{{selfedit}}", currentBot.SelfEditField)
+               .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? groupPersona.GetScenario(user.Name) : Settings.ScenarioOverride);
+            return res.ToString().CleanupAndTrim();
+        }
+
+        /// <summary>
+        /// Replaces macros in a string with values for group chat context using string userName.
+        /// In group context, {{char}} and {{charbio}} refer to the current active bot.
+        /// </summary>
+        /// <param name="inputText">The text to process</param>
+        /// <param name="userName">The user's name</param>
+        /// <param name="groupPersona">The group persona container</param>
+        /// <returns>Text with macros replaced</returns>
+        public static string ReplaceMacros(string inputText, string userName, GroupPersona groupPersona)
+        {
+            if (string.IsNullOrEmpty(inputText))
+                return string.Empty;
+
+            var currentBot = groupPersona.CurrentBot ?? groupPersona.BotPersonas.FirstOrDefault();
+            if (currentBot == null)
+                return ReplaceMacros(inputText, userName, groupPersona as BasePersona);
+
+            StringBuilder res = new(inputText);
+            res.Replace("{{user}}", userName)
+               .Replace("{{userbio}}", "This is the user interacting with you.")
+               .Replace("{{char}}", currentBot.Name)
+               .Replace("{{charbio}}", currentBot.GetBio(userName))
+               .Replace("{{currentchar}}", currentBot.Name)
+               .Replace("{{currentcharbio}}", currentBot.GetBio(userName))
+               .Replace("{{examples}}", currentBot.GetDialogExamples(userName))
+               .Replace("{{group}}", groupPersona.GetGroupPersonasList(userName))
+               .Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
+               .Replace("{{time}}", DateTime.Now.ToShortTimeString())
+               .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
+               .Replace("{{selfedit}}", currentBot.SelfEditField)
+               .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? groupPersona.GetScenario(userName) : Settings.ScenarioOverride);
             return res.ToString().CleanupAndTrim();
         }
 
@@ -704,6 +779,56 @@ namespace AIToolkit.LLM
         }
 
         /// <summary>
+        /// Checks if the current bot is a group persona.
+        /// </summary>
+        /// <returns>True if the current bot is a GroupPersona, false otherwise.</returns>
+        public static bool IsGroupConversation => Bot is GroupPersona;
+
+        /// <summary>
+        /// Gets the current GroupPersona if the bot is a group, null otherwise.
+        /// </summary>
+        /// <returns>The GroupPersona or null if not in group mode.</returns>
+        public static GroupPersona? GetGroupPersona() => Bot as GroupPersona;
+
+        /// <summary>
+        /// Sets the current active bot in a group conversation.
+        /// </summary>
+        /// <param name="uniqueName">The unique name of the bot persona to set as current.</param>
+        /// <exception cref="InvalidOperationException">Thrown when not in group conversation mode.</exception>
+        /// <exception cref="ArgumentException">Thrown when the specified bot is not found in the group.</exception>
+        public static void SetCurrentGroupBot(string uniqueName)
+        {
+            var groupPersona = GetGroupPersona();
+            if (groupPersona == null)
+                throw new InvalidOperationException("Cannot set current group bot when not in group conversation mode.");
+
+            groupPersona.SetCurrentBot(uniqueName);
+            InvalidatePromptCache();
+            
+            // Trigger bot changed event for UI updates
+            OnBotChanged?.Invoke(null, bot);
+            EventBus.Publish(new BotChangedEvent(uniqueName));
+        }
+
+        /// <summary>
+        /// Gets the currently active bot in a group conversation.
+        /// </summary>
+        /// <returns>The current bot persona, or null if not in group mode or no bot is set.</returns>
+        public static BasePersona? GetCurrentGroupBot()
+        {
+            return GetGroupPersona()?.CurrentBot;
+        }
+
+        /// <summary>
+        /// Gets all bot personas in the group conversation.
+        /// </summary>
+        /// <returns>List of bot personas if in group mode, empty list otherwise.</returns>
+        public static List<BasePersona> GetGroupBots()
+        {
+            return GetGroupPersona()?.BotPersonas ?? [];
+        }
+
+        /// <summary>
         /// Generates the system prompt content.
         /// </summary>
         /// <param name="MsgSender"></param>
@@ -858,8 +983,11 @@ namespace AIToolkit.LLM
             {
                 if (role == AuthorRole.Assistant)
                 {
-                    realprompt = string.Format("{0}: {1}", bot.Name, prompt);
-                    selname = bot.Name;
+                    // For group conversations, use the current bot's name
+                    var actualBot = bot is GroupPersona groupPersona ? 
+                        (groupPersona.CurrentBot ?? groupPersona.BotPersonas.FirstOrDefault() ?? bot) : bot;
+                    realprompt = string.Format("{0}: {1}", actualBot.Name, prompt);
+                    selname = actualBot.Name;
                 }
                 else if (role == AuthorRole.User)
                 {
