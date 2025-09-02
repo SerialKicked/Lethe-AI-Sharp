@@ -20,9 +20,17 @@ namespace AIToolkit.Files
     public class GroupPersona : BasePersona
     {
         /// <summary>
-        /// List of bot personas participating in the group conversation.
-        /// Does not include the user persona.
+        /// List of unique names of bot personas participating in the group conversation.
+        /// Used for serialization to avoid nested persona objects in JSON.
         /// </summary>
+        public List<string> BotPersonaNames { get; set; } = [];
+
+        /// <summary>
+        /// List of bot personas participating in the group conversation.
+        /// Does not include the user persona. This is populated dynamically during BeginChat()
+        /// from LLMSystem.LoadedPersonas using BotPersonaNames.
+        /// </summary>
+        [JsonIgnore]
         public List<BasePersona> BotPersonas { get; set; } = [];
 
         /// <summary>
@@ -55,8 +63,12 @@ namespace AIToolkit.Files
             if (persona.IsUser)
                 throw new ArgumentException("Cannot add user personas to group chat. Only bot personas are allowed.");
 
-            if (!BotPersonas.Any(p => p.UniqueName == persona.UniqueName))
+            if (string.IsNullOrEmpty(persona.UniqueName))
+                throw new ArgumentException("Persona must have a valid UniqueName.");
+
+            if (!BotPersonaNames.Contains(persona.UniqueName))
             {
+                BotPersonaNames.Add(persona.UniqueName);
                 BotPersonas.Add(persona);
                 
                 // Set as current bot if this is the first one added
@@ -76,6 +88,7 @@ namespace AIToolkit.Files
             var persona = BotPersonas.FirstOrDefault(p => p.UniqueName == uniqueName);
             if (persona != null)
             {
+                BotPersonaNames.Remove(uniqueName);
                 BotPersonas.Remove(persona);
                 
                 // If we removed the current bot, switch to the first available one
@@ -198,10 +211,17 @@ namespace AIToolkit.Files
         {
             base.BeginChat();
             
-            // Initialize all bot personas
-            foreach (var persona in BotPersonas)
+            // Clear the current BotPersonas list and repopulate from LoadedPersonas
+            BotPersonas.Clear();
+            
+            // Load personas from LLMSystem.LoadedPersonas based on BotPersonaNames
+            foreach (var personaName in BotPersonaNames)
             {
-                persona.BeginChat();
+                if (LLMSystem.LoadedPersonas.TryGetValue(personaName, out var persona))
+                {
+                    BotPersonas.Add(persona);
+                    persona.BeginChat();
+                }
             }
             
             // Restore current bot from saved ID
@@ -213,6 +233,13 @@ namespace AIToolkit.Files
                     CurrentBot = savedBot;
                 }
             }
+            
+            // If no current bot is set but we have personas, set the first one
+            if (CurrentBot == null && BotPersonas.Count > 0)
+            {
+                CurrentBot = BotPersonas.First();
+                CurrentBotId = CurrentBot.UniqueName;
+            }
         }
 
         /// <summary>
@@ -223,6 +250,9 @@ namespace AIToolkit.Files
         {
             // Save current bot ID for restoration
             CurrentBotId = CurrentBot?.UniqueName ?? string.Empty;
+            
+            // Ensure BotPersonaNames is synchronized with BotPersonas
+            BotPersonaNames = BotPersonas.Select(p => p.UniqueName).ToList();
             
             // End chat for all bot personas
             foreach (var persona in BotPersonas)

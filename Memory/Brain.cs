@@ -125,6 +125,11 @@ namespace AIToolkit.Memory
 
         [JsonIgnore] public Queue<MemoryUnit> Eurekas { get; set; } = [];
 
+        /// <summary>
+        /// Checks if Brain functionality should be disabled (currently returns true for group conversations)
+        /// </summary>
+        private bool IsBrainDisabled => LLMSystem.IsGroupConversation;
+
         public void CharacterLoad()
         {
             // Remove old natural memories
@@ -149,6 +154,9 @@ namespace AIToolkit.Memory
 
         public void OnUserPost(string userinput)
         {
+            if (IsBrainDisabled)
+                return;
+                
             CharacterLoad();
             if (!string.IsNullOrWhiteSpace(LLMSystem.Settings.ScenarioOverride) || Eurekas.Count == 0)
                 return;
@@ -160,6 +168,9 @@ namespace AIToolkit.Memory
 
         public void InsertEureka()
         {
+            if (IsBrainDisabled)
+                return;
+                
             CurrentDelay = 0;
             LastInsertTime = DateTime.Now;
             if (!Eurekas.TryDequeue(out var memory))
