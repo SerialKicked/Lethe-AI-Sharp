@@ -30,7 +30,18 @@ namespace AIToolkit.LLM
     /// </summary>
     public static class LLMSystem
     {
+        /// <summary> All settings for the LLM system. </summary>
         public static LLMSettings Settings { get; set; } = new();
+
+        /// <summary>
+        /// Client to communicate with the LLM backend (KoboldAPI, OpenAI API). 
+        /// </summary>
+        public static ILLMServiceClient? Client { get; private set; }
+
+        /// <summary>
+        /// Unified prompt builder to create prompts for the currently loaded backend.
+        /// </summary>
+        public static IPromptBuilder? PromptBuilder { get; private set; }
 
         /// <summary> Total token context window the model can handle </summary>
         public static int MaxContextLength { 
@@ -49,10 +60,12 @@ namespace AIToolkit.LLM
         /// <summary> Name of the current backend </summary>
         public static string Backend { get; private set; } = string.Empty;
 
-        /// <summary> If >= 0 it'll override the selected sampler's temperature setting. </summary>
+        /// <summary> If >= 0 it'll override the selected sampler's temperature setting.</summary>
         public static double ForceTemperature { get; set; } = 0.7;
 
-        /// <summary> Override the Instruct Format setting deciding if character names should be inserted into the prompts (null to disable) </summary>
+        /// <summary> 
+        /// Override the Instruct Format setting deciding if character names should be inserted into the prompts (null to disable) 
+        /// </summary>
         public static bool? NamesInPromptOverride { get; set; } = null;
 
         internal static Dictionary<string, BasePersona> LoadedPersonas = [];
@@ -67,6 +80,7 @@ namespace AIToolkit.LLM
         public static event EventHandler<string>? OnInferenceEnded;
         /// <summary> Called when the system changes states (no init, busy, ready) </summary>
         public static event EventHandler<SystemStatus>? OnStatusChanged;
+        /// <summary> Called when the bot persona is changed, returns the new bot </summary>
         public static event EventHandler<BasePersona>? OnBotChanged;
 
         /// <summary> Set to true if the backend supports text-to-speech </summary>
@@ -79,7 +93,6 @@ namespace AIToolkit.LLM
         public static bool SupportsVision => Client?.SupportsVision ?? false;
 
         public static CompletionType CompletionAPIType => Client?.CompletionType ?? CompletionType.Text;
-
 
         private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(null, fullprompt);
         private static void RaiseOnStatusChange(SystemStatus newStatus) => OnStatusChanged?.Invoke(null, newStatus);
@@ -133,8 +146,10 @@ namespace AIToolkit.LLM
         /// <seealso cref="SamplerSettings"/>
         public static SamplerSettings Sampler { get; set; } = new();
 
-        /// <summary> Customer system prompt that will be used. See SysPrompt </summary>
-        /// <seealso cref="SystemPrompt"/>"
+        /// <summary> 
+        /// System prompt to be used when communicating with the LLM.
+        /// </summary>
+        /// <seealso cref="Files.SystemPrompt"/>"
         public static SystemPrompt SystemPrompt { get; set; } = new();
 
         /// <summary> Shortcut to the chat history of the currently loaded bot. </summary>
@@ -152,10 +167,6 @@ namespace AIToolkit.LLM
         private static BasePersona user = new() { IsUser = true, Name = "User", UniqueName = string.Empty };
 
         internal static List<string> vlm_pictures = [];
-
-        public static ILLMServiceClient? Client { get; private set; }
-        public static IPromptBuilder? PromptBuilder { get; private set; }
-
         internal static HashSet<Guid> usedGuidInSession = [];
         internal static PromptInserts dataInserts = [];
         internal static readonly Random RNG = new();
@@ -719,10 +730,10 @@ namespace AIToolkit.LLM
                     rawprompt.AppendLinuxLine(item.Content);
             }
 
-            if (Bot.SessionMemorySystem && Settings.ReservedSessionTokens > 0 && History.Sessions.Count > 1)
+            if (Settings.SessionMemorySystem && Settings.SessionReservedTokens > 0 && History.Sessions.Count > 1)
             {
                 usedGuidInSession = dataInserts.GetGuids();
-                var shistory = History.GetPreviousSummaries(Settings.ReservedSessionTokens - GetTokenCount(ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator);
+                var shistory = History.GetPreviousSummaries(Settings.SessionReservedTokens - GetTokenCount(ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator);
                 if (!string.IsNullOrEmpty(shistory))
                 {
                     rawprompt.AppendLinuxLine(NewLine + ReplaceMacros(SystemPrompt.SessionHistoryTitle) + NewLine);

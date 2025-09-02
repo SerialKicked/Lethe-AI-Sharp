@@ -1,8 +1,6 @@
 This is a C# based repository for a middleware DLL used between a LLM backend and a UI Frontend. It is primarily used to simplify the heavy duty operations, offering powerful functions and premade file formats to the end developer. Please follow these guidelines when contributing:
 
-## Code Standards
-
-### Base Requirements
+## Base Requirements
 - Never change the target platform or NET version
 - Documentation must be in English and go in the Docs/ folder
 

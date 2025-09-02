@@ -8,42 +8,104 @@ using System.Text;
 
 namespace AIToolkit.Files
 {
+    /// <summary>
+    /// Represents a base persona, which serves as a customizable character or user profile with attributes, behaviors,
+    /// and settings for interaction in chat-based systems.
+    /// </summary>
+    /// <remarks>
+    /// The class provides a foundation for defining personas with
+    /// properties such as name, biography, scenarios, and dialog examples. It supports macros for dynamic text
+    /// replacement, self-editable fields, and integration with plugins and world information. This class is designed to
+    /// be extended for more specialized persona implementations.  Key features include: 
+    /// - Support for user or bot personas via the IsUser flag. 
+    /// - Dynamic macro replacement in fields like Bio and Scenarios
+    /// - Management of chat history, world information, and plugins. 
+    /// - Customizable system prompts and session behaviors. 
+    /// - Factory methods for creating chat logs and sessions.  
+    /// - Derived classes can override methods such as BeginChat and EndChat to implement custom loading and saving behaviors.
+    /// </remarks>
     public class BasePersona : BaseFile
     {
-        public enum AttributeCategory { Core, Physical, Personality, Tastes, Sexuality, Relationships, Mood, End }
-
-        /// <summary> Character's name (used by LLM) </summary>
-        public string Name { get; set; } = string.Empty;
-        public bool IsUser { get; set; } = false;
-        /// <summary> Character's bio (used by LLM) </summary>
-        public string Bio { get; set; } = string.Empty;
-        /// <summary> Self editable field for the character (updated on new summary) </summary>
-        public string SelfEditField { get; set; } = string.Empty;
-        /// <summary> Character's default scenario (used by LLM) </summary>
-        public string Scenario { get; set; } = string.Empty;
-        /// <summary> First message the character will send when starting a new session </summary>
-        public List<string> FirstMessage { get; set; } = [];
-        /// <summary> Examples of dialogs from the character to get a more consistent tone </summary>
-        public List<string> ExampleDialogs { get; set; } = [];
-        /// <summary> Custom system prompt for this character </summary>
-        public string SystemPrompt { get; set; } = string.Empty;
-        /// <summary> WorldInfo applied to this character </summary>
-        public List<string> Worlds { get; set; } = [];
-        /// <summary> Optional world info being used for the Location plugin </summary>
-        public List<string> Plugins { get; set; } = [];
-        /// <summary> If set to true, older chat sessions will be summarized, allowing for a advanced form of memory </summary>
-        public bool SessionMemorySystem { get; set; } = false;
-        /// <summary> If set to true, this bot will stay informed about the spacing between user messages </summary>
-        public bool SenseOfTime { get; set; } = false;
         /// <summary> 
-        /// If set above 0, this character will be allowed to write this amount of tokens in its system prompt. Altered each new session. 
+        /// Is this an User or Bot persona. It's mostly a flag for the front-end but also helps with prompt macros.
+        /// </summary>
+        public bool IsUser { get; set; } = false;
+
+        /// <summary> 
+        /// Character's name
+        /// can be put into system prompt and other inputs with {{user}} or {{char}} macros
+        /// </summary>
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary> 
+        /// Character's bio.
+        /// Can be put into prompt with {{userbio}} or {{charbio}} macros
+        /// </summary>
+        public string Bio { get; set; } = string.Empty;
+
+        /// <summary> 
+        /// Optional Self-editable field for the character, updated on new summary if SelfEditTokens > 0. 
+        /// Can be put into prompt with the {{selfedit}} macro.
+        /// </summary>
+        public string SelfEditField { get; set; } = string.Empty;
+
+        /// <summary> 
+        /// If set above 0, this character will be allowed to write this amount of tokens in its SelfEditField field. Updated each chat session.
         /// </summary>
         public int SelfEditTokens { get; set; } = 0;
+
+        /// <summary> 
+        /// Character's default scenario. An arbitrary text to give some context to the language model
+        /// Can be put into the prompt with the {{scenario}} macro.
+        /// </summary>
+        /// <seealso cref="Files.SystemPrompt"/>
+        public string Scenario { get; set; } = string.Empty;
+
+        /// <summary> 
+        /// First message the character will send when starting a new session 
+        /// </summary>
+        public List<string> FirstMessage { get; set; } = [];
+
+        /// <summary> 
+        /// Examples of dialogs from the character to get a more consistent tone, assuming the system prompt has a field for this. 
+        /// </summary>
+        /// <seealso cref="Files.SystemPrompt"/>
+        public List<string> ExampleDialogs { get; set; } = [];
+
+        /// <summary> 
+        /// If set, this will override the system prompt selected in LLMSystem and use this instead. Can be useful for very custom characters. 
+        /// </summary>
+        /// <seealso cref="Files.SystemPrompt"/>
+        public string SystemPrompt { get; set; } = string.Empty;
+
+        /// <summary> 
+        /// WorldInfo ID applied to this character. WorldInfo is a keyword-activated text insertion system that can be used to give context to the model.
+        /// Those are unique ID corresponding to the actual files in the front-end. 
+        /// The frontend is meant to ovedride BeginChat() and load the actual WorldInfo files into the MyWorlds field.
+        /// </summary>
+        /// <seealso cref="Files.WorldInfo"/>
+        public List<string> Worlds { get; set; } = [];
+
+        /// <summary> 
+        /// Optional list of ID for the IContextPlugin plugins that you want this character to load automatically.
+        /// </summary>
+        public List<string> Plugins { get; set; } = [];
+
+        /// <summary> 
+        /// If set to true, system messages will occasionally be inserted in the chat to inform the bot of how much time has passed 
+        /// between the latest user message and its last response. It'll also help with keeping track of dates and time in general.
+        /// </summary>
+        public bool SenseOfTime { get; set; } = false;
+
         /// <summary>
-        /// For better recall accuracy IRL dates are included in session summaries, however for roleplay characters, this might be counter productive. Set this to false to disable dates.
+        /// For better recall accuracy IRL dates are included in session summaries. 
+        /// However for roleplay characters, this might be counter productive. Set this to false to disable dates.
         /// </summary>
         public bool DatesInSessionSummaries { get; set; } = true;
 
+        /// <summary>
+        /// Work in progress, don't document
+        /// </summary>
         [JsonIgnore] public Brain Brain { get; set; } = new();
 
         [JsonIgnore] public List<WorldInfo> MyWorlds { get; protected set; } = [];
@@ -66,6 +128,12 @@ namespace AIToolkit.Files
         {
             return new ChatSession();
         }
+
+        /// <summary>
+        /// Retrieve the bio with the correct macros replaced (depending if User or Bot)
+        /// </summary>
+        /// <param name="othername"></param>
+        /// <returns></returns>
         public string GetBio(string othername)
         {
             if (IsUser)
@@ -78,6 +146,11 @@ namespace AIToolkit.Files
             }
         }
 
+        /// <summary>
+        /// Retrieve the scenario with the correct macros replaced (depending if User or Bot)
+        /// </summary>
+        /// <param name="othername"></param>
+        /// <returns></returns>
         public string GetScenario(string othername) => IsUser ?
             Scenario.Replace("{{user}}", Name).Replace("{{char}}", othername) :
             Scenario.Replace("{{char}}", Name).Replace("{{user}}", othername);
@@ -107,31 +180,54 @@ namespace AIToolkit.Files
 
         }
 
+        /// <summary>
+        /// Called when loading a character. Override this in derived classes to implement custom loading behavior.
+        /// A feature-complete overide should load the ChatLog, WorldInfo, and Plugins.
+        /// </summary>
         public virtual void BeginChat()
         {
             LoadBrain("data/chars/");
             Brain.CharacterLoad();
         }
 
+        /// <summary>
+        /// Called when switching away from a character. Should be called when closing the application too. 
+        /// Override this in derived classes to implement custom saving behavior. Ideally, you should save the ChatLog in your derived class.
+        /// </summary>
+        /// <param name="backup"></param>
         public virtual void EndChat(bool backup = false)
         {
             SaveBrain("data/chars/", backup);
         }
 
+        /// <summary>
+        /// Save the chatlog to a file. Meant to be called by custom EndChat() in derived class, but you can call it manually too.
+        /// </summary>
+        /// <param name="path">directory to save the file in. File name is automatic $UniqueName + ".json"</param>
+        /// <param name="backup">set to true to save a backup of previous chatlog (if any) with a .bak extension</param>
         protected void SaveChatHistory(string path, bool backup = false)
         {
             if (string.IsNullOrEmpty(UniqueName))
                 return;
-            if (backup && File.Exists(path + UniqueName + ".json"))
+            // if path doesn't have a trailing slash, add one
+            var selpath = path;
+            if (!selpath.EndsWith('/') && !selpath.EndsWith('\\'))
+                selpath += Path.DirectorySeparatorChar;
+
+            if (backup && File.Exists(selpath + UniqueName + ".json"))
             {
-                if (File.Exists(path + UniqueName + ".bak"))
-                    File.Delete(path + UniqueName + ".bak");
-                File.Move(path + UniqueName + ".json", path + UniqueName + ".bak");
+                if (File.Exists(selpath + UniqueName + ".bak"))
+                    File.Delete(selpath + UniqueName + ".bak");
+                File.Move(selpath + UniqueName + ".json", selpath + UniqueName + ".bak");
             }
 
-            History.SaveToFile(path + UniqueName + ".json");
+            History.SaveToFile(selpath + UniqueName + ".json");
         }
 
+        /// <summary>
+        /// Load the chatlog from a file. Meant to be called by custom BeginChat() in derived class, but you can call it manually too.
+        /// </summary>
+        /// <param name="path">directory load the file from. File name is $UniqueName + ".json"</param>
         public void LoadChatHistory(string path)
         {
             if (string.IsNullOrEmpty(UniqueName))
@@ -139,98 +235,39 @@ namespace AIToolkit.Files
                 History = CreateChatlog();
                 return;
             }
-            var f = path + UniqueName + ".json";
+            // if path doesn't have a trailing slash, add one
+            var selpath = path;
+            if (!selpath.EndsWith('/') && !selpath.EndsWith('\\'))
+                selpath += Path.DirectorySeparatorChar;
+            var f = selpath + UniqueName + ".json";
             History = File.Exists(f) ? JsonConvert.DeserializeObject<Chatlog>(File.ReadAllText(f))! : CreateChatlog();
         }
 
+        /// <summary>
+        /// Clear the chat history, optionally delete file
+        /// </summary>
+        /// <param name="path">directory where the chatlog is located (optional if no deletion)</param>
+        /// <param name="deletefile">delete file or not</param>
         public void ClearChatHistory(string path, bool deletefile = true)
         {
             History.ClearHistory();
             if (!deletefile)
                 return;
-            var f = path + UniqueName;
+
+            // if path doesn't have a trailing slash, add one
+            var selpath = path;
+            if (!selpath.EndsWith('/') && !selpath.EndsWith('\\'))
+                selpath += Path.DirectorySeparatorChar;
+            var f = selpath + UniqueName;
+
             if (File.Exists(f + ".json")) File.Delete(f + ".json");
         }
 
-        protected void SaveBrain(string path, bool backup = false)
-        {
-            if (string.IsNullOrEmpty(UniqueName))
-                return;
-            var brainPath = path + UniqueName + ".brain";
-            if (backup && File.Exists(brainPath))
-            {
-                if (File.Exists(path + UniqueName + ".brain.bak"))
-                    File.Delete(path + UniqueName + ".brain.bak");
-                File.Move(brainPath, path + UniqueName + ".brain.bak");
-            }
-
-            var content = JsonConvert.SerializeObject(Brain, new JsonSerializerSettings { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
-            // create directory if it doesn't exist
-            var dir = Path.GetDirectoryName(brainPath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-            File.WriteAllText(brainPath, content);
-        }
-
-        public void LoadBrain(string path)
-        {
-            if (string.IsNullOrEmpty(UniqueName))
-            {
-                Brain = new Brain();
-                return;
-            }
-            
-            var brainFilePath = path + UniqueName + ".brain";
-            
-            // If brain file exists, load it
-            if (File.Exists(brainFilePath))
-            {
-                Brain = JsonConvert.DeserializeObject<Brain>(File.ReadAllText(brainFilePath))! ?? new Brain();
-                return;
-            }
-            
-            // If no brain file exists, check if we need to migrate from the persona file
-            var personaFilePath = path + UniqueName + ".json";
-            if (File.Exists(personaFilePath))
-            {
-                try
-                {
-                    var personaJson = File.ReadAllText(personaFilePath);
-                    // Try to extract Brain data using dynamic parsing
-                    var jsonObject = JsonConvert.DeserializeObject<dynamic>(personaJson);
-                    if (jsonObject?.Brain != null)
-                    {
-                        // Migrate brain data from persona file to separate brain file
-                        Brain = JsonConvert.DeserializeObject<Brain>(jsonObject.Brain.ToString())! ?? new Brain();
-                        SaveBrain(path, false);
-                        return;
-                    }
-                }
-                catch
-                {
-                    // If migration fails, just use empty brain
-                }
-            }
-            
-            // Default to empty brain
-            Brain = new Brain();
-        }
-
-        public WorldEntry? GetWIEntryByGUID(Guid id)
-        {
-            if (MyWorlds.Count == 0)
-                return null;
-            foreach (var world in MyWorlds)
-            {
-                var res = world.Entries.Find(e => e.Guid == id);
-                if (res != null)
-                    return res; 
-            }
-            return null;
-        }
-
-        #region Attribute Handling and Self Editing
-
+        /// <summary>
+        /// Function used to update the self-edit section of the system prompt. Automatically called when ending a chat session if SelfEditTokens > 0.
+        /// Can be called manually as well.
+        /// </summary>
+        /// <returns></returns>
         public async Task UpdateSelfEditSection()
         {
             if (SelfEditTokens == 0 || History.Sessions.Count < 3 || LLMSystem.Client == null)
@@ -289,6 +326,83 @@ namespace AIToolkit.Files
             EventBus.Publish(new PersonaUpdatedEvent(UniqueName, DateTime.UtcNow));
         }
 
-        #endregion
+
+        protected void SaveBrain(string path, bool backup = false)
+        {
+            if (string.IsNullOrEmpty(UniqueName))
+                return;
+            var brainPath = path + UniqueName + ".brain";
+            if (backup && File.Exists(brainPath))
+            {
+                if (File.Exists(path + UniqueName + ".brain.bak"))
+                    File.Delete(path + UniqueName + ".brain.bak");
+                File.Move(brainPath, path + UniqueName + ".brain.bak");
+            }
+
+            var content = JsonConvert.SerializeObject(Brain, new JsonSerializerSettings { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
+            // create directory if it doesn't exist
+            var dir = Path.GetDirectoryName(brainPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            File.WriteAllText(brainPath, content);
+        }
+
+        protected void LoadBrain(string path)
+        {
+            if (string.IsNullOrEmpty(UniqueName))
+            {
+                Brain = new Brain();
+                return;
+            }
+            
+            var brainFilePath = path + UniqueName + ".brain";
+            
+            // If brain file exists, load it
+            if (File.Exists(brainFilePath))
+            {
+                Brain = JsonConvert.DeserializeObject<Brain>(File.ReadAllText(brainFilePath))! ?? new Brain();
+                return;
+            }
+            
+            // If no brain file exists, check if we need to migrate from the persona file
+            var personaFilePath = path + UniqueName + ".json";
+            if (File.Exists(personaFilePath))
+            {
+                try
+                {
+                    var personaJson = File.ReadAllText(personaFilePath);
+                    // Try to extract Brain data using dynamic parsing
+                    var jsonObject = JsonConvert.DeserializeObject<dynamic>(personaJson);
+                    if (jsonObject?.Brain != null)
+                    {
+                        // Migrate brain data from persona file to separate brain file
+                        Brain = JsonConvert.DeserializeObject<Brain>(jsonObject.Brain.ToString())! ?? new Brain();
+                        SaveBrain(path, false);
+                        return;
+                    }
+                }
+                catch
+                {
+                    // If migration fails, just use empty brain
+                }
+            }
+            
+            // Default to empty brain
+            Brain = new Brain();
+        }
+
+        internal WorldEntry? GetWIEntryByGUID(Guid id)
+        {
+            if (MyWorlds.Count == 0)
+                return null;
+            foreach (var world in MyWorlds)
+            {
+                var res = world.Entries.Find(e => e.Guid == id);
+                if (res != null)
+                    return res; 
+            }
+            return null;
+        }
+
     }
 }

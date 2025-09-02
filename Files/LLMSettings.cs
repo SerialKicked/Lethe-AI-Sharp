@@ -19,9 +19,6 @@ namespace AIToolkit.Files
         /// <summary> API key for OpenAI (depends on the backend) </summary>
         public string OpenAIKey { get; set; } = "123";
 
-        /// <summary> Reserved token space for summaries of previous sessions (0 to disable) </summary>
-        public int ReservedSessionTokens { get; set; } = 2048;
-
         /// <summary> Max length for the bot's reply. </summary>
         public int MaxReplyLength { get; set; } = 512;
 
@@ -37,8 +34,16 @@ namespace AIToolkit.Files
         /// <summary> Allow keyword-activated snippets to be inserted in the prompt (see WorldInfo and BasePersona) </summary>
         public bool AllowWorldInfo { get; set; } = true;
 
+        /// <summary> 
+        /// If set to true, summaries of previous chat sessions will be insereted in the system prompt to provide extended context.
+        /// </summary>
+        public bool SessionMemorySystem { get; set; } = false;
+
         /// <summary> Should the prompt contains only the latest chat session or as much dialog as we can fit? </summary>
         public SessionHandling SessionHandling { get; set; } = SessionHandling.FitAll;
+
+        /// <summary> Reserved token space for summaries of previous sessions (0 to disable) </summary>
+        public int SessionReservedTokens { get; set; } = 2048;
 
         /// <summary> Thinking models only, will move all RAG and WI to the thinking block </summary>
         public bool RAGMoveToThinkBlock { get; set; } = false;
