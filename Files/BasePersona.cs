@@ -134,7 +134,7 @@ namespace AIToolkit.Files
         /// </summary>
         /// <param name="othername"></param>
         /// <returns></returns>
-        public string GetBio(string othername)
+        public virtual string GetBio(string othername)
         {
             if (IsUser)
             {
@@ -151,11 +151,11 @@ namespace AIToolkit.Files
         /// </summary>
         /// <param name="othername"></param>
         /// <returns></returns>
-        public string GetScenario(string othername) => IsUser ?
+        public virtual string GetScenario(string othername) => IsUser ?
             Scenario.Replace("{{user}}", Name).Replace("{{char}}", othername) :
             Scenario.Replace("{{char}}", Name).Replace("{{user}}", othername);
 
-        public string GetDialogExamples(string othername)
+        public virtual string GetDialogExamples(string othername)
         {
             if (ExampleDialogs.Count == 0)
                 return string.Empty;
@@ -166,7 +166,7 @@ namespace AIToolkit.Files
             return str.ToString().CleanupAndTrim();
         }
 
-        public string GetWelcomeLine(string othername)
+        public virtual string GetWelcomeLine(string othername)
         {
             if (FirstMessage.Count == 0)
                 return string.Empty;
