@@ -466,6 +466,13 @@ namespace AIToolkit.LLM
         {
             if (string.IsNullOrEmpty(inputText))
                 return string.Empty;
+
+            // Use group macro replacement for group personas
+            if (character is GroupPersona groupPersona)
+            {
+                return ReplaceGroupMacros(inputText, user, groupPersona);
+            }
+
             StringBuilder res = new(inputText);
             res.Replace("{{user}}", user.Name)
                .Replace("{{userbio}}", user.GetBio(character.Name))
@@ -494,6 +501,122 @@ namespace AIToolkit.LLM
                .Replace("{{selfedit}}", character.SelfEditField)
                .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? character.GetScenario(userName) : Settings.ScenarioOverride);
             return res.ToString().CleanupAndTrim();
+        }
+
+        /// <summary>
+        /// Replaces macros in a string specifically for group chat scenarios.
+        /// Handles group-specific macros like {{groupchars}}, {{groupbios}}, etc.
+        /// </summary>
+        /// <param name="inputText">Text containing macros to replace</param>
+        /// <param name="user">User persona</param>
+        /// <param name="groupPersona">Group persona containing multiple bots</param>
+        /// <returns>Text with macros replaced</returns>
+        public static string ReplaceGroupMacros(string inputText, BasePersona user, GroupPersona groupPersona)
+        {
+            if (string.IsNullOrEmpty(inputText))
+                return string.Empty;
+
+            StringBuilder res = new(inputText);
+            
+            // Replace standard user macros
+            res.Replace("{{user}}", user.Name)
+               .Replace("{{userbio}}", user.GetBio("the group"))
+               .Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
+               .Replace("{{time}}", DateTime.Now.ToShortTimeString())
+               .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString());
+
+            // For group chats, {{char}} and {{charbio}} refer to the active bot or group
+            var activeBot = groupPersona.ActiveBot;
+            if (activeBot != null)
+            {
+                res.Replace("{{char}}", activeBot.Name)
+                   .Replace("{{charbio}}", activeBot.GetBio(user.Name))
+                   .Replace("{{selfedit}}", activeBot.SelfEditField);
+            }
+            else
+            {
+                res.Replace("{{char}}", groupPersona.Name)
+                   .Replace("{{charbio}}", groupPersona.GetBio(user.Name))
+                   .Replace("{{selfedit}}", groupPersona.SelfEditField);
+            }
+
+            // Group-specific macros
+            var groupChars = string.Join(", ", groupPersona.BotPersonas.Select(b => b.Name));
+            res.Replace("{{groupchars}}", groupChars);
+
+            var groupBios = string.Join("\n\n", groupPersona.BotPersonas.Select(b => $"{b.Name}: {b.GetBio(user.Name)}"));
+            res.Replace("{{groupbios}}", groupBios);
+
+            var groupExamples = groupPersona.GetDialogExamples(user.Name);
+            res.Replace("{{examples}}", groupExamples)
+               .Replace("{{groupexamples}}", groupExamples);
+
+            var scenario = string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? groupPersona.GetScenario(user.Name) : Settings.ScenarioOverride;
+            res.Replace("{{scenario}}", scenario)
+               .Replace("{{groupscenario}}", scenario);
+
+            return res.ToString();
+        }
+
+        /// <summary>
+        /// Determines if the current bot is a group persona.
+        /// </summary>
+        public static bool IsGroupChat => Bot is GroupPersona;
+
+        /// <summary>
+        /// Gets the current group persona if in group chat mode.
+        /// </summary>
+        public static GroupPersona? CurrentGroup => Bot as GroupPersona;
+
+        /// <summary>
+        /// Sends a message to a specific bot in a group chat.
+        /// </summary>
+        /// <param name="role">Role of the message sender</param>
+        /// <param name="message">Message content</param>
+        /// <param name="targetBotId">ID of the bot that should respond, or null for auto-selection</param>
+        public static async Task SendMessageToGroupBot(AuthorRole role, string message, string? targetBotId = null)
+        {
+            if (Status == SystemStatus.Busy)
+                return;
+
+            if (CurrentGroup == null)
+            {
+                // Fall back to regular single bot message
+                await SendMessageToBot(role, message);
+                return;
+            }
+
+            // Set the active bot if specified
+            if (!string.IsNullOrEmpty(targetBotId))
+            {
+                CurrentGroup.SetActiveBot(targetBotId);
+            }
+
+            await StartGeneration(role, message);
+        }
+
+        /// <summary>
+        /// Creates a group persona with the specified bot personas.
+        /// </summary>
+        /// <param name="botIds">IDs of bot personas to include in the group</param>
+        /// <param name="groupName">Name for the group persona</param>
+        /// <param name="groupInstructions">Instructions for managing the group conversation</param>
+        /// <returns>New GroupPersona instance</returns>
+        public static GroupPersona CreateGroupPersona(List<string> botIds, string groupName = "Group Chat", string? groupInstructions = null)
+        {
+            var group = new GroupPersona
+            {
+                Name = groupName,
+                UniqueName = $"group_{Guid.NewGuid():N}",
+                GroupInstructions = groupInstructions ?? "This is a group conversation. Choose which character should respond based on their personality and the conversation context. Always respond as the most appropriate character."
+            };
+
+            foreach (var botId in botIds)
+            {
+                group.AddBot(botId);
+            }
+
+            return group;
         }
 
         /// <summary>
@@ -858,8 +981,12 @@ namespace AIToolkit.LLM
             {
                 if (role == AuthorRole.Assistant)
                 {
-                    realprompt = string.Format("{0}: {1}", bot.Name, prompt);
-                    selname = bot.Name;
+                    // For group chats, use the active bot's name instead of the group persona name
+                    var botName = bot is GroupPersona groupPersona && groupPersona.ActiveBot != null 
+                        ? groupPersona.ActiveBot.Name 
+                        : bot.Name;
+                    realprompt = string.Format("{0}: {1}", botName, prompt);
+                    selname = botName;
                 }
                 else if (role == AuthorRole.User)
                 {

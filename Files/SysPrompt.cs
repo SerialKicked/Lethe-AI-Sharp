@@ -61,9 +61,22 @@ namespace AIToolkit.Files
             var res = new StringBuilder(selprompt.CleanupAndTrim());
             res.AppendLinuxLine();
 
-            if (character.SelfEditTokens > 0 && !string.IsNullOrWhiteSpace(character.SelfEditField))
+            // Handle GroupPersona specifically
+            if (character is GroupPersona groupPersona)
             {
-                res.AppendLinuxLine().AppendLinuxLine($"{CategorySeparator} {character.Name}'s personal thoughts").AppendLinuxLine().AppendLinuxLine("{{selfedit}}");
+                // Add group-specific sections
+                if (groupPersona.BotPersonas.Count > 0)
+                {
+                    res.AppendLinuxLine().AppendLinuxLine($"{CategorySeparator} Group Characters").AppendLinuxLine().AppendLinuxLine("{{groupbios}}");
+                }
+            }
+            else
+            {
+                // Standard persona handling
+                if (character.SelfEditTokens > 0 && !string.IsNullOrWhiteSpace(character.SelfEditField))
+                {
+                    res.AppendLinuxLine().AppendLinuxLine($"{CategorySeparator} {character.Name}'s personal thoughts").AppendLinuxLine().AppendLinuxLine("{{selfedit}}");
+                }
             }
 
             if (character.ExampleDialogs.Count > 0 && !string.IsNullOrEmpty(DialogsTitle))
@@ -75,7 +88,6 @@ namespace AIToolkit.Files
             {
                 res.AppendLinuxLine().AppendLinuxLine(ScenarioTitle).AppendLinuxLine().AppendLinuxLine("{{scenario}}");
             }
-
 
             return res.ToString();
         }

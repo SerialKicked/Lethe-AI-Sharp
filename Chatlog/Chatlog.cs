@@ -162,6 +162,36 @@ namespace AIToolkit.Files
             return single;
         }
 
+        /// <summary>
+        /// Log a message with specific bot and user IDs. Useful for group chats where you want to specify
+        /// which specific bot persona the message is from, even when using a GroupPersona.
+        /// </summary>
+        /// <param name="role">Role of the message author</param>
+        /// <param name="msg">Message content</param>
+        /// <param name="userID">ID of the user persona</param>
+        /// <param name="botID">ID of the specific bot persona (can be different from the current Bot)</param>
+        /// <returns>The logged message</returns>
+        public SingleMessage LogMessage(AuthorRole role, string msg, string userID, string botID)
+        {
+            if (Sessions.Count == 0)
+                Sessions.Add(CreateChatSession());
+
+            // Remove thinking block if any
+            var stringfix = msg;
+            if (!string.IsNullOrEmpty(LLMSystem.Instruct.ThinkingStart) && stringfix.Contains(LLMSystem.Instruct.ThinkingStart) && stringfix.Contains(LLMSystem.Instruct.ThinkingEnd))
+            {
+                // remove everything before the thinking end tag (included)
+                var idx = stringfix.IndexOf(LLMSystem.Instruct.ThinkingEnd);
+                stringfix = stringfix[(idx + LLMSystem.Instruct.ThinkingEnd.Length)..].CleanupAndTrim();
+            }
+
+            var single = new SingleMessage(role, DateTime.Now, stringfix, botID, userID);
+            CurrentSession.Messages.Add(single);
+            RaiseOnMessageAdded(single);
+            EventBus.Publish(new MessageAddedEvent(single.Guid, role == AuthorRole.User, single.Date));
+            return single;
+        }
+
         public SingleMessage LogMessage(SingleMessage single)
         {
             if (Sessions.Count == 0)
