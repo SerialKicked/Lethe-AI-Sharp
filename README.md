@@ -32,6 +32,7 @@ It includes easy-to-use (and easy to build upon) systems to handle most of the o
 ## Advanced Features / WIP
 - Basic support for VLM (visual language models) depending on the backend
 - Background Agent system (bot can run tasks in the background)
+- Group chat functionalities (one user and multiple AI characters)
 
 ## Usage and Documentations
 
