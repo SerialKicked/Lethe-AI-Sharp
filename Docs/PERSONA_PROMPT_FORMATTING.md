@@ -856,3 +856,14 @@ if (LLMSystem.MaxContextLength < 4000)
 ```
 
 This comprehensive documentation covers the essential aspects of using BasePersona, InstructFormat, and SystemPrompt classes in AIToolkit. These classes provide the foundation for creating rich, interactive AI characters with proper prompt formatting for various language models.
+
+## Additional Resources
+
+For more information about AIToolkit, see:
+- [LLMSystem Documentation](LLMSYSTEM.md) - Core system functionality
+- [Extensibility Guide](EXTENSIBILITY.md) - Advanced customization patterns
+- [Agent System Documentation](AGENT_SYSTEM.md) - AI agent capabilities
+
+The combination of these three classes enables developers to build sophisticated AI chat applications with minimal code while maintaining full control over character behavior and prompt formatting.
+
+This comprehensive documentation covers the essential aspects of using BasePersona, InstructFormat, and SystemPrompt classes in AIToolkit. These classes provide the foundation for creating rich, interactive AI characters with proper prompt formatting for various language models.
