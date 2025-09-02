@@ -327,7 +327,7 @@ namespace AIToolkit.LLM
         {
             if (Status == SystemStatus.Busy)
                 return;
-            await StartGeneration(message.Role, message.Message);
+            await StartGeneration(message.Role, message.Message, message.Guid);
         }
 
         /// <summary>
@@ -905,7 +905,7 @@ namespace AIToolkit.LLM
         /// <param name="MsgSender">Role of the sender</param>
         /// <param name="userInput">Message from sender</param>
         /// <returns></returns>
-        private static async Task StartGeneration(AuthorRole MsgSender, string userInput)
+        private static async Task StartGeneration(AuthorRole MsgSender, string userInput, Guid? setGuid = null)
         {
             if (Client == null || PromptBuilder == null)
                 return;
@@ -931,7 +931,11 @@ namespace AIToolkit.LLM
             }
 
             if (!string.IsNullOrEmpty(userInput))
-                Bot.History.LogMessage(MsgSender, userInput, User, Bot);
+            {
+                var msg = Bot.History.LogMessage(MsgSender, userInput, User, Bot);
+                if (setGuid is not null)
+                    msg.Guid = (Guid)setGuid;
+            }
 
             RaiseOnFullPromptReady(PromptBuilder.PromptToText());
             await Client.GenerateTextStreaming(genparams);

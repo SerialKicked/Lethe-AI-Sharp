@@ -15,6 +15,7 @@ namespace AIToolkit.Memory
             "what's up",
             "what's new",
             "anything new",
+            "something new",
             "anything interesting",
             "any updates",
             "what have you learned",
