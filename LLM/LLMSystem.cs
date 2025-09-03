@@ -1053,7 +1053,7 @@ namespace AIToolkit.LLM
             var pluginmessage = await BuildPluginSystemInsertAsync(lastuserinput);
             if (string.IsNullOrWhiteSpace(pluginmessage) && !string.IsNullOrEmpty(userInput) && MsgSender == AuthorRole.User)
             {
-                Bot.Brain.OnUserPost(userInput);
+                await Bot.Brain.OnUserPost(userInput);
             }
 
             using var _ = await AcquireModelSlotAsync(CancellationToken.None);

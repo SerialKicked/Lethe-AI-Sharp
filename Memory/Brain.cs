@@ -1,5 +1,6 @@
 ﻿using AIToolkit.Agent;
 using AIToolkit.Files;
+using AIToolkit.GBNF;
 using AIToolkit.LLM;
 using Newtonsoft.Json;
 using System.Text;
@@ -118,23 +119,25 @@ namespace AIToolkit.Memory
         [JsonIgnore]
         public BasePersona Owner { get; set; } = basePersona;
         public TimeSpan MinInsertDelay { get; set; } = TimeSpan.FromMinutes(15);
-        public int MinMessageDelay { get; set; } = 5;
+        public int MinMessageDelay { get; set; } = 4;
         public TimeSpan EurekaCutOff { get; set; } = TimeSpan.FromDays(15);
         public DateTime LastInsertTime { get; set; }
         public int CurrentDelay = 0;
 
         public List<MemoryUnit> Memories { get; set; } = [];
 
+        public List<TopicSearch> RecentSearches { get; set; } = [];
+
         public MoodState Mood { get; set; } = new MoodState();
 
-        [JsonIgnore] public Queue<MemoryUnit> Eurekas { get; set; } = [];
+        [JsonIgnore] public List<MemoryUnit> Eurekas { get; set; } = [];
 
         /// <summary>
         /// Checks if Brain functionality should be disabled (currently returns true for group conversations)
         /// </summary>
         private bool IsBrainDisabled => LLMSystem.IsGroupConversation;
 
-        public void RefreshMemories()
+        public virtual void RefreshMemories()
         {
             // Remove old natural memories
             Memories.RemoveAll(e => e.Insertion == MemoryInsertion.Natural && (DateTime.Now - e.Added) > EurekaCutOff);
@@ -144,7 +147,7 @@ namespace AIToolkit.Memory
             var recent = Memories.Where(m => m.Insertion == MemoryInsertion.Natural && m.Added >= cutoff)
                                 .OrderByDescending(m => m.Added).ToList();
             foreach (var item in recent)
-                Eurekas.Enqueue(item);
+                Eurekas.Add(item);
             Mood.Update();
         }
 
@@ -156,7 +159,7 @@ namespace AIToolkit.Memory
             }
         }
 
-        public void OnUserPost(string userinput)
+        public virtual async Task OnUserPost(string userinput)
         {
             if (IsBrainDisabled)
                 return;
@@ -165,31 +168,53 @@ namespace AIToolkit.Memory
             if (!string.IsNullOrWhiteSpace(LLMSystem.Settings.ScenarioOverride) || Eurekas.Count == 0)
                 return;
             CurrentDelay++;
+            // If there's a super relevant eureka to the user input, insert it immediately
+            var foundunit = await GetRelevantEureka(userinput);
+            if (foundunit != null)
+            {
+                InsertEureka(foundunit);
+                return;
+            }
             if ((CurrentDelay < MinMessageDelay || LastInsertTime + MinInsertDelay > DateTime.Now) && !MemoryTriggers.IsTrigger(userinput))
                 return;
             InsertEureka();
         }
 
-        public void InsertEureka()
+        protected virtual async Task<MemoryUnit?> GetRelevantEureka(string userinput)
+        {
+            if (IsBrainDisabled ||!RAGSystem.Enabled)
+                return null;
+
+            foreach (var item in Eurekas)
+            {
+                var dist = await RAGSystem.GetDistanceAsync(userinput, item);
+                if (dist <= 0.075f)
+                {
+                    return item;
+                }
+            }
+            return null;
+        }
+
+        public virtual void InsertEureka(MemoryUnit? insert = null)
         {
             if (IsBrainDisabled)
                 return;
-                
+
             CurrentDelay = 0;
             LastInsertTime = DateTime.Now;
-            if (!Eurekas.TryDequeue(out var memory))
-                return;
-            var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, memory.ToEureka(), Owner.UniqueName, LLMSystem.User.UniqueName, true);
+            var select = insert ?? Eurekas[0];
+            Memories.Remove(select);
+            var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, select.ToEureka(), Owner.UniqueName, LLMSystem.User.UniqueName, true);
             LLMSystem.History.LogMessage(tosend);
             // High Priority memories are kept and set back to Trigger insertion
-            if (memory.Priority > 1)
+            if (select.Priority > 1)
             {
-                memory.Insertion = MemoryInsertion.Trigger;
+                select.Insertion = MemoryInsertion.Trigger;
             }
         }
 
-
-        public void OnNewSession()
+        public virtual void OnNewSession()
         {
             CurrentDelay = 0;
             LastInsertTime = DateTime.Now;
@@ -203,7 +228,7 @@ namespace AIToolkit.Memory
             return Memories.FirstOrDefault(m => m.Guid == iD);
         }
 
-        public MemoryUnit? GetGlobalMemoryByID(Guid iD)
+        public virtual MemoryUnit? GetGlobalMemoryByID(Guid iD)
         {
             // Check Sessions
             MemoryUnit? res = Owner.History.GetSessionByID(iD);
@@ -215,6 +240,31 @@ namespace AIToolkit.Memory
                 return res;
             // Check local memories
             return Memories.FirstOrDefault(m => m.Guid == iD);
+        }
+
+        public virtual async Task<bool> WasSearchedRecently(string topic)
+        {
+            // If RecentSearches > 20, remove entries starting with the first index until count is 20
+            while (RecentSearches.Count > 20)
+                RecentSearches.RemoveAt(0);
+
+            var lowered = topic.ToLowerInvariant();
+            if (RecentSearches.Find(s => s.Topic.Equals(lowered, StringComparison.InvariantCultureIgnoreCase)) != default)
+            {
+                return true;
+            }
+
+            if (RAGSystem.Enabled)
+            {
+                foreach (var item in RecentSearches)
+                {
+                    if (await RAGSystem.GetDistanceAsync(item.Topic, topic) < 0.075)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
     }
 }

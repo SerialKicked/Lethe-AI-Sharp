@@ -327,7 +327,7 @@ namespace AIToolkit.Files
         }
 
 
-        protected void SaveBrain(string path, bool backup = false)
+        protected virtual void SaveBrain(string path, bool backup = false)
         {
             if (string.IsNullOrEmpty(UniqueName))
                 return;
@@ -347,7 +347,7 @@ namespace AIToolkit.Files
             File.WriteAllText(brainPath, content);
         }
 
-        protected void LoadBrain(string path)
+        protected virtual void LoadBrain(string path)
         {
             if (string.IsNullOrEmpty(UniqueName))
             {

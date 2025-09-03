@@ -367,6 +367,19 @@ namespace AIToolkit.LLM
             return ToCosineDistance(CosineSimilarityUnit(ea, eb));
         }
 
+        public static async Task<float> GetDistanceAsync(string a, IEmbed b)
+        {
+            if (!Enabled)
+                return 0f;
+
+            var ea = await EmbeddingText(a).ConfigureAwait(false);
+
+            if (ea.Length == 0 || b.EmbedSummary.Length == 0 || ea.Length != b.EmbedSummary.Length)
+                return 0f;
+
+            return ToCosineDistance(CosineSimilarityUnit(ea, b.EmbedSummary));
+        }
+
         /// <summary>
         /// Synchronous wrapper for GetSimilarityAsync. May block the calling thread.
         /// Prefer the async version when possible.

@@ -82,14 +82,20 @@ namespace AIToolkit.Agent.Plugins
 
             var totalSearchCount = 0;
             var allStagedMessages = new List<StagedMessage>();
-
+            
             // Process each topic from the session
             foreach (var topic in session.NewTopics.Unfamiliar_Topics)
             {
+                // Compare to recent searches to avoid duplicate
+                var wassearchedbefore = await LLMSystem.Bot.Brain.WasSearchedRecently(topic.Topic);
+                if (wassearchedbefore)
+                    continue;
+
+                LLMSystem.Bot.Brain.RecentSearches.Add(topic);
                 // Drop trivial ones if budget nearly exhausted
                 if (topic.Urgency <= 1 && ctx.Config.DailySearchBudget - ctx.State.SearchesUsedToday - totalSearchCount < 5)
                     continue;
-
+                
                 var allResults = new List<EnrichedSearchResult>();
                 var searchCount = 0;
 
