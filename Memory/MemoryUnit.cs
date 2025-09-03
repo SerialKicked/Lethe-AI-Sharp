@@ -97,11 +97,11 @@ namespace AIToolkit.Memory
             };
             if (!mixedcat.Contains(Category))
             {
-                EmbedSummary = await RAGSystem.EmbeddingText(Content);
+                EmbedSummary = await RAGSystem.EmbeddingText(LLMSystem.ReplaceMacros(Content));
                 return;
             }
             var titleembed = await RAGSystem.EmbeddingText(Name);
-            var sumembed = await RAGSystem.EmbeddingText(Content);
+            var sumembed = await RAGSystem.EmbeddingText(LLMSystem.ReplaceMacros(Content));
             EmbedSummary = RAGSystem.MergeEmbeddings(titleembed, sumembed);
         }
 
