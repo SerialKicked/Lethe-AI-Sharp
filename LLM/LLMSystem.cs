@@ -779,10 +779,7 @@ namespace AIToolkit.LLM
         /// <exception cref="ArgumentException">Thrown when the specified bot is not found in the group.</exception>
         public static void SetCurrentGroupBot(string uniqueName)
         {
-            var groupPersona = GetGroupPersona();
-            if (groupPersona == null)
-                throw new InvalidOperationException("Cannot set current group bot when not in group conversation mode.");
-
+            var groupPersona = GetGroupPersona() ?? throw new InvalidOperationException("Cannot set current group bot when not in group conversation mode.");
             groupPersona.SetCurrentBot(uniqueName);
             InvalidatePromptCache();
             
