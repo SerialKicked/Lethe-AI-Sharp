@@ -180,7 +180,7 @@ namespace AIToolkit.Memory
             InsertEureka();
         }
 
-        protected virtual async Task<MemoryUnit?> GetRelevantEureka(string userinput)
+        protected virtual async Task<MemoryUnit?> GetRelevantEureka(string userinput, float maxDistance = 0.075f)
         {
             if (IsBrainDisabled ||!RAGSystem.Enabled)
                 return null;
@@ -188,7 +188,7 @@ namespace AIToolkit.Memory
             foreach (var item in Eurekas)
             {
                 var dist = await RAGSystem.GetDistanceAsync(userinput, item);
-                if (dist <= 0.075f)
+                if (dist <= maxDistance)
                 {
                     return item;
                 }
@@ -242,7 +242,7 @@ namespace AIToolkit.Memory
             return Memories.FirstOrDefault(m => m.Guid == iD);
         }
 
-        public virtual async Task<bool> WasSearchedRecently(string topic)
+        public virtual async Task<bool> WasSearchedRecently(string topic, float maxDistance = 0.075f)
         {
             // If RecentSearches > 20, remove entries starting with the first index until count is 20
             while (RecentSearches.Count > 20)
@@ -258,7 +258,7 @@ namespace AIToolkit.Memory
             {
                 foreach (var item in RecentSearches)
                 {
-                    if (await RAGSystem.GetDistanceAsync(item.Topic, topic) < 0.075)
+                    if (await RAGSystem.GetDistanceAsync(item.Topic, topic) < maxDistance)
                     {
                         return true;
                     }
