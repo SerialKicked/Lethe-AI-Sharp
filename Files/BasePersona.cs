@@ -391,7 +391,7 @@ namespace AIToolkit.Files
             Brain = new Brain();
         }
 
-        internal WorldEntry? GetWIEntryByGUID(Guid id)
+        internal MemoryUnit? GetWIEntryByGUID(Guid id)
         {
             if (MyWorlds.Count == 0)
                 return null;

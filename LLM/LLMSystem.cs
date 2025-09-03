@@ -1,6 +1,7 @@
 ﻿using AIToolkit.Agent;
 using AIToolkit.API;
 using AIToolkit.Files;
+using AIToolkit.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic;
 using Newtonsoft.Json;
@@ -869,7 +870,7 @@ namespace AIToolkit.LLM
             // Check for keyword-activated world info entries
             if (Settings.AllowWorldInfo)
             {
-                var _currentWorldEntries = new List<WorldEntry>();
+                var _currentWorldEntries = new List<MemoryUnit>();
                 
                 // Add world entries from the group/bot itself
                 if (Bot.MyWorlds.Count > 0)

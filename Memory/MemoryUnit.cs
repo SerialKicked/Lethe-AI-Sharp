@@ -18,7 +18,7 @@ namespace AIToolkit.Memory
         None
     }
 
-    public enum MemoryType { General, WorldInfo, WebSearch, Journal, Image, File, Location, Event, ChatSession }
+    public enum MemoryType { General, WorldInfo, WebSearch, ChatSession, Journal, Image, File, Location, Event, Person }
     public enum MemoryInsertion { Trigger, Natural, None }
 
 
@@ -45,12 +45,12 @@ namespace AIToolkit.Memory
         /// <summary>
         /// Name or Title for the entry. May be inserted for some Category (like people, file, locations...) and insertion types
         /// </summary>
-        public string Name { get; set; } = string.Empty;
+        public virtual string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Raw content of the memory
         /// </summary>
-        public string Content { get; set; } = string.Empty;
+        public virtual string Content { get; set; } = string.Empty;
 
         /// <summary>
         /// The context or reason why this topic is of interest to the bot, user, or both.
@@ -82,11 +82,26 @@ namespace AIToolkit.Memory
         /// </summary>
         public int Priority { get; set; } = 1;
 
-        public async Task EmbedText()
+        public int PositionIndex { get; set; } = 0;
+        public int Duration { get; set; } = 1;
+        public WEPosition Position { get; set; } = WEPosition.SystemPrompt;
+        public float TriggerChance { get; set; } = 1;
+
+        public virtual async Task EmbedText()
         {
+            if (!RAGSystem.Enabled)
+                return;
+            var mixedcat = new HashSet<MemoryType>() 
+            { 
+                MemoryType.ChatSession, MemoryType.Journal, MemoryType.WebSearch, MemoryType.Person, MemoryType.Location, MemoryType.Event 
+            };
+            if (!mixedcat.Contains(Category))
+            {
+                EmbedSummary = await RAGSystem.EmbeddingText(Content);
+                return;
+            }
             var titleembed = await RAGSystem.EmbeddingText(Name);
             var sumembed = await RAGSystem.EmbeddingText(Content);
-
             EmbedSummary = RAGSystem.MergeEmbeddings(titleembed, sumembed);
         }
 

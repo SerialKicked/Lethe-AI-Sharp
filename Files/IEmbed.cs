@@ -7,5 +7,7 @@ namespace AIToolkit.Files
     {
         Guid Guid { get; set; }
         float[] EmbedSummary { get; set; }
+
+        Task EmbedText();
     }
 }

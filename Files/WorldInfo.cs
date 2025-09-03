@@ -54,14 +54,6 @@ namespace AIToolkit.Files
         }
     }
 
-    public class WorldEntry : MemoryUnit, IEmbed
-    {
-        public int PositionIndex = 0;
-        public int Duration = 1;
-        public WEPosition Position = WEPosition.SystemPrompt;
-        public float TriggerChance = 1;
-    }
-
     public class WorldInfo : BaseFile
     {
         private class ActiveLink
@@ -74,7 +66,7 @@ namespace AIToolkit.Files
         public string Description { get; set; } = string.Empty;
         public bool DoEmbeds { get; set; } = true;
         public int ScanDepth { get; set; } = 1;
-        public List<WorldEntry> Entries { get; set; } = [];
+        public List<MemoryUnit> Entries { get; set; } = [];
         private readonly List<ActiveLink> activeEntries = [];
 
         /// <summary>
@@ -82,7 +74,7 @@ namespace AIToolkit.Files
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
-        public List<WorldEntry> FindEntries(string message)
+        public List<MemoryUnit> FindEntries(string message)
         {
             foreach (var entry in activeEntries)
                 entry.DurationLeft--;
@@ -104,7 +96,7 @@ namespace AIToolkit.Files
         /// </summary>
         /// <param name="log"></param>
         /// <returns></returns>
-        public List<WorldEntry> FindEntries(Chatlog log, string? userinput = null)
+        public List<MemoryUnit> FindEntries(Chatlog log, string? userinput = null)
         {
             if (log.CurrentSession.Messages.Count == 0)
                 return [];

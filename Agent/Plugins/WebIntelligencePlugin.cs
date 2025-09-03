@@ -190,7 +190,7 @@ namespace AIToolkit.Agent.Plugins
             prompt.AppendLinuxLine();
             prompt.AppendLinuxLine($"# Previous Chat Session");
             prompt.AppendLinuxLine();
-            prompt.AppendLinuxLine($"{session.Summary.RemoveNewLines()}");
+            prompt.AppendLinuxLine($"{session.Content.RemoveNewLines()}");
             prompt.AppendLinuxLine();
             prompt.AppendLinuxLine($"# Documents Found:");
             prompt.AppendLinuxLine();

@@ -41,8 +41,7 @@ namespace AIToolkit.Agent
         {
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException("Plugin ID cannot be null or empty", nameof(id));
-            if (plugin == null)
-                throw new ArgumentNullException(nameof(plugin));
+            ArgumentNullException.ThrowIfNull(plugin);
 
             _pluginRegistry[id] = () => plugin;
         }
@@ -51,8 +50,7 @@ namespace AIToolkit.Agent
         {
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException("Plugin ID cannot be null or empty", nameof(id));
-            if (factory == null)
-                throw new ArgumentNullException(nameof(factory));
+            ArgumentNullException.ThrowIfNull(factory);
 
             _pluginRegistry[id] = factory;
         }
@@ -79,7 +77,7 @@ namespace AIToolkit.Agent
             {
                 var plugins = _config.Plugins.ToList();
                 plugins.Add(id);
-                _config.Plugins = plugins.ToArray();
+                _config.Plugins = [.. plugins];
             }
         }
 
@@ -90,7 +88,7 @@ namespace AIToolkit.Agent
 
             if (_config != null && _config.Plugins.Contains(id))
             {
-                _config.Plugins = _config.Plugins.Where(p => p != id).ToArray();
+                _config.Plugins = [.. _config.Plugins.Where(p => p != id)];
             }
         }
 

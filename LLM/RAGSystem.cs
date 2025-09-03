@@ -160,7 +160,7 @@ namespace AIToolkit.LLM
             // Embed all the messages in the chatlog
             foreach (var session in log.Sessions)
             {
-                await session.GenerateEmbeds();
+                await session.EmbedText();
                 RaidOnEmbedSession(session);
             }
         }

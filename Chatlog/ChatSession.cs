@@ -1,32 +1,70 @@
 ﻿using AIToolkit.API;
 using AIToolkit.GBNF;
 using AIToolkit.LLM;
+using AIToolkit.Memory;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using System.Runtime.Serialization;
 using System.Text;
 
 namespace AIToolkit.Files
 {
-    public class ChatSession : KeywordEntry, IChatSession
+    public class ChatSession : MemoryUnit, IChatSession
     {
-        public Guid Guid { get; set; } = Guid.NewGuid();
-        [JsonIgnore] public string Title => MetaData.Title;
-        [JsonIgnore] public string Summary => MetaData.Summary;
+        // Canonical fields proxied to MetaData for this subtype
+        public override string Name
+        {
+            get => MetaData.Title ?? string.Empty;
+            set => MetaData.Title = value ?? string.Empty;
+        }
+
+        public override string Content
+        {
+            get => MetaData?.Summary ?? string.Empty;
+            set => MetaData.Summary = value ?? string.Empty;
+        }
 
         public SessionMetaInfo MetaData { get; set; } = new();
         public TopicLookup NewTopics { get; set; } = new();
 
         public string Scenario { get; set; } = string.Empty;
 
-        public float[] EmbedSummary { get; set; } = [];
+        public DateTime StartTime 
+        {
+            get => Added;
+            set => Added = value;
+        }
 
-        public DateTime StartTime { get; set; }
-        public DateTime EndTime { get; set; }
         public List<SingleMessage> Messages { get; set; } = [];
+
         /// <summary>
         /// If set to true, this memory will always be included in the prompt
         /// </summary>
         public bool Sticky { get; set; } = false;
-        public TimeSpan Duration => EndTime - StartTime;
+
+        [OnError]
+        internal void OnError(StreamingContext ctx, Newtonsoft.Json.Serialization.ErrorContext error)
+        {
+            // fix loading with older versions of the chatlog.
+            if (string.Equals(error.Member?.ToString(), "Duration", StringComparison.OrdinalIgnoreCase))
+            {
+                // Ignore legacy TimeSpan/Date token assigned to int Duration (from MemoryUnit)
+                error.Handled = true;
+            }
+        }
+
+        public ChatSession()
+        {
+            Category = MemoryType.ChatSession;
+        }
+
+        [OnDeserialized]
+        internal void OnDeserialized(StreamingContext ctx)
+        {
+            // Ensure Category is correct on legacy files
+            if (Category == default)
+                Category = MemoryType.ChatSession;
+        }
 
         public virtual async Task UpdateSession()
         {
@@ -74,7 +112,7 @@ namespace AIToolkit.Files
                 MetaData.IsRoleplaySession = await IsRoleplay();
                 MetaData.Title = await GenerateNewTitle(sum);
             }
-            await GenerateEmbeds();
+            await EmbedText();
         }
 
         public virtual async Task<SessionMetaInfo> GetSessionInfo()
@@ -101,7 +139,7 @@ namespace AIToolkit.Files
                 "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
                 "# Chat Session:" + LLMSystem.NewLine +
                 "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
-                "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine;
+                "## Duration: " + StringExtensions.TimeSpanToHumanString(EndTime-StartTime) + LLMSystem.NewLine + LLMSystem.NewLine;
 
 
             var requestedTask = session.GetQuery();
@@ -150,7 +188,7 @@ namespace AIToolkit.Files
                 "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
                 "# Chat Session:" + LLMSystem.NewLine +
                 "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
-                "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine;
+                "## Duration: " + StringExtensions.TimeSpanToHumanString(EndTime - StartTime) + LLMSystem.NewLine + LLMSystem.NewLine;
 
 
             var requestedTask = session.GetQuery();
@@ -264,7 +302,7 @@ namespace AIToolkit.Files
                 "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
                 "# Chat Session:" + LLMSystem.NewLine +
                 "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
-                "## Duration: " + StringExtensions.TimeSpanToHumanString(Duration) + LLMSystem.NewLine + LLMSystem.NewLine;
+                "## Duration: " + StringExtensions.TimeSpanToHumanString(EndTime - StartTime) + LLMSystem.NewLine + LLMSystem.NewLine;
 
             availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
             availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
@@ -326,35 +364,25 @@ namespace AIToolkit.Files
             var sb = new StringBuilder();
             if (withtitle)
             {
-                sb.Append($"{Title.RemoveNewLines()}: ");
+                sb.Append($"{Name.RemoveNewLines()}: ");
             }
             if (includedates)
             {
                 if (StartTime.Date == EndTime.Date)
                 {
-                    sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}: {Summary.RemoveNewLines()}");
+                    sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}: {Content.RemoveNewLines()}");
                 }
                 else
                 {
-                    sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}: {Summary.RemoveNewLines()}");
+                    sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}: {Content.RemoveNewLines()}");
                 }
             }
             else
             {
-                sb.AppendLinuxLine($"{Summary.RemoveNewLines()}");
+                sb.AppendLinuxLine($"{Content.RemoveNewLines()}");
             }
 
             return sb.ToString();
-        }
-
-        public async Task GenerateEmbeds()
-        {
-            if (!RAGSystem.Enabled)
-                return;
-            var titleembed = await RAGSystem.EmbeddingText(Title);
-            var sumembed = await RAGSystem.EmbeddingText(Summary);
-
-            EmbedSummary = RAGSystem.MergeEmbeddings(titleembed, sumembed);
         }
     }
 }

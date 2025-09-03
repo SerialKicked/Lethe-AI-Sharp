@@ -4,18 +4,16 @@ namespace AIToolkit.Files
 {
     public interface IChatSession : IEmbed
     {
-        TimeSpan Duration { get; }
+        DateTime StartTime { get; set; }
         DateTime EndTime { get; set; }
         List<SingleMessage> Messages { get; set; }
         SessionMetaInfo MetaData { get; set; }
         TopicLookup NewTopics { get; set; }
         string Scenario { get; set; }
-        DateTime StartTime { get; set; }
         bool Sticky { get; set; }
-        string Summary { get; }
-        string Title { get; }
+        string Content { get; }
+        string Name { get; }
 
-        Task GenerateEmbeds();
         Task<string> GenerateGoals();
         Task<string[]> GenerateKeywords();
         Task<string> GenerateNewSummary();

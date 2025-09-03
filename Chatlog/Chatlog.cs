@@ -68,12 +68,12 @@ namespace AIToolkit.Files
             for (int i = entrydepth; i >= 0; i--)
             {
                 var session = Sessions[i];
-                if (LLMSystem.usedGuidInSession.Contains(session.Guid) || string.IsNullOrWhiteSpace(session.Summary))
+                if (LLMSystem.usedGuidInSession.Contains(session.Guid) || string.IsNullOrWhiteSpace(session.Content))
                     continue;
                 if (!allowRP && session.MetaData.IsRoleplaySession)
                     continue;
                 var sb = new StringBuilder();
-                sb.AppendLinuxLine($"{sectionHeader} {session.Title}");
+                sb.AppendLinuxLine($"{sectionHeader} {session.Name}");
                 sb.AppendLinuxLine(session.GetRawMemory(false, LLMSystem.Bot.DatesInSessionSummaries));
                 var tks = LLMSystem.GetTokenCount(sb.ToString());
                 if (tks <= tokensleft)

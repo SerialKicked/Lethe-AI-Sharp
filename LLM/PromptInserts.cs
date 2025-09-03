@@ -62,7 +62,7 @@ namespace AIToolkit.LLM
                 return;
             foreach (var (session, _, _) in memories)
             {
-                if (session is WorldEntry entry)
+                if (session is MemoryUnit entry)
                 {
                     AddInsert(new PromptInsert(entry.Guid, entry.Content, entry.Position == WEPosition.SystemPrompt ? -1 : entry.PositionIndex, entry.Duration));
                 }
