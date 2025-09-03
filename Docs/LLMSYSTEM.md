@@ -581,7 +581,7 @@ string processed = LLMSystem.ReplaceMacros(template);
 
 ### Working with RAGSystem
 
-Proper documention has yet to be written/
+Proper documention has yet to be written.
 
 ```csharp
 // Configure RAG integration

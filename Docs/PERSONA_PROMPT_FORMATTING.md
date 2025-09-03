@@ -278,7 +278,7 @@ var dailyAssistant = new BasePersona()
 ## InstructFormat Class
 
 The `InstructFormat` class handles prompt formatting for different instruction-tuned language models. 
-This is primarily used with text completion backends (KoboldAPI), while chat completion backends (OpenAI) handle formatting internally.
+This is primarily used with text completion backends (KoboldAPI). This is only required in chat completion backends (OpenAI) for CoT / Thinking models.
 
 ### Core Properties
 
@@ -613,7 +613,7 @@ if (LLMSystem.IsGroupConversation)
 - **Appropriate settings**: Enable `SenseOfTime` for realistic characters, disable for fantasy
 
 ### 2. Instruction Format Configuration
-- **Match your backend**: Instruct format is only relevant for Text Completion (KoboldCpp), it's not used for OpenAI-style APIs
+- **Match your backend**: Instruct format is mostly relevant for Text Completion (KoboldCpp), for OpenAI-style APIs it's only relevant for CoT / Thinking models
 - **Double Check**: Verify that the format is correct for the your specific model, or you'll degrade the output's quality immensely.
 - **Consider names**: Enable `AddNamesToPrompt` for better role recognition in some models
 - **Handle stop strings**: Add model-specific stop sequences to prevent runaway generation
