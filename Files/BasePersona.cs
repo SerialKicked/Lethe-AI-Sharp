@@ -106,7 +106,7 @@ namespace AIToolkit.Files
         /// <summary>
         /// Work in progress, don't document
         /// </summary>
-        [JsonIgnore] public Brain Brain { get; set; } = new();
+        [JsonIgnore] public Brain Brain { get; set; }
 
         [JsonIgnore] public List<WorldInfo> MyWorlds { get; protected set; } = [];
         [JsonIgnore] public Chatlog History { get; protected set; } = new();
@@ -177,7 +177,7 @@ namespace AIToolkit.Files
 
         public BasePersona() 
         {
-
+            Brain = new(this);
         }
 
         /// <summary>
@@ -187,7 +187,7 @@ namespace AIToolkit.Files
         public virtual void BeginChat()
         {
             LoadBrain("data/chars/");
-            Brain.CharacterLoad();
+            Brain.RefreshMemories();
         }
 
         /// <summary>
@@ -351,7 +351,7 @@ namespace AIToolkit.Files
         {
             if (string.IsNullOrEmpty(UniqueName))
             {
-                Brain = new Brain();
+                Brain = new Brain(this);
                 return;
             }
             
@@ -360,35 +360,12 @@ namespace AIToolkit.Files
             // If brain file exists, load it
             if (File.Exists(brainFilePath))
             {
-                Brain = JsonConvert.DeserializeObject<Brain>(File.ReadAllText(brainFilePath))! ?? new Brain();
+                Brain = JsonConvert.DeserializeObject<Brain>(File.ReadAllText(brainFilePath))! ?? new Brain(this);
+                Brain.Owner = this;
                 return;
             }
-            
-            // If no brain file exists, check if we need to migrate from the persona file
-            var personaFilePath = path + UniqueName + ".json";
-            if (File.Exists(personaFilePath))
-            {
-                try
-                {
-                    var personaJson = File.ReadAllText(personaFilePath);
-                    // Try to extract Brain data using dynamic parsing
-                    var jsonObject = JsonConvert.DeserializeObject<dynamic>(personaJson);
-                    if (jsonObject?.Brain != null)
-                    {
-                        // Migrate brain data from persona file to separate brain file
-                        Brain = JsonConvert.DeserializeObject<Brain>(jsonObject.Brain.ToString())! ?? new Brain();
-                        SaveBrain(path, false);
-                        return;
-                    }
-                }
-                catch
-                {
-                    // If migration fails, just use empty brain
-                }
-            }
-            
             // Default to empty brain
-            Brain = new Brain();
+            Brain = new Brain(this);
         }
 
         internal MemoryUnit? GetWIEntryByGUID(Guid id)

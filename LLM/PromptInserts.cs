@@ -62,13 +62,17 @@ namespace AIToolkit.LLM
                 return;
             foreach (var (session, _, _) in memories)
             {
-                if (session is MemoryUnit entry)
-                {
-                    AddInsert(new PromptInsert(entry.Guid, entry.Content, entry.Position == WEPosition.SystemPrompt ? -1 : entry.PositionIndex, entry.Duration));
-                }
-                else if (session is ChatSession info)
+                if (session is ChatSession info)
                 {
                     AddInsert(new PromptInsert(session.Guid, info.GetRawMemory(true, LLMSystem.Bot.DatesInSessionSummaries), LLMSystem.Settings.RAGIndex, 1));
+                }
+                else if (session is MemoryUnit entry)
+                {
+                    if (entry.Category == MemoryType.WorldInfo)
+                        AddInsert(new PromptInsert(entry.Guid, entry.Content, entry.Position == WEPosition.SystemPrompt ? -1 : entry.PositionIndex, entry.Duration));
+                    else
+                        AddInsert(new PromptInsert(session.Guid, entry.Content, LLMSystem.Settings.RAGIndex, 1));
+
                 }
                 else if (session is MemoryUnit unit)
                 {
@@ -76,6 +80,8 @@ namespace AIToolkit.LLM
                 }
             }
         }
+
+
 
         public HashSet<Guid> GetGuids()
         {

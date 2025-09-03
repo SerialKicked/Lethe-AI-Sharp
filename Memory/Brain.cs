@@ -1,4 +1,5 @@
-﻿using AIToolkit.Files;
+﻿using AIToolkit.Agent;
+using AIToolkit.Files;
 using AIToolkit.LLM;
 using Newtonsoft.Json;
 using System.Text;
@@ -112,13 +113,16 @@ namespace AIToolkit.Memory
     }
 
 
-    public class Brain
+    public class Brain(BasePersona basePersona)
     {
+        [JsonIgnore]
+        public BasePersona Owner { get; set; } = basePersona;
         public TimeSpan MinInsertDelay { get; set; } = TimeSpan.FromMinutes(15);
         public int MinMessageDelay { get; set; } = 5;
         public TimeSpan EurekaCutOff { get; set; } = TimeSpan.FromDays(15);
         public DateTime LastInsertTime { get; set; }
         public int CurrentDelay = 0;
+
         public List<MemoryUnit> Memories { get; set; } = [];
 
         public MoodState Mood { get; set; } = new MoodState();
@@ -130,7 +134,7 @@ namespace AIToolkit.Memory
         /// </summary>
         private bool IsBrainDisabled => LLMSystem.IsGroupConversation;
 
-        public void CharacterLoad()
+        public void RefreshMemories()
         {
             // Remove old natural memories
             Memories.RemoveAll(e => e.Insertion == MemoryInsertion.Natural && (DateTime.Now - e.Added) > EurekaCutOff);
@@ -157,7 +161,7 @@ namespace AIToolkit.Memory
             if (IsBrainDisabled)
                 return;
                 
-            CharacterLoad();
+            RefreshMemories();
             if (!string.IsNullOrWhiteSpace(LLMSystem.Settings.ScenarioOverride) || Eurekas.Count == 0)
                 return;
             CurrentDelay++;
@@ -175,7 +179,7 @@ namespace AIToolkit.Memory
             LastInsertTime = DateTime.Now;
             if (!Eurekas.TryDequeue(out var memory))
                 return;
-            var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, memory.ToEureka(), LLMSystem.Bot.UniqueName, LLMSystem.User.UniqueName, true);
+            var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, memory.ToEureka(), Owner.UniqueName, LLMSystem.User.UniqueName, true);
             LLMSystem.History.LogMessage(tosend);
             // High Priority memories are kept and set back to Trigger insertion
             if (memory.Priority > 1)
@@ -189,13 +193,27 @@ namespace AIToolkit.Memory
         {
             CurrentDelay = 0;
             LastInsertTime = DateTime.Now;
-            CharacterLoad();
+            RefreshMemories();
         }
 
         public bool Has(MemoryType memType, Guid sessionId) => Memories.Any(m => m.Category == memType && m.Guid == sessionId);
 
-        internal IEmbed? GetMemoryByID(Guid iD)
+        internal IEmbed? GetEmbedByID(Guid iD)
         {
+            return Memories.FirstOrDefault(m => m.Guid == iD);
+        }
+
+        public MemoryUnit? GetGlobalMemoryByID(Guid iD)
+        {
+            // Check Sessions
+            MemoryUnit? res = Owner.History.GetSessionByID(iD);
+            if (res != null)
+                return res;
+            // Check WorldInfo
+            res = Owner.GetWIEntryByGUID(iD);
+            if (res != null)
+                return res;
+            // Check local memories
             return Memories.FirstOrDefault(m => m.Guid == iD);
         }
     }

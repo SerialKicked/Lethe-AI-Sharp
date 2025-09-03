@@ -289,7 +289,7 @@ namespace AIToolkit.LLM
                 }
                 else if (item.Category == EmbedType.Brain)
                 {
-                    var found = LLMSystem.Bot.Brain.GetMemoryByID(item.ID);
+                    var found = LLMSystem.Bot.Brain.GetEmbedByID(item.ID);
                     if (found != null)
                         list.Add((found, item.Category, item.Distance));
                 }
