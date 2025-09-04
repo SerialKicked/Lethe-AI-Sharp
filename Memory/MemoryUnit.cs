@@ -114,7 +114,7 @@ namespace AIToolkit.Memory
             var text = new StringBuilder($"You remember something you've researched on the web recently about '{Name}'.");
             if (!string.IsNullOrEmpty(Reason))
             {
-                text.Append($" The reason for that search was: {Reason}.");
+                text.AppendLinuxLine($" The reason for that search was: {Reason}.");
             }
             text.AppendLinuxLine().AppendLinuxLine($"{Content}").AppendLinuxLine().Append("Mention this information when there's a lull in the discussion, or if the user makes a mention of it, or if you feel like it's a good idea to talk about it.");
             return text.ToString();
