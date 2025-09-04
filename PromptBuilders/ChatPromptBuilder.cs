@@ -1,4 +1,5 @@
-﻿using AIToolkit.LLM;
+﻿using AIToolkit.Files;
+using AIToolkit.LLM;
 using CommunityToolkit.HighPerformance;
 using OpenAI.Chat;
 using System;
@@ -17,7 +18,7 @@ namespace AIToolkit
 
         public int AddMessage(AuthorRole role, string message)
         {
-            var msg = LLMSystem.FormatSingleMessage(role, LLMSystem.User, LLMSystem.Bot, message);
+            var msg = FormatSingleMessage(role, LLMSystem.User, LLMSystem.Bot, message);
             _prompt.Add(msg);
             return LLMSystem.GetTokenCount(msg.Content.ToString()) + 4;
         }
@@ -43,7 +44,7 @@ namespace AIToolkit
             {
                 return AddMessage(role, message);
             }
-            var msg = LLMSystem.FormatSingleMessage(role, LLMSystem.User, LLMSystem.Bot, message);
+            var msg = FormatSingleMessage(role, LLMSystem.User, LLMSystem.Bot, message);
             _prompt.Insert(index, msg);
             return LLMSystem.GetTokenCount(msg.Content.ToString()) + 4;
         }
@@ -68,7 +69,7 @@ namespace AIToolkit
 
         public int GetTokenCount(AuthorRole role, string message)
         {
-            var msg = LLMSystem.FormatSingleMessage(role, LLMSystem.User, LLMSystem.Bot, message);
+            var msg = FormatSingleMessage(role, LLMSystem.User, LLMSystem.Bot, message);
             return LLMSystem.GetTokenCount(msg.Content.ToString());
         }
 
@@ -85,6 +86,37 @@ namespace AIToolkit
                     sb.AppendLine("SYSTEM" + ": " + message.Content.ToString());
             }
             return sb.ToString();
+        }
+
+        private static Message FormatSingleMessage(AuthorRole role, BasePersona user, BasePersona bot, string prompt)
+        {
+            var realprompt = prompt;
+            var addname = LLMSystem.NamesInPromptOverride ?? LLMSystem.Instruct.AddNamesToPrompt;
+
+            // In group conversations, ALWAYS add names so the LLM knows which persona is speaking
+            if (bot is GroupPersona)
+                addname = true;
+
+            if (role != AuthorRole.Assistant && role != AuthorRole.User)
+                addname = false;
+            string? selname = null;
+            if (addname)
+            {
+                if (role == AuthorRole.Assistant)
+                {
+                    // For group conversations, use the current bot's name
+                    var actualBot = bot is GroupPersona groupPersona ?
+                        (groupPersona.CurrentBot ?? groupPersona.BotPersonas.FirstOrDefault() ?? bot) : bot;
+                    realprompt = string.Format("{0}: {1}", actualBot.Name, prompt);
+                    selname = actualBot.Name;
+                }
+                else if (role == AuthorRole.User)
+                {
+                    realprompt = string.Format("{0}: {1}", user.Name, prompt);
+                    selname = user.Name;
+                }
+            }
+            return new Message(TokenTools.InternalRoleToChatRole(role), LLMSystem.ReplaceMacros(realprompt, user, bot), selname);
         }
     }
 }

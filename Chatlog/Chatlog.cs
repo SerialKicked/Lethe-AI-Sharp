@@ -6,6 +6,7 @@ using AIToolkit.Memory;
 using CommunityToolkit.HighPerformance;
 using LLama.Sampling;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices.Marshalling;
 using System.Text;
@@ -37,9 +38,25 @@ namespace AIToolkit.Files
             }
         }
 
+        [JsonIgnore] public EventHandler<SingleMessage>? OnBeforeMessageAdded;
         [JsonIgnore] public EventHandler<SingleMessage>? OnMessageAdded;
+        [JsonIgnore] public EventHandler<ChatSession>? OnNewSession;
 
-        private void RaiseOnMessageAdded(SingleMessage message) => OnMessageAdded?.Invoke(this, message);
+        private void RaiseBeforeMessageAdded(SingleMessage message)
+        {
+            OnBeforeMessageAdded?.Invoke(this, message);
+        }
+
+        private void RaiseOnMessageAdded(SingleMessage message)
+        {
+            OnMessageAdded?.Invoke(this, message);
+            EventBus.Publish(new MessageAddedEvent(message.Guid, message.Role == AuthorRole.User, message.Date));
+        }
+
+        private void RaiseOnNewSession(ChatSession session)
+        {
+            OnNewSession?.Invoke(this, session);
+        }
 
         /// <summary>
         /// Factory method for creating ChatSession instances. Override this in derived classes to provide custom ChatSession implementations.
@@ -154,11 +171,10 @@ namespace AIToolkit.Files
                 var idx = stringfix.IndexOf(LLMSystem.Instruct.ThinkingEnd);
                 stringfix = stringfix[(idx + LLMSystem.Instruct.ThinkingEnd.Length)..].CleanupAndTrim();
             }
-
             var single = new SingleMessage(role, DateTime.Now, stringfix, bot.UniqueName, user.UniqueName);
+            RaiseBeforeMessageAdded(single);
             CurrentSession.Messages.Add(single);
             RaiseOnMessageAdded(single);
-            EventBus.Publish(new MessageAddedEvent(single.Guid, role == AuthorRole.User, single.Date));
             return single;
         }
 
@@ -166,9 +182,9 @@ namespace AIToolkit.Files
         {
             if (Sessions.Count == 0)
                 Sessions.Add(CreateChatSession());
+            RaiseBeforeMessageAdded(single);
             CurrentSession.Messages.Add(single);
             RaiseOnMessageAdded(single);
-            EventBus.Publish(new MessageAddedEvent(single.Guid, single.Role == AuthorRole.User, single.Date));
             return single;
         }
 
@@ -229,6 +245,7 @@ namespace AIToolkit.Files
             {
                 CurrentSession.Messages.Clear();
             }
+            RaiseOnNewSession(CurrentSession);
             // Generate new system message about the new session
             var msgtxt = "*We're {{day}} the {{date}} at {{time}}.";
             if (Sessions.Count > 1)
@@ -246,7 +263,6 @@ namespace AIToolkit.Files
             }
             msgtxt += "*";
             LogMessage(AuthorRole.System, LLMSystem.ReplaceMacros(msgtxt, LLMSystem.User, LLMSystem.Bot), LLMSystem.User, LLMSystem.Bot);
-            LLMSystem.Bot.Brain.OnNewSession();
         }
 
         /// <summary>

@@ -3,21 +3,10 @@ using AIToolkit.API;
 using AIToolkit.Files;
 using AIToolkit.Memory;
 using Microsoft.Extensions.Logging;
-using Microsoft.VisualBasic;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using OpenAI.Chat;
-using System;
-using System.Collections.ObjectModel;
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Globalization;
-using System.IO;
 using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
 using static AIToolkit.SearchAPI.WebSearchAPI;
-using static LLama.Common.ChatHistory;
 using Message = OpenAI.Chat.Message;
 
 namespace AIToolkit.LLM
@@ -580,7 +569,7 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         public static string GetAwayString()
         {
-            if (History.CurrentSession.Messages.Count == 0 || !Bot.SenseOfTime || History.CurrentSession != History.Sessions.Last())
+            if (History.CurrentSession.Messages.Count == 0 || History.CurrentSession != History.Sessions.Last())
                 return string.Empty;
 
             var timespan = DateTime.Now - History.CurrentSession.Messages.Last().Date;
@@ -590,13 +579,13 @@ namespace AIToolkit.LLM
             var msgtxt = (DateTime.Now.Date != History.CurrentSession.Messages.Last().Date.Date) || (timespan > new TimeSpan(12, 0, 0)) ?
                 $"We're {DateTime.Now.DayOfWeek} {StringExtensions.DateToHumanString(DateTime.Now)}." : string.Empty;
             if (timespan.Days > 1)
-                msgtxt += $" Your last chat was {timespan.Days} days ago. " + "It is {{time}} now.";
+                msgtxt += $" The last chat was {timespan.Days} days ago. " + "It is {{time}} now.";
             else if (timespan.Days == 1)
                 msgtxt += " The last chat happened yesterday. It is {{time}} now.";
             else
                 msgtxt += $" The last chat was about {timespan.Hours} hours ago. " + "It is {{time}} now.";
-            msgtxt = "*" + msgtxt.Trim() + "*" + NewLine;
-            return ReplaceMacros(msgtxt + NewLine);
+            msgtxt = msgtxt.Trim();
+            return ReplaceMacros(msgtxt);
         }
 
         /// <summary>
@@ -977,37 +966,6 @@ namespace AIToolkit.LLM
                 return PromptBuilder.PromptToQuery(AuthorRole.Assistant);
         }
 
-        internal static Message FormatSingleMessage(AuthorRole role, BasePersona user, BasePersona bot, string prompt)
-        {
-            var realprompt = prompt;
-            var addname = NamesInPromptOverride ?? Instruct.AddNamesToPrompt;
-            
-            // In group conversations, ALWAYS add names so the LLM knows which persona is speaking
-            if (bot is GroupPersona)
-                addname = true;
-                
-            if (role != AuthorRole.Assistant && role != AuthorRole.User)
-                addname = false;
-            string? selname = null;
-            if (addname)
-            {
-                if (role == AuthorRole.Assistant)
-                {
-                    // For group conversations, use the current bot's name
-                    var actualBot = bot is GroupPersona groupPersona ? 
-                        (groupPersona.CurrentBot ?? groupPersona.BotPersonas.FirstOrDefault() ?? bot) : bot;
-                    realprompt = string.Format("{0}: {1}", actualBot.Name, prompt);
-                    selname = actualBot.Name;
-                }
-                else if (role == AuthorRole.User)
-                {
-                    realprompt = string.Format("{0}: {1}", user.Name, prompt);
-                    selname = user.Name;
-                }
-            }
-            return new Message(TokenTools.InternalRoleToChatRole(role), ReplaceMacros(realprompt, user, bot), selname);
-        }
-
         /// <summary>
         /// Plugin Handler
         /// </summary>
@@ -1051,9 +1009,20 @@ namespace AIToolkit.LLM
             // Plugin pre-pass OUTSIDE the model slot to avoid deadlocks
             var lastuserinput = string.IsNullOrEmpty(userInput) ? History.GetLastUserMessageContent() : userInput;
             var pluginmessage = await BuildPluginSystemInsertAsync(lastuserinput);
-            if (string.IsNullOrWhiteSpace(pluginmessage) && !string.IsNullOrEmpty(userInput) && MsgSender == AuthorRole.User)
+
+            // build the message if relevant
+            SingleMessage? singlemsg = null;
+            if (!string.IsNullOrEmpty(userInput))
             {
-                await Bot.Brain.OnUserPost(userInput);
+                singlemsg = new SingleMessage(MsgSender, DateTime.Now, userInput, Bot.UniqueName, User.UniqueName);
+                if (setGuid is not null)
+                    singlemsg.Guid = (Guid)setGuid;
+            }
+
+            // call the brain if there's no plugin interfering
+            if (singlemsg is not null && string.IsNullOrEmpty(pluginmessage))
+            {
+                await Bot.Brain.HandleMessages(singlemsg!);
             }
 
             using var _ = await AcquireModelSlotAsync(CancellationToken.None);
@@ -1068,11 +1037,9 @@ namespace AIToolkit.LLM
                 RaiseOnInferenceStreamed(StreamingTextProgress);
             }
 
-            if (!string.IsNullOrEmpty(userInput))
+            if (singlemsg is not null)
             {
-                var msg = Bot.History.LogMessage(MsgSender, userInput, User, Bot);
-                if (setGuid is not null)
-                    msg.Guid = (Guid)setGuid;
+                Bot.History.LogMessage(singlemsg!);
             }
 
             RaiseOnFullPromptReady(PromptBuilder.PromptToText());

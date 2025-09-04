@@ -187,7 +187,6 @@ namespace AIToolkit.Files
         public virtual void BeginChat()
         {
             LoadBrain("data/chars/");
-            Brain.RefreshMemories();
         }
 
         /// <summary>
@@ -329,6 +328,7 @@ namespace AIToolkit.Files
 
         protected virtual void SaveBrain(string path, bool backup = false)
         {
+            Brain.Close();
             if (string.IsNullOrEmpty(UniqueName))
                 return;
             var brainPath = path + UniqueName + ".brain";
@@ -347,25 +347,24 @@ namespace AIToolkit.Files
             File.WriteAllText(brainPath, content);
         }
 
+        /// <summary>
+        /// Load the brain, can be overriden if you want to make a custom brain or load from a different location.
+        /// </summary>
+        /// <param name="path"></param>
         protected virtual void LoadBrain(string path)
         {
-            if (string.IsNullOrEmpty(UniqueName))
-            {
-                Brain = new Brain(this);
-                return;
-            }
-            
             var brainFilePath = path + UniqueName + ".brain";
-            
             // If brain file exists, load it
-            if (File.Exists(brainFilePath))
+            if (!string.IsNullOrEmpty(UniqueName) && File.Exists(brainFilePath))
             {
                 Brain = JsonConvert.DeserializeObject<Brain>(File.ReadAllText(brainFilePath))! ?? new Brain(this);
-                Brain.Owner = this;
-                return;
             }
-            // Default to empty brain
-            Brain = new Brain(this);
+            else
+            {
+                // Default to empty brain
+                Brain = new Brain(this);
+            }
+            Brain.Init(this);
         }
 
         internal MemoryUnit? GetWIEntryByGUID(Guid id)
