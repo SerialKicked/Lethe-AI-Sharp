@@ -12,6 +12,12 @@ namespace AIToolkit.Files
     public class LLMSettings : BaseFile
     {
 
+        /// <summary>
+        /// Agentic and Brain data will be saved to this folder.
+        /// It will use "{BasePersona.UniqueName}" filename with ".brain" and ".agent" extensions.
+        /// </summary>
+        public string DataPath { get; set; } = "data/chars/";
+
         #region *** Backend Connection ***
 
         /// <summary> URL of the backend server (KoboldAPI, OpenAI, etc.) </summary>

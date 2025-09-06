@@ -730,7 +730,6 @@ namespace AIToolkit.LLM
             bot = newbot;
 
             OnBotChanged?.Invoke(null, bot);
-            EventBus.Publish(new BotChangedEvent(bot.UniqueName));
 
             bot.BeginChat();
 
@@ -774,7 +773,6 @@ namespace AIToolkit.LLM
             
             // Trigger bot changed event for UI updates
             OnBotChanged?.Invoke(null, bot);
-            EventBus.Publish(new BotChangedEvent(uniqueName));
         }
 
         /// <summary>

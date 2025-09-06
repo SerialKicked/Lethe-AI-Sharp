@@ -50,7 +50,6 @@ namespace AIToolkit.Files
         private void RaiseOnMessageAdded(SingleMessage message)
         {
             OnMessageAdded?.Invoke(this, message);
-            EventBus.Publish(new MessageAddedEvent(message.Guid, message.Role == AuthorRole.User, message.Date));
         }
 
         private void RaiseOnNewSession(ChatSession session)
@@ -233,7 +232,6 @@ namespace AIToolkit.Files
             {
                 CurrentSession.Scenario = LLMSystem.Settings.ScenarioOverride;
                 await CurrentSession.UpdateSession();
-                EventBus.Publish(new SessionArchivedEvent(CurrentSession.Guid, DateTime.UtcNow));
                 // reset session ID
                 CurrentSessionID = -1;
                 // Create new session

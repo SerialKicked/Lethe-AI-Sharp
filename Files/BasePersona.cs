@@ -91,6 +91,17 @@ namespace AIToolkit.Files
         /// </summary>
         public List<string> Plugins { get; set; } = [];
 
+        /// <summary>
+        /// Toggles the background agent mode for this persona (the bot will act autonomously in the background using the provided AgentTasks). 
+        /// Only the currently loaded persona will run the agentic logic. See documentations for more information.
+        /// </summary>
+        public bool AgentMode { get; set; } = false;
+
+        /// <summary> 
+        /// Optional list of plugin ID for the background agent mode. See documentations for more information.
+        /// </summary>
+        public List<string> AgentTasks { get; set; } = [];
+
         /// <summary> 
         /// If set to true, system messages will occasionally be inserted in the chat to inform the bot of how much time has passed 
         /// between the latest user message and its last response. It'll also help with keeping track of dates and time in general.
@@ -107,10 +118,11 @@ namespace AIToolkit.Files
         /// Work in progress, don't document
         /// </summary>
         [JsonIgnore] public Brain Brain { get; set; }
-
         [JsonIgnore] public List<WorldInfo> MyWorlds { get; protected set; } = [];
         [JsonIgnore] public Chatlog History { get; protected set; } = new();
-        
+
+        [JsonIgnore] private AgentLoop? _agent = null;
+
         /// <summary>
         /// Factory method for creating Chatlog instances. Override this in derived classes to provide custom Chatlog implementations.
         /// </summary>
@@ -186,7 +198,9 @@ namespace AIToolkit.Files
         /// </summary>
         public virtual void BeginChat()
         {
-            LoadBrain("data/chars/");
+            LoadBrain(LLMSystem.Settings.DataPath);
+            _agent = new AgentLoop(this);
+            _agent.Init();
         }
 
         /// <summary>
@@ -197,6 +211,8 @@ namespace AIToolkit.Files
         public virtual void EndChat(bool backup = false)
         {
             SaveBrain("data/chars/", backup);
+            _agent?.CloseSync();
+            _agent = null;
         }
 
         /// <summary>
@@ -322,28 +338,32 @@ namespace AIToolkit.Files
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
 
             SelfEditField = finalstr.RemoveUnfinishedSentence().RemoveNewLines().CleanupAndTrim().RemoveTitle();
-            EventBus.Publish(new PersonaUpdatedEvent(UniqueName, DateTime.UtcNow));
         }
-
 
         protected virtual void SaveBrain(string path, bool backup = false)
         {
             Brain.Close();
             if (string.IsNullOrEmpty(UniqueName))
                 return;
-            var brainPath = path + UniqueName + ".brain";
+
+            // if path doesn't have a trailing slash, add one
+            var selpath = path;
+            if (!selpath.EndsWith('/') && !selpath.EndsWith('\\'))
+                selpath += Path.DirectorySeparatorChar;
+            var dir = Path.GetDirectoryName(selpath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            var brainPath = selpath + UniqueName + ".brain";
             if (backup && File.Exists(brainPath))
             {
-                if (File.Exists(path + UniqueName + ".brain.bak"))
-                    File.Delete(path + UniqueName + ".brain.bak");
-                File.Move(brainPath, path + UniqueName + ".brain.bak");
+                if (File.Exists(selpath + UniqueName + ".brain.bak"))
+                    File.Delete(selpath + UniqueName + ".brain.bak");
+                File.Move(brainPath, selpath + UniqueName + ".brain.bak");
             }
 
             var content = JsonConvert.SerializeObject(Brain, new JsonSerializerSettings { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
             // create directory if it doesn't exist
-            var dir = Path.GetDirectoryName(brainPath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
             File.WriteAllText(brainPath, content);
         }
 
@@ -353,7 +373,11 @@ namespace AIToolkit.Files
         /// <param name="path"></param>
         protected virtual void LoadBrain(string path)
         {
-            var brainFilePath = path + UniqueName + ".brain";
+            // if path doesn't have a trailing slash, add one
+            var selpath = path;
+            if (!selpath.EndsWith('/') && !selpath.EndsWith('\\'))
+                selpath += Path.DirectorySeparatorChar;
+            var brainFilePath = selpath + UniqueName + ".brain";
             // If brain file exists, load it
             if (!string.IsNullOrEmpty(UniqueName) && File.Exists(brainFilePath))
             {
