@@ -72,6 +72,10 @@ namespace AIToolkit.Memory
         /// </summary>
         public DateTime EndTime { get; set; } = DateTime.Now;
 
+        public DateTime LastTrigger { get; set; } = DateTime.Now;
+
+        public int TriggerCount { get; set; } = 0;
+
         /// <summary>
         /// Embedding data for RAG
         /// </summary>

@@ -7,7 +7,6 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -40,6 +39,7 @@ namespace AIToolkit.Agent
     public class AgentLoopConfig
     {
         public Dictionary<string, AgentTaskSetting> PluginSettings { get; set; } = [];
+        public TimeSpan MinInactivityTime { get; set; } = new TimeSpan(0, 15, 0); // 30 minutes
     }
 
     public class AgentLoop(BasePersona owner)
@@ -48,11 +48,20 @@ namespace AIToolkit.Agent
         public AgentLoopConfig Config { get; set; } = new();
 
         private CancellationTokenSource? _cts = new();
+        private DateTime _lastuseractivity = DateTime.Now;
         private bool _running;
         private Task? _loop;
         private readonly List<IAgentTask> _plugins = [];
         private readonly Dictionary<string, Func<IAgentTask>> _pluginRegistry = [];
 
+        /// <summary>
+        /// Updates the timestamp of the most recent user activity. 
+        /// Must be called by the app to notifiy the library of user activity, so the agent knows when not to interrupt
+        /// </summary>
+        public void NotifyUserActivity()
+        {
+            _lastuseractivity = DateTime.Now;
+        }
 
         private async Task MainLoop()
         {
@@ -62,11 +71,13 @@ namespace AIToolkit.Agent
 
             while (_running && !_cts.Token.IsCancellationRequested)
             {
-                if (!Owner.AgentMode)
+                // don't do anything if not in agent mode, or if user was active recently
+                if (!Owner.AgentMode || (DateTime.Now - _lastuseractivity) < Config.MinInactivityTime || LLMSystem.Status == SystemStatus.NotInit)
                 {
                     await Task.Delay(1000, _cts.Token);
                     continue;
                 }
+                // Run through all plugins
                 foreach (var plugin in _plugins)
                 {
                     if (!Config.PluginSettings.TryGetValue(plugin.Id, out var setting))
@@ -79,17 +90,21 @@ namespace AIToolkit.Agent
                             await plugin.Execute(Owner, setting, _cts.Token);
                         }
                     }
+                    catch (TaskCanceledException)
+                    {
+                        return;
+                    }
                     catch (OperationCanceledException)
                     {
-                        break;
+                        return;
                     }
                     catch (Exception ex)
                     {
                         LLMSystem.Logger?.LogError(ex, "Error in plugin {PluginId}: {ex}", plugin.Id, ex.Message);
                     }
+                    await Task.Delay(1000, _cts.Token);
                     if (!_running || _cts.Token.IsCancellationRequested)
                         break;
-                    await Task.Delay(1000, _cts.Token);
                 }
             }
         }
@@ -111,11 +126,6 @@ namespace AIToolkit.Agent
             if (_cts == null || _cts.IsCancellationRequested)
                 _cts = new CancellationTokenSource();
             _loop = Task.Run(MainLoop);
-        }
-
-        public void CloseSync()
-        {
-            Close().GetAwaiter().GetResult();
         }
 
         public async Task Close()

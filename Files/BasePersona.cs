@@ -121,7 +121,7 @@ namespace AIToolkit.Files
         [JsonIgnore] public List<WorldInfo> MyWorlds { get; protected set; } = [];
         [JsonIgnore] public Chatlog History { get; protected set; } = new();
 
-        [JsonIgnore] private AgentLoop? _agent = null;
+        [JsonIgnore] public AgentLoop? AgentSystem = null;
 
         /// <summary>
         /// Factory method for creating Chatlog instances. Override this in derived classes to provide custom Chatlog implementations.
@@ -199,8 +199,8 @@ namespace AIToolkit.Files
         public virtual void BeginChat()
         {
             LoadBrain(LLMSystem.Settings.DataPath);
-            _agent = new AgentLoop(this);
-            _agent.Init();
+            AgentSystem = new AgentLoop(this);
+            AgentSystem.Init();
         }
 
         /// <summary>
@@ -208,11 +208,12 @@ namespace AIToolkit.Files
         /// Override this in derived classes to implement custom saving behavior. Ideally, you should save the ChatLog in your derived class.
         /// </summary>
         /// <param name="backup"></param>
-        public virtual void EndChat(bool backup = false)
+        public virtual async Task EndChat(bool backup = false)
         {
             SaveBrain("data/chars/", backup);
-            _agent?.CloseSync();
-            _agent = null;
+            if (AgentSystem is not null)
+                await AgentSystem.Close();
+            AgentSystem = null;
         }
 
         /// <summary>

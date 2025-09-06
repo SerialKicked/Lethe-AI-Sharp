@@ -246,7 +246,7 @@ namespace AIToolkit.Files
         /// Override EndChat to properly save all bot personas in the group.
         /// </summary>
         /// <param name="backup">Whether to create backup files.</param>
-        public override void EndChat(bool backup = false)
+        public override async Task EndChat(bool backup = false)
         {
             // Save current bot ID for restoration
             CurrentBotId = CurrentBot?.UniqueName ?? string.Empty;
@@ -257,10 +257,10 @@ namespace AIToolkit.Files
             // End chat for all bot personas
             foreach (var persona in BotPersonas)
             {
-                persona.EndChat(backup);
+                await persona.EndChat(backup);
             }
             
-            base.EndChat(backup);
+            await base.EndChat(backup);
         }
     }
 }

@@ -125,9 +125,5 @@ namespace AIToolkit.Files
 
         #endregion
 
-        /// <summary> 
-        /// Enable/Disable the background agent on runtime
-        /// </summary>
-        public bool AgentEnabled { get; set; } = true;
     }
 }
