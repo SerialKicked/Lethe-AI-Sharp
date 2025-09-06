@@ -3,7 +3,6 @@ using AIToolkit.Files;
 using AIToolkit.LLM;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,29 +11,6 @@ using System.Threading.Tasks;
 
 namespace AIToolkit.Agent
 {
-    public interface IAgentTask
-    {
-        string Id { get; }
-        Task<bool> Observe(BasePersona owner, AgentTaskSetting cfg, CancellationToken ct);
-        Task Execute(BasePersona owner, AgentTaskSetting cfg, CancellationToken ct);
-    }
-
-
-    public class AgentTaskSetting
-    {
-        public string PluginId { get; set; } = string.Empty;
-        public Dictionary<string, JToken> Settings { get; set; } = [];
-
-        public T? GetSetting<T>(string key, T? defaultValue = default)
-        {
-            return Settings.TryGetValue(key, out var token) ? token.Value<T>() : defaultValue;
-        }
-
-        public void SetSetting<T>(string key, T value)
-        {
-            Settings[key] = value is null ? JToken.FromObject(string.Empty) : JToken.FromObject(value);
-        }
-    }
 
     public class AgentLoopConfig
     {
@@ -42,6 +18,10 @@ namespace AIToolkit.Agent
         public TimeSpan MinInactivityTime { get; set; } = new TimeSpan(0, 15, 0); // 30 minutes
     }
 
+    /// <summary>
+    /// AgentLoop is responsible for managing the agent mode of a BasePersona.
+    /// </summary>
+    /// <param name="owner">persona tied to the agent</param>
     public class AgentLoop(BasePersona owner)
     {
         public BasePersona Owner { get; private set; } = owner;
@@ -51,8 +31,8 @@ namespace AIToolkit.Agent
         private DateTime _lastuseractivity = DateTime.Now;
         private bool _running;
         private Task? _loop;
-        private readonly List<IAgentTask> _plugins = [];
-        private readonly Dictionary<string, Func<IAgentTask>> _pluginRegistry = [];
+        private static readonly List<IAgentTask> _plugins = [];
+        private static readonly Dictionary<string, Func<IAgentTask>> _pluginRegistry = [];
 
         /// <summary>
         /// Updates the timestamp of the most recent user activity. 
@@ -90,13 +70,10 @@ namespace AIToolkit.Agent
                             await plugin.Execute(Owner, setting, _cts.Token);
                         }
                     }
-                    catch (TaskCanceledException)
-                    {
-                        return;
-                    }
                     catch (OperationCanceledException)
                     {
-                        return;
+                        // gtfo
+                        break;
                     }
                     catch (Exception ex)
                     {
@@ -253,7 +230,7 @@ namespace AIToolkit.Agent
         /// </summary>
         /// <param name="id">The unique identifier for the plugin. This value cannot be null, empty, or consist only of whitespace.</param>
         /// <param name="plugin">class / interface of the plugin</param>
-        public void RegisterPlugin(string id, IAgentTask plugin)
+        public static void RegisterPlugin(string id, IAgentTask plugin)
         {
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException("Plugin ID cannot be null or empty", nameof(id));
@@ -267,7 +244,7 @@ namespace AIToolkit.Agent
         /// </summary>
         /// <param name="id">The unique identifier for the plugin. This value cannot be null, empty, or consist only of whitespace.</param>
         /// <param name="factory">A factory method that creates an instance of the plugin. This value cannot be null.</param>
-        public void RegisterPlugin(string id, Func<IAgentTask> factory)
+        public static void RegisterPlugin(string id, Func<IAgentTask> factory)
         {
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException("Plugin ID cannot be null or empty", nameof(id));
@@ -280,7 +257,7 @@ namespace AIToolkit.Agent
         /// Unregisters a plugin from the system using its unique identifier.
         /// </summary>
         /// <param name="id">The unique identifier of the plugin to unregister. Must not be null, empty, or consist only of whitespace.</param>
-        public void UnregisterPlugin(string id)
+        public static void UnregisterPlugin(string id)
         {
             if (string.IsNullOrWhiteSpace(id))
                 return;
@@ -292,7 +269,7 @@ namespace AIToolkit.Agent
         /// List all registered plugin IDs.
         /// </summary>
         /// <returns></returns>
-        public IReadOnlyList<string> GetRegisteredPluginIds()
+        public static IReadOnlyList<string> GetRegisteredPluginIds()
         {
             return _pluginRegistry.Keys.ToList().AsReadOnly();
         }
