@@ -233,7 +233,11 @@ namespace AIToolkit.Files
         public string FormatSinglePrompt(AuthorRole role, BasePersona user, BasePersona bot, string prompt)
         {
             var realprompt = prompt;
-            if (RealAddNameToPrompt)
+
+            // In group conversations, ALWAYS add names so the LLM knows which persona is speaking
+            var addname = (bot is GroupPersona) ? true : RealAddNameToPrompt;
+
+            if (addname)
             {
                 if (role == AuthorRole.Assistant)
                     realprompt = string.Format("{0}: {1}", bot.Name, prompt);

@@ -14,16 +14,10 @@ namespace AIToolkit.Files
         string Content { get; }
         string Name { get; }
 
-        Task<string> GenerateGoals();
-        Task<string[]> GenerateKeywords();
-        Task<string> GenerateNewSummary();
-        Task<string> GenerateNewTitle(string sum);
+        Task<bool> IsRoleplay();
         Task<string> GenerateTaskRes(string requestedTask, int responseLen, bool lightDialogs = false, bool showHidden = false);
         string GetRawDialogs(int maxTokens, bool ignoresystem, bool lightDialogs = false, bool showHidden = false);
         string GetRawMemory(bool withtitle, bool includedates);
-        Task<TopicLookup> GetResearchTopics();
-        Task<SessionMetaInfo> GetSessionInfo();
-        Task<bool> IsRoleplay();
         Task UpdateSession();
     }
 }

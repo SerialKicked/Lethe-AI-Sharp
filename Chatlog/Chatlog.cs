@@ -66,6 +66,20 @@ namespace AIToolkit.Files
             return new ChatSession();
         }
 
+        /// <summary>
+        /// Retrieves a concatenated summary of previous sessions, formatted with a specified section header,  while
+        /// adhering to token limits and optional filtering criteria.
+        /// </summary>
+        /// <remarks>Sessions that already used for memory recall (use <seealso cref="LLMSystem.InvalidatePromptCache"/> before call to include everything), are empty, or do not meet
+        /// the filtering  criteria (e.g., roleplay sessions when <paramref name="allowRP"/> is <see langword="false"/>)
+        /// are skipped. The method stops adding content once the token limit is reached.</remarks>
+        /// <param name="maxTokens">The maximum number of tokens allowed in the resulting summary. The method will truncate content to stay
+        /// within this limit.</param>
+        /// <param name="sectionHeader">The header string to prepend to each session's name in the summary. Defaults to "##".</param>
+        /// <param name="allowRP">A boolean value indicating whether to include roleplay sessions in the summary. If <see langword="false"/>,
+        /// roleplay sessions are excluded. Defaults to <see langword="true"/>.</param>
+        /// <returns>A string containing the formatted summaries of previous sessions, up to the specified token limit.  Returns
+        /// an empty string if no valid sessions are found or if the token limit is too restrictive.</returns>
         public string GetPreviousSummaries(int maxTokens, string sectionHeader = "##", bool allowRP = true)
         {
             var res = new StringBuilder();
@@ -103,9 +117,8 @@ namespace AIToolkit.Files
             return res.ToString();
         }
 
-        public void AddHistoryToPrompt(SessionHandling sessionHandling, int maxTokens, PromptInserts? memories)
+        internal void AddHistoryToPrompt(SessionHandling sessionHandling, int maxTokens, PromptInserts? memories)
         {
-            //var sb = new StringBuilder();
             var tokensleft = maxTokens;
             var entrydepth = 0;
             var startpos = LLMSystem.PromptBuilder!.Count;
@@ -153,10 +166,37 @@ namespace AIToolkit.Files
             lastSessionID = oldest;
         }
 
+        /// <summary>
+        /// Retrieves a chat session with the specified unique identifier.
+        /// </summary>
+        /// <param name="id">The unique identifier of the chat session to retrieve.</param>
+        /// <returns>The <see cref="ChatSession"/> with the specified identifier, or <see langword="null"/> if no matching
+        /// session is found.</returns>
         public ChatSession? GetSessionByID(Guid id) => Sessions.FirstOrDefault(s => s.Guid == id);
 
+        /// <summary>
+        /// Retrieves a message with the specified unique identifier.
+        /// </summary>
+        /// <remarks>This method searches the current session's collection of messages and returns the
+        /// first match  based on the provided identifier. If no match is found, the method returns <see
+        /// langword="null"/>.</remarks>
+        /// <param name="id">The unique identifier of the message to retrieve.</param>
+        /// <returns>The <see cref="SingleMessage"/> instance with the specified identifier, or <see langword="null"/>  if no
+        /// message with the given identifier is found.</returns>
         public SingleMessage? GetMessageByID(Guid id) => CurrentSession.Messages.FirstOrDefault(m => m.Guid == id);
 
+        /// <summary>
+        /// Logs a message in the current chat session and returns the created message object.
+        /// </summary>
+        /// <remarks>If no chat sessions exist, a new session is created before logging the message. The
+        /// method ensures that any predefined "thinking" markers in the message content are removed before logging.
+        /// Events are raised before and after the message is added to the current session.</remarks>
+        /// <param name="role">The role of the author of the message, such as user or bot.</param>
+        /// <param name="msg">The content of the message to be logged. If the message contains specific markers, they will be removed.</param>
+        /// <param name="user">The persona representing the user who authored the message.</param>
+        /// <param name="bot">The persona representing the bot associated with the message.</param>
+        /// <returns>A <see cref="SingleMessage"/> object representing the logged message, including metadata such as the author
+        /// role, timestamp, and cleaned message content.</returns>
         public SingleMessage LogMessage(AuthorRole role, string msg, BasePersona user, BasePersona bot)
         {
             if (Sessions.Count == 0)
@@ -177,18 +217,25 @@ namespace AIToolkit.Files
             return single;
         }
 
-        public SingleMessage LogMessage(SingleMessage single)
+        /// <summary>
+        /// Logs a pre-constructed message in the current chat session.
+        /// </summary>
+        /// <param name="single">A <seealso cref="SingleMessage"/> class instance representing the message to be logged. The message should already contain all necessary metadata.</param>
+        public void LogMessage(SingleMessage single)
         {
             if (Sessions.Count == 0)
                 Sessions.Add(CreateChatSession());
             RaiseBeforeMessageAdded(single);
             CurrentSession.Messages.Add(single);
             RaiseOnMessageAdded(single);
-            return single;
         }
 
         public void RemoveAt(int id) => CurrentSession.Messages.RemoveAt(id);
 
+        /// <summary>
+        /// Removes the last message from the current chat session, if any messages exist.
+        /// </summary>
+        /// <returns></returns>
         public bool RemoveLast()
         {
             if (CurrentSession.Messages.Count > 0)
@@ -200,8 +247,15 @@ namespace AIToolkit.Files
 
         }
 
+        /// <summary>
+        /// Removes all messages from the current chat session, effectively clearing the chat history.
+        /// </summary>
         public void ClearHistory() => CurrentSession.Messages.Clear();
 
+        /// <summary>
+        /// Gets the last message from the current chat session, or null if there are no messages.
+        /// </summary>
+        /// <returns></returns>
         public SingleMessage? LastMessage() => CurrentSession.Messages.Count >= 1 ? CurrentSession.Messages.Last() : null;
 
         public void RemoveEmbeds()
@@ -211,7 +265,6 @@ namespace AIToolkit.Files
                 item.EmbedSummary = [];
             }
         }
-
 
         /// <summary>
         /// Generate title, summary and embeddings for all the sessions in the chatlog
@@ -225,7 +278,19 @@ namespace AIToolkit.Files
             }
         }
 
-        public async Task StartNewChatSession(bool archivePreviousSession = true)
+        /// <summary>
+        /// Starts a new chat session, optionally archiving the current session if it meets certain criteria.
+        /// </summary>
+        /// <remarks>This method creates a new chat session and raises an event to notify listeners about
+        /// the new session. If the current session is archived, its scenario is updated based on the system settings,
+        /// and the session is saved before being replaced. If the current session is not archived, its messages are
+        /// cleared instead. Additionally, an optional system message can be generated to provide context about the new session,
+        /// including the time elapsed since the last session, if applicable.</remarks>
+        /// <param name="archivePreviousSession">A value indicating whether the current session should be archived before starting a new session. If <see
+        /// langword="true"/>, the current session is archived if it contains more than two messages; otherwise, it is
+        /// reset. The default value is <see langword="true"/>.</param>
+        /// <returns></returns>
+        public async Task StartNewChatSession(bool archivePreviousSession = true, bool addDateInfo = true)
         {
             // Save current session if it has enough messages otherwise just reset it
             if (archivePreviousSession && CurrentSession.Messages.Count > 2)
@@ -244,8 +309,10 @@ namespace AIToolkit.Files
                 CurrentSession.Messages.Clear();
             }
             RaiseOnNewSession(CurrentSession);
+            if (!addDateInfo)
+                return;
             // Generate new system message about the new session
-            var msgtxt = "*We're {{day}} the {{date}} at {{time}}.";
+            var msgtxt = "We're {{day}} the {{date}} at {{time}}.";
             if (Sessions.Count > 1)
             {
                 var lastsession = Sessions[^2];
@@ -259,7 +326,6 @@ namespace AIToolkit.Files
                 else
                     msgtxt += " The last chat was " + ((int)timespan.TotalMinutes).ToString() + " minutes ago.";
             }
-            msgtxt += "*";
             LogMessage(AuthorRole.System, LLMSystem.ReplaceMacros(msgtxt, LLMSystem.User, LLMSystem.Bot), LLMSystem.User, LLMSystem.Bot);
         }
 

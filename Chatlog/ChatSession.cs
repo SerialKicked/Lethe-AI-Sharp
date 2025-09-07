@@ -66,6 +66,10 @@ namespace AIToolkit.Files
                 Category = MemoryType.ChatSession;
         }
 
+        /// <summary>
+        /// Updates the session's metadata, including start and end times, summary, keywords, goals, and roleplay status.
+        /// </summary>
+        /// <returns></returns>
         public virtual async Task UpdateSession()
         {
             if (StartTime == default)
@@ -95,7 +99,7 @@ namespace AIToolkit.Files
             {
                 var meta = await GetSessionInfo();
                 MetaData = meta;
-                var sum = await GenerateNewSummary();
+                var sum = await GenerateSummary();
                 if (sum.Length > MetaData.Summary.Length)
                     MetaData.Summary = sum;
                 var topics = await GetResearchTopics();
@@ -103,19 +107,23 @@ namespace AIToolkit.Files
             }
             else
             {
-                var sum = await GenerateNewSummary();
+                var sum = await GenerateSummary();
                 MetaData.Summary = sum;
                 var kw = await GenerateKeywords();
                 MetaData.Keywords = [.. kw];
                 var goals = await GenerateGoals();
                 MetaData.FutureGoals = [.. goals.Split('\n').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x))];
                 MetaData.IsRoleplaySession = await IsRoleplay();
-                MetaData.Title = await GenerateNewTitle(sum);
+                MetaData.Title = await GenerateTitle(sum);
             }
             await EmbedText();
         }
 
-        public virtual async Task<SessionMetaInfo> GetSessionInfo()
+        /// <summary>
+        /// Generates a detailed summary of the chat session, including character information and dialog context, and create reliable metadata class using a specified grammar.
+        /// </summary>
+        /// <returns> A <see cref="SessionMetaInfo"/> object containing the generated session metadata.</returns>
+        protected virtual async Task<SessionMetaInfo> GetSessionInfo()
         {
             var session = new SessionMetaInfo();
             var grammar = await session.GetGrammar();
@@ -164,7 +172,13 @@ namespace AIToolkit.Files
             return session!;
         }
 
-        public virtual async Task<TopicLookup> GetResearchTopics()
+        /// <summary>
+        /// Method that generates a list of research topics based on the chat session's content, character information, 
+        /// and dialog context, using a specified grammar for structured output. 
+        /// Used by the ResearchTask agentic plugin to identify topics for background web research.
+        /// </summary>
+        /// <returns>A <see cref="TopicLookup"/> object containing the generated research topics.</returns>
+        protected virtual async Task<TopicLookup> GetResearchTopics()
         {
             var session = new TopicLookup();
             var grammar = await session.GetGrammar();
@@ -213,20 +227,33 @@ namespace AIToolkit.Files
             return session!;
         }
 
-        public virtual async Task<string[]> GenerateKeywords()
+        /// <summary>
+        /// If the back-end doesn't provides GBNF grammar to formatted output, this method acts as a backup to 
+        /// generate a list of keywords associated with the chat session.
+        /// </summary>
+        /// <returns></returns>
+        protected virtual async Task<string[]> GenerateKeywords()
         {
             var query = "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of keywords {{char}} would associate with this chat. The list must be between 1 and 5 keywords long.";
             var res = await GenerateTaskRes(query, 512, true, false);
             return res.Split(',');
         }
 
-        public virtual async Task<string> GenerateGoals()
+        /// <summary>
+        /// If the back-end doesn't provides GBNF grammar to formatted output, this method acts as a backup to generate a list of goals.
+        /// </summary>
+        /// <returns></returns>
+        protected virtual async Task<string> GenerateGoals()
         {
             var query = "Based on the exchange between {{user}} and {{char}} shown above, write a list of the plans they both setup for the near future. This list should contain between 0 and 4 items. Each item should be summarized in a single sentence. If there's no items, don't answer with anything. Make sure those plans aren't already resolved within the span of the dialog." + LLMSystem.NewLine + "Example:" + LLMSystem.NewLine + "- They promised to eat together tomorrow." + LLMSystem.NewLine + "- {{user}} will watch the movie recommanded by {{char}}.";
             var res = await GenerateTaskRes(query, 1024, true, false);
             return res;
         }
 
+        /// <summary>
+        /// If the back-end doesn't provides GBNF grammar to formatted output, this method acts as a backup to determine if this is a roleplay session or not.
+        /// </summary>
+        /// <returns></returns>
         public virtual async Task<bool> IsRoleplay()
         {
             var query = "Based on the exchange between {{user}} and {{char}} shown above, determine if {{user}} and {{char}} are roleplaying a scenario. Respond Yes if they are acting a roleplay. Discussing a future roleplay doesn't count as a roleplay. Respond No if this is a just a chat." + LLMSystem.NewLine + LLMSystem.NewLine +
@@ -240,7 +267,11 @@ namespace AIToolkit.Files
             return s.StartsWith("yes");
         }
 
-        public virtual async Task<string> GenerateNewSummary()
+        /// <summary>
+        /// Generates a detailed summary of the chat session.
+        /// </summary>
+        /// <returns></returns>
+        protected virtual async Task<string> GenerateSummary()
         {
 
             var query = "Write a detailed summary of the exchange between {{user}} and {{char}} shown above. Do not add a title, just write the summary directly.";
@@ -256,7 +287,11 @@ namespace AIToolkit.Files
             return await GenerateTaskRes(query, 1024, true, false);
         }
 
-        public virtual async Task<string> GenerateNewTitle(string sum)
+        /// <summary>
+        /// Generates a title for this chat session based on the provided summary.
+        /// </summary>
+        /// <returns></returns>
+        protected virtual async Task<string> GenerateTitle(string sum)
         {
             if (LLMSystem.Client == null)
                 return string.Empty;
@@ -281,7 +316,24 @@ namespace AIToolkit.Files
             return finalstr;
         }
 
-        public virtual async Task<string> GenerateTaskRes(string requestedTask, int responseLen, bool lightDialogs = false, bool showHidden = false)
+        /// <summary>
+        /// Generates a response based on the provided task description and specified parameters.
+        /// </summary>
+        /// <remarks>This method constructs a prompt based on the provided task description and available
+        /// dialog data, then queries the system to generate a response. The response length and dialog inclusion
+        /// options can be customized using the <paramref name="responseLen"/>, <paramref name="lightDialogs"/>, and
+        /// <paramref name="showHidden"/> parameters.</remarks>
+        /// <param name="requestedTask">The task or query for which a response is to be generated. This should be a descriptive string outlining the
+        /// desired operation or analysis.</param>
+        /// <param name="responseLen">The maximum length of the response, in tokens. This value determines the size of the generated output.</param>
+        /// <param name="lightDialogs">A boolean value indicating whether to include only lightweight dialog data in the analysis. Set to <see
+        /// langword="true"/> to reduce the amount of dialog context included; otherwise, <see langword="false"/>.</param>
+        /// <param name="showHidden">A boolean value indicating whether to include hidden or filtered dialog data in the analysis. Set to <see
+        /// langword="true"/> to include hidden data; otherwise, <see langword="false"/>.</param>
+        /// <returns>A <see cref="Task{String}"/> representing the asynchronous operation. The result contains the generated
+        /// response as a string. If the operation cannot proceed (e.g., the client is not initialized), an empty string
+        /// is returned.</returns>
+        public virtual async Task<string> GenerateTaskRes(string requestedTask, int responseLen, bool lightDialogs = true, bool showHidden = false)
         {
             if (LLMSystem.Client == null)
                 return string.Empty;
@@ -321,7 +373,26 @@ namespace AIToolkit.Files
             return finalstr.CleanupAndTrim();
         }
 
-        public string GetRawDialogs(int maxTokens, bool ignoresystem, bool lightDialogs = false, bool showHidden = false)
+        /// <summary>
+        /// Constructs a formatted string representation of the dialog messages, based on the specified parameters.
+        /// </summary>
+        /// <remarks> 
+        /// Messages are formatted based on their role and the provided parameters. System messages are optionally
+        /// excluded, and hidden messages are included only if <paramref name="showHidden"/> is set to <see
+        /// langword="true"/>. The token count is calculated for each message, and the output is truncated once the
+        /// token limit is reached.
+        /// </remarks>
+        /// <param name="maxTokens">The maximum number of tokens to include in the output. If the total token count exceeds this value, the
+        /// output will be truncated.</param>
+        /// <param name="ignoresystem">A value indicating whether system messages should be excluded from the output. Set to <see langword="true"/>
+        /// to ignore system messages; otherwise, <see langword="false"/>.</param>
+        /// <param name="lightDialogs">A value indicating whether to use a simplified format for user and assistant messages. Set to <see
+        /// langword="true"/> for a lighter format; otherwise, <see langword="false"/>.</param>
+        /// <param name="showHidden">A value indicating whether hidden messages should be included in the output. Set to <see langword="true"/>
+        /// to include hidden messages; otherwise, <see langword="false"/>.</param>
+        /// <returns>A string containing the formatted dialog messages, adhering to the specified parameters. The string may be
+        /// truncated if the token limit is reached.</returns>
+        public string GetRawDialogs(int maxTokens, bool ignoresystem, bool lightDialogs = true, bool showHidden = false)
         {
             var sb = new StringBuilder();
             var totaltks = maxTokens;
@@ -359,6 +430,21 @@ namespace AIToolkit.Files
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Generates a formatted string representation of the memory content, optionally including a title and date
+        /// information.
+        /// </summary>
+        /// <remarks>The method formats the memory content based on the specified parameters. If both
+        /// <paramref name="withtitle"/>  and <paramref name="includedates"/> are <see langword="true"/>, the output
+        /// includes the title, the date range  (if applicable), and the content. If <paramref name="includedates"/> is
+        /// <see langword="true"/> and the start  and end dates are the same, only the single date is
+        /// included.</remarks>
+        /// <param name="withtitle">A value indicating whether to include the title in the output.  If <see langword="true"/>, the title is
+        /// included; otherwise, it is omitted.</param>
+        /// <param name="includedates">A value indicating whether to include date information in the output.  If <see langword="true"/>, the start
+        /// and end dates are included; otherwise, they are omitted.</param>
+        /// <returns>A string containing the formatted memory content. The output may include the title and/or date information 
+        /// depending on the values of <paramref name="withtitle"/> and <paramref name="includedates"/>.</returns>
         public string GetRawMemory(bool withtitle, bool includedates)
         {
             var sb = new StringBuilder();

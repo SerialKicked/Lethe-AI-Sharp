@@ -4,6 +4,20 @@ using OpenAI.Chat;
 
 namespace AIToolkit.Files
 {
+    /// <summary>
+    /// Represents a single message exchanged in a conversational context, including metadata such as the author role,
+    /// timestamp, and associated personas.
+    /// </summary>
+    /// <remarks>This class encapsulates the details of a message, including its content, author role, and
+    /// associated user or bot personas.  It provides methods to format the message for text-based or chat-based
+    /// completions, and includes metadata such as the message's unique identifier,  creation date, and visibility
+    /// status.</remarks>
+    /// <param name="role"> AuthorRole of the message sender (e.g., User, Assistant, System) </param>
+    /// <param name="date"> Timestamp of when the message was created </param>
+    /// <param name="mess"> Content of the message </param>
+    /// <param name="chara"> Character ID associated with the bot persona </param>
+    /// <param name="user"> User ID associated with the user persona </param>
+    /// <param name="hidden"> Indicates if the message is hidden from standard views </param>
     public class SingleMessage(AuthorRole role, DateTime date, string mess, string chara, string user, bool hidden = false)
     {
         public Guid Guid { get; set; } = Guid.NewGuid();
