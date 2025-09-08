@@ -45,6 +45,10 @@ namespace AIToolkit.Agent
             _lastuseractivity = DateTime.Now;
         }
 
+        /// <summary>
+        /// The main loop that runs the agent tasks based on user inactivity and agent mode status.
+        /// </summary>
+        /// <returns></returns>
         private async Task MainLoop()
         {
             _running = true;
@@ -102,13 +106,15 @@ namespace AIToolkit.Agent
             if (_loop != null && !_loop.IsCompleted)
                 throw new InvalidOperationException("Agent mode is already running. This is most likely caused by switching to a new active persona without closing the previous one properly.");
             LoadSettings();
-            LoadDefaultActions();
             LoadPlugins();
             if (_cts == null || _cts.IsCancellationRequested)
                 _cts = new CancellationTokenSource();
             _loop = Task.Run(MainLoop);
         }
 
+        /// <summary>
+        /// Stop the agent loop and wait for it to finish. Should be called by BasePersona.EndChat()
+        /// </summary>
         public void CloseSync()
         {
             Close().GetAwaiter().GetResult();
@@ -287,10 +293,11 @@ namespace AIToolkit.Agent
 
         #region *** Action Management ***
 
-        public static void LoadDefaultActions()
+        internal static void LoadDefaultActions()
         {
             RegisterAction(new WebSearchAction());
             RegisterAction(new MergeSearchResultsAction());
+            RegisterAction(new FindResearchTopicsAction());
         }
 
         public static void RegisterAction<TResult, TParam>(IAgentAction<TResult, TParam> action)

@@ -312,7 +312,7 @@ namespace AIToolkit.Memory
                 return;
             CurrentDelay++;
             // If there's a super relevant eureka to the user input, insert it immediately
-            var foundunit = await GetRelevantEureka(message.Message).ConfigureAwait(false);
+            var foundunit = await GetRelevantEureka(message.Message, 0.09f).ConfigureAwait(false);
             if (foundunit != null)
             {
                 InsertEureka(foundunit);

@@ -394,12 +394,42 @@ namespace AIToolkit.Files
         /// truncated if the token limit is reached.</returns>
         public string GetRawDialogs(int maxTokens, bool ignoresystem, bool lightDialogs = true, bool showHidden = false)
         {
+            return GetRawDialogs(Messages, maxTokens, ignoresystem, lightDialogs, showHidden);
+        }
+
+        /// <summary>
+        /// Retrieves and formats a subset of dialog messages based on their position, applying specified formatting options and token limits.
+        /// </summary>
+        /// <param name="FirstID">start location in list (included)</param>
+        /// <param name="LastID">end location in list (included)</param>
+        /// <param name="maxTokens">Max tokens (will stop if we reach that)</param>
+        /// <param name="ignoresystem">skip all system messages</param>
+        /// <param name="lightDialogs">token light version</param>
+        /// <param name="showHidden">include hidden messages or not (only relevant if ignoresystem is false)</param>
+        /// <returns></returns>
+        public string GetRawDialogs(int FirstID, int LastID, int maxTokens, bool ignoresystem, bool lightDialogs = true, bool showHidden = false)
+        {
+            // get the messages in the range with ID being their position in the list (0 based)
+            if (FirstID < 0)
+                FirstID = 0;
+            if (LastID >= Messages.Count)
+                LastID = Messages.Count - 1;
+            if (FirstID > LastID)
+                return string.Empty;
+            var selected = this.Messages.GetRange(FirstID, LastID - FirstID + 1);
+            if (selected.Count == 0)
+                return string.Empty;
+            return GetRawDialogs(selected, maxTokens, ignoresystem, lightDialogs, showHidden);
+        }
+
+        static internal string GetRawDialogs(List<SingleMessage> messages, int maxTokens, bool ignoresystem, bool lightDialogs = true, bool showHidden = false)
+        {
             var sb = new StringBuilder();
             var totaltks = maxTokens;
 
-            for (int i = Messages.Count - 1; i >= 0; i--)
+            for (int i = messages.Count - 1; i >= 0; i--)
             {
-                var msg = Messages[i];
+                var msg = messages[i];
                 if (msg.Hidden && !showHidden)
                     continue;
                 var text = string.Empty;

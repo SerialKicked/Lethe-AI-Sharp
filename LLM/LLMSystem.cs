@@ -209,6 +209,7 @@ namespace AIToolkit.LLM
             Client.TokenReceived += Client_StreamingMessageReceived;
 
             PromptBuilder = Client.GetPromptBuilder();
+            AgentRuntime.LoadDefaultActions();
 
             Status = SystemStatus.Ready;
         }

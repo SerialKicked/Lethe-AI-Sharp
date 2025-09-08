@@ -43,9 +43,9 @@ namespace AIToolkit.Agent.Actions
         {
             var builder = LLMSystem.Client!.GetPromptBuilder();
             var prompt = new StringBuilder();
-            prompt.AppendLinuxLine($"You are {LLMSystem.Bot.Name} and your goal is to analyze and merge information from the following documents regarding the subject of '{topic}'. This topic was made relevant during the previous chat session.");
+            prompt.AppendLinuxLine($"You are {LLMSystem.Bot.Name} and your goal is to analyze and merge information from the following documents regarding the subject of '{topic}'. This topic was made relevant during this chat session.");
             prompt.AppendLinuxLine();
-            prompt.AppendLinuxLine($"# Previous Chat Session");
+            prompt.AppendLinuxLine($"# Chat Session");
             prompt.AppendLinuxLine();
             prompt.AppendLinuxLine($"{summary.RemoveNewLines()}");
             prompt.AppendLinuxLine();
