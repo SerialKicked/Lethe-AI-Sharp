@@ -18,8 +18,8 @@ namespace AIToolkit.Memory
         None
     }
 
-    public enum MemoryType { General, WorldInfo, WebSearch, ChatSession, Journal, Image, File, Location, Event, Person }
-    public enum MemoryInsertion { Trigger, Natural, None }
+    public enum MemoryType { General, WorldInfo, WebSearch, ChatSession, Journal, Image, File, Location, Event, Person, Goal }
+    public enum MemoryInsertion { Trigger, Natural, NaturalForced, None }
 
 
     /// <summary>
@@ -115,10 +115,29 @@ namespace AIToolkit.Memory
         /// <returns></returns>
         public string ToEureka()
         {
-            var text = new StringBuilder($"You remember something you've researched on the web recently about '{Name}'.");
+            var text = new StringBuilder();
+            switch (Category)
+            {
+                case MemoryType.Person:
+                    text.Append($"Here's the information you remember about {Name}.");
+                    break;
+                case MemoryType.Location:
+                    text.Append($"You remember something about this location: {Name}.");
+                    break;
+                case MemoryType.Goal:
+                    text.Append($"You remember you've set this goal for yourself: {Name}.");
+                    break;
+                case MemoryType.WebSearch:
+                    text.Append($"You remember something you've found on the web recently about '{Name}'.");
+                    break;
+                default:
+                    text.Append($"This is some information regarding '{Name}'.");
+                    break;
+            }
+
             if (!string.IsNullOrEmpty(Reason))
             {
-                text.AppendLinuxLine($" The reason for that search was: {Reason}.");
+                text.AppendLinuxLine($" Your reason for it was: {Reason}.");
             }
             text.AppendLinuxLine().AppendLinuxLine($"{Content}").AppendLinuxLine().Append("Mention this information when there's a lull in the discussion, if the user makes a mention of it, or if you feel like it's a good idea to talk about it.");
             return text.ToString();

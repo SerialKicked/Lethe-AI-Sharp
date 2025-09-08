@@ -72,15 +72,16 @@ namespace AIToolkit.Files
         /// </summary>
         /// <remarks>Sessions that already used for memory recall (use <seealso cref="LLMSystem.InvalidatePromptCache"/> before call to include everything), are empty, or do not meet
         /// the filtering  criteria (e.g., roleplay sessions when <paramref name="allowRP"/> is <see langword="false"/>)
-        /// are skipped. The method stops adding content once the token limit is reached.</remarks>
+        /// are skipped. The method stops adding content once the maxTokens or maxCount limit are reached.</remarks>
         /// <param name="maxTokens">The maximum number of tokens allowed in the resulting summary. The method will truncate content to stay
         /// within this limit.</param>
         /// <param name="sectionHeader">The header string to prepend to each session's name in the summary. Defaults to "##".</param>
         /// <param name="allowRP">A boolean value indicating whether to include roleplay sessions in the summary. If <see langword="false"/>,
         /// roleplay sessions are excluded. Defaults to <see langword="true"/>.</param>
+        /// <param name="maxCount">The maximum number of previous sessions to include in the summary. Defaults to <see cref="int.MaxValue"/>, meaning all valid sessions</param>
         /// <returns>A string containing the formatted summaries of previous sessions, up to the specified token limit.  Returns
         /// an empty string if no valid sessions are found or if the token limit is too restrictive.</returns>
-        public string GetPreviousSummaries(int maxTokens, string sectionHeader = "##", bool allowRP = true)
+        public string GetPreviousSummaries(int maxTokens, string sectionHeader = "##", bool allowRP = true, int maxCount = int.MaxValue)
         {
             var res = new StringBuilder();
             var tokensleft = maxTokens;
@@ -94,7 +95,7 @@ namespace AIToolkit.Files
             var entrydepth = lastSessionID - 1;
             if (entrydepth < 0)
                 return string.Empty;
-
+            var count = 0;
             for (int i = entrydepth; i >= 0; i--)
             {
                 var session = Sessions[i];
@@ -113,6 +114,9 @@ namespace AIToolkit.Files
                 else
                     break;
                 tokensleft = maxTokens - LLMSystem.GetTokenCount(res.ToString());
+                count++;
+                if (count >= maxCount)
+                    break;
             }
             return res.ToString();
         }
@@ -330,7 +334,7 @@ namespace AIToolkit.Files
         }
 
         /// <summary>
-        /// Divides a raw chatlog (likely imported from ST) into sessions using timestamps and specific messages to determine the start of a new session
+        /// Divides a raw chatlog (likely imported from Silly Tavern) into sessions using timestamps and specific messages to determine the start of a new session
         /// </summary>
         public void DivideChatIntoSessions()
         {

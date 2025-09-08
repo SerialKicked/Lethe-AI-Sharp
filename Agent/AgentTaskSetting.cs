@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using AIToolkit.Files;
+using Newtonsoft.Json.Linq;
 
 namespace AIToolkit.Agent
 {
@@ -9,12 +10,23 @@ namespace AIToolkit.Agent
 
         public T? GetSetting<T>(string key, T? defaultValue = default)
         {
-            return Settings.TryGetValue(key, out var token) ? token.Value<T>() : defaultValue;
+            if (!Settings.TryGetValue(key, out var token) || token is null || token.Type == JTokenType.Null)
+                return defaultValue;
+
+            try
+            {
+                var result = token.ToObject<T>();
+                return result is null ? defaultValue : result;
+            }
+            catch
+            {
+                return defaultValue;
+            }
         }
 
         public void SetSetting<T>(string key, T value)
         {
-            Settings[key] = value is null ? JToken.FromObject(string.Empty) : JToken.FromObject(value);
+            Settings[key] = value is null ? JValue.CreateNull() : JToken.FromObject(value!);
         }
     }
 }

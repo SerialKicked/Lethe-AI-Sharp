@@ -68,6 +68,7 @@ namespace AIToolkit.Agent
                         if (shouldrun)
                         {
                             await plugin.Execute(Owner, setting, _cts.Token);
+                            SaveSettings();
                         }
                     }
                     catch (OperationCanceledException)
@@ -146,7 +147,7 @@ namespace AIToolkit.Agent
             if (!selpath.EndsWith('/') && !selpath.EndsWith('\\'))
                 selpath += Path.DirectorySeparatorChar;
 
-            var content = JsonConvert.SerializeObject(Config, new JsonSerializerSettings { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
+            var content = JsonConvert.SerializeObject(Config, new JsonSerializerSettings { Formatting = Formatting.Indented });
             // create directory if it doesn't exist
             var dir = Path.GetDirectoryName(selpath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
@@ -220,7 +221,7 @@ namespace AIToolkit.Agent
             {
                 if (!Config.PluginSettings.ContainsKey(plugin.Id))
                 {
-                    Config.PluginSettings[plugin.Id] = new AgentTaskSetting { PluginId = plugin.Id };
+                    Config.PluginSettings[plugin.Id] = plugin.GetDefaultSettings();
                 }
             }
         }

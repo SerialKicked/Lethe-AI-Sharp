@@ -7,5 +7,7 @@ namespace AIToolkit.Agent
         string Id { get; }
         Task<bool> Observe(BasePersona owner, AgentTaskSetting cfg, CancellationToken ct);
         Task Execute(BasePersona owner, AgentTaskSetting cfg, CancellationToken ct);
+        AgentTaskSetting GetDefaultSettings();
+
     }
 }

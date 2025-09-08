@@ -262,11 +262,11 @@ namespace AIToolkit.Memory
         private void RefreshMemories()
         {
             // Remove old natural memories
-            Memories.RemoveAll(e => e.Insertion == MemoryInsertion.Natural && (DateTime.Now - e.Added) > EurekaCutOff);
+            Memories.RemoveAll(e => (e.Insertion == MemoryInsertion.Natural || e.Insertion == MemoryInsertion.NaturalForced)  && (DateTime.Now - e.Added) > EurekaCutOff);
             // Select all natural memories within the cutoff period, order by Added descending, and enqueue them
             Eurekas.Clear();
             var cutoff = DateTime.Now - EurekaCutOff;
-            var recent = Memories.Where(m => m.Insertion == MemoryInsertion.Natural && m.Added >= cutoff)
+            var recent = Memories.Where(m => (m.Insertion == MemoryInsertion.Natural || m.Insertion == MemoryInsertion.NaturalForced) && m.Added >= cutoff)
                                 .OrderByDescending(m => m.Added).ToList();
             foreach (var item in recent)
                 Eurekas.Add(item);
@@ -318,9 +318,11 @@ namespace AIToolkit.Memory
                 InsertEureka(foundunit);
                 return;
             }
-            if ((CurrentDelay < MinMessageDelay || LastInsertTime + MinInsertDelay > DateTime.Now) && !MemoryTriggers.IsEurekaTrigger(message.Message))
-                return;
-            InsertEureka();
+            var iseurekatriggerword = MemoryTriggers.IsEurekaTrigger(message.Message);
+            if (CurrentDelay >= MinMessageDelay && LastInsertTime + MinInsertDelay <= DateTime.Now || iseurekatriggerword)
+            {
+                InsertEureka(null, !iseurekatriggerword);
+            }
         }
 
         /// <summary>
@@ -350,22 +352,54 @@ namespace AIToolkit.Memory
         /// Inserts a selected memory into the conversation as a system message.
         /// </summary>
         /// <param name="insert">memory to insert</param>
-        protected virtual void InsertEureka(MemoryUnit? insert = null)
+        protected virtual void InsertEureka(MemoryUnit? insert = null, bool onlyForced = false)
         {
             if (IsBrainDisabled)
                 return;
+            // Work on a local variable; do not reassign the parameter for clarity.
+            MemoryUnit? selected = insert;
 
-            CurrentDelay = 0;
-            LastInsertTime = DateTime.Now;
-            var select = insert ?? Eurekas[0];
-            Memories.Remove(select);
-            var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, select.ToEureka(), Owner.UniqueName, LLMSystem.User.UniqueName, true);
-            LLMSystem.History.LogMessage(tosend);
-            // High Priority memories are kept and set back to Trigger insertion
-            if (select.Priority > 1)
+            // If only forced, search the forced pool
+            if (onlyForced && selected is null)
             {
-                select.Insertion = MemoryInsertion.Trigger;
+                selected = Eurekas.Find(e => e.Insertion == MemoryInsertion.NaturalForced);
+                if (selected is null)
+                    return; // nothing to insert
             }
+
+            if (selected is null)
+            {
+                if (Eurekas.Count == 0)
+                    return;
+                selected = Eurekas[0];
+            }
+
+            // Avoid immediate re-use in the current window
+            Eurekas.Remove(selected);
+            LastInsertTime = DateTime.Now;
+            CurrentDelay = 0;
+
+            // Persist the intent so RefreshMemories will not bring it back:
+            if (selected.Priority > 1)
+            {
+                // Keep important memories but stop them from being considered "natural" next time
+                selected.Insertion = MemoryInsertion.Trigger;
+            }
+            else
+            {
+                // One-shot natural memories are consumed
+                Memories.Remove(selected);
+            }
+
+            var tosend = new SingleMessage(
+                AuthorRole.System,
+                DateTime.Now,
+                selected.ToEureka(),
+                Owner.UniqueName,
+                LLMSystem.User.UniqueName,
+                true);
+
+            LLMSystem.History.LogMessage(tosend);
         }
 
         /// <summary>

@@ -593,7 +593,7 @@ namespace AIToolkit.LLM
         /// </summary>
         public static void InvalidatePromptCache()
         {
-            PromptBuilder?.ResetPrompt();
+            PromptBuilder?.Clear();
             dataInserts.Clear();
             usedGuidInSession.Clear();
         }
@@ -912,7 +912,7 @@ namespace AIToolkit.LLM
         private static async Task<object> GenerateFullPrompt(AuthorRole MsgSender, string newMessage, string? pluginMessage = null, int imgpadding = 0)
         {
             var availtokens = MaxContextLength - Settings.MaxReplyLength - imgpadding;
-            PromptBuilder!.ResetPrompt();
+            PromptBuilder!.Clear();
 
             // setup user message (+ optional plugin message) and count tokens used
             var pluginmsg = string.IsNullOrEmpty(pluginMessage) ? string.Empty : Instruct.FormatSinglePrompt(AuthorRole.System, User, Bot, pluginMessage);

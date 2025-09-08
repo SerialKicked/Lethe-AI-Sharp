@@ -62,7 +62,7 @@ namespace AIToolkit
             return chatrq;
         }
 
-        public void ResetPrompt()
+        public void Clear()
         {
             _prompt.Clear();
         }

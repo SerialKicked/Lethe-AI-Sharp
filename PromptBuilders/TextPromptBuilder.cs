@@ -72,7 +72,7 @@ namespace AIToolkit
             return res;
         }
 
-        public void ResetPrompt()
+        public void Clear()
         {
             _prompt.Clear();
         }

@@ -11,7 +11,7 @@ namespace AIToolkit
     {
         int Count { get; }
 
-        void ResetPrompt();
+        void Clear();
 
         int AddMessage(AuthorRole role, string message);
 

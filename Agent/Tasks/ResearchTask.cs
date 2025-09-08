@@ -12,7 +12,6 @@ namespace AIToolkit.Agent.Plugins
     {
         public string Id => "ResearchTask";
 
-
         public async Task<bool> Observe(BasePersona owner, AgentTaskSetting cfg, CancellationToken ct)
         {
             // Just a small delay so i don't have to remove async and do Task.ResultFrom everywhere. It's not like we're on a timer anyway.
@@ -82,7 +81,7 @@ namespace AIToolkit.Agent.Plugins
                 var mem = new MemoryUnit
                 {
                     Category = MemoryType.WebSearch,
-                    Insertion = MemoryInsertion.Natural,
+                    Insertion = MemoryInsertion.NaturalForced,
                     Name = topic.Topic,
                     Content = merged.CleanupAndTrim(),
                     Reason = topic.Reason,
@@ -94,20 +93,14 @@ namespace AIToolkit.Agent.Plugins
                 await mem.EmbedText();
                 owner.Brain.Memories.Add(mem);
             }
-            cfg.SetSetting("LastSessionGuid", session.Guid);
+            cfg.SetSetting<Guid>("LastSessionGuid", session.Guid);
         }
 
         private static async Task<string> MergeResults(ChatSession session, string topic, string reason, List<EnrichedSearchResult> webresults)
         {
             LLMSystem.NamesInPromptOverride = false;
-            var fullprompt = BuildMergerPrompt(session, topic, reason, webresults);
-            var llmparams = LLMSystem.Sampler.GetCopy();
-            if (llmparams.Temperature > 0.75)
-                llmparams.Temperature = 0.75;
-            llmparams.Max_context_length = LLMSystem.MaxContextLength;
-            llmparams.Max_length = 1024;
-            llmparams.Prompt = fullprompt;
-            var response = await LLMSystem.SimpleQuery(llmparams);
+            var fullprompt = BuildMergerPrompt(session, topic, reason, webresults).PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.75) ? 0.75 : LLMSystem.Sampler.Temperature, 1024);
+            var response = await LLMSystem.SimpleQuery(fullprompt);
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
             {
                 response = response.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
@@ -118,8 +111,9 @@ namespace AIToolkit.Agent.Plugins
             return response;
         }
 
-        private static string BuildMergerPrompt(ChatSession session, string topic, string reason, List<EnrichedSearchResult> webresults)
+        private static IPromptBuilder BuildMergerPrompt(ChatSession session, string topic, string reason, List<EnrichedSearchResult> webresults)
         {
+            var builder = LLMSystem.Client!.GetPromptBuilder();
             var prompt = new StringBuilder();
             prompt.AppendLinuxLine($"You are {LLMSystem.Bot.Name} and your goal is to analyze and merge information from the following documents regarding the subject of '{topic}'. This topic was made relevant during the previous chat session.");
             prompt.AppendLinuxLine();
@@ -152,16 +146,15 @@ namespace AIToolkit.Agent.Plugins
                     }
                 }
             }
-            var sysprompt = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.SysPrompt, LLMSystem.User, LLMSystem.Bot, prompt.ToString().CleanupAndTrim());
-
+            builder.AddMessage(AuthorRole.SysPrompt, prompt.ToString().CleanupAndTrim());
             var txt = new StringBuilder($"You are researching '{topic}' for the following reason: {reason}").AppendLinuxLine().Append($"Merge the information available in the system prompt to offer an explanation on this topic. Don't use markdown formatting, favor natural language. The explanation should be 1 to 3 paragraphs long.");
-            var msg = LLMSystem.Instruct.FormatSinglePrompt(AuthorRole.User, LLMSystem.User, LLMSystem.Bot, txt.ToString());
-            LLMSystem.NamesInPromptOverride = false;
-            msg += LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
-            LLMSystem.NamesInPromptOverride = null;
-            return sysprompt + msg;
+            builder.AddMessage(AuthorRole.User, txt.ToString()); 
+            return builder;
         }
 
-
+        public AgentTaskSetting GetDefaultSettings()
+        {
+            return new AgentTaskSetting();
+        }
     }
 }
