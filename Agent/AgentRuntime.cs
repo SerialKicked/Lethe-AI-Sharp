@@ -1,4 +1,5 @@
-﻿using AIToolkit.Agent.Plugins;
+﻿using AIToolkit.Agent.Actions;
+using AIToolkit.Agent.Plugins;
 using AIToolkit.Files;
 using AIToolkit.LLM;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,7 @@ using System.Threading.Tasks;
 namespace AIToolkit.Agent
 {
 
-    public class AgentLoopConfig
+    public class AgentConfig
     {
         public Dictionary<string, AgentTaskSetting> PluginSettings { get; set; } = [];
         public TimeSpan MinInactivityTime { get; set; } = new TimeSpan(0, 15, 0); // 30 minutes
@@ -22,10 +23,10 @@ namespace AIToolkit.Agent
     /// AgentLoop is responsible for managing the agent mode of a BasePersona.
     /// </summary>
     /// <param name="owner">persona tied to the agent</param>
-    public class AgentLoop(BasePersona owner)
+    public class AgentRuntime(BasePersona owner)
     {
         public BasePersona Owner { get; private set; } = owner;
-        public AgentLoopConfig Config { get; set; } = new();
+        public AgentConfig Config { get; set; } = new();
 
         private CancellationTokenSource? _cts = new();
         private DateTime _lastuseractivity = DateTime.Now;
@@ -33,6 +34,7 @@ namespace AIToolkit.Agent
         private Task? _loop;
         private static readonly List<IAgentTask> _plugins = [];
         private static readonly Dictionary<string, Func<IAgentTask>> _pluginRegistry = [];
+        private static readonly Dictionary<string, object> _actions = [];
 
         /// <summary>
         /// Updates the timestamp of the most recent user activity. 
@@ -98,8 +100,9 @@ namespace AIToolkit.Agent
         {
             // Make sure it's not already running
             if (_loop != null && !_loop.IsCompleted)
-                throw new InvalidOperationException("Agent mode is already running.");
+                throw new InvalidOperationException("Agent mode is already running. This is most likely caused by switching to a new active persona without closing the previous one properly.");
             LoadSettings();
+            LoadDefaultActions();
             LoadPlugins();
             if (_cts == null || _cts.IsCancellationRequested)
                 _cts = new CancellationTokenSource();
@@ -174,7 +177,7 @@ namespace AIToolkit.Agent
             try
             {
                 var content = File.ReadAllText(filepath);
-                var cfg = JsonConvert.DeserializeObject<AgentLoopConfig>(content);
+                var cfg = JsonConvert.DeserializeObject<AgentConfig>(content);
                 if (cfg != null)
                     Config = cfg;
             }
@@ -278,6 +281,38 @@ namespace AIToolkit.Agent
         public static IReadOnlyList<string> GetRegisteredPluginIds()
         {
             return _pluginRegistry.Keys.ToList().AsReadOnly();
+        }
+
+        #endregion
+
+        #region *** Action Management ***
+
+        public static void LoadDefaultActions()
+        {
+            RegisterAction(new WebSearchAction());
+            RegisterAction(new MergeSearchResultsAction());
+        }
+
+        public static void RegisterAction<TResult, TParam>(IAgentAction<TResult, TParam> action)
+        {
+            _actions[action.Id] = action;
+        }
+
+        public static IAgentAction<TResult, TParam>? GetAction<TResult, TParam>(string id)
+        {
+            if (_actions.TryGetValue(id, out var action))
+                return action as IAgentAction<TResult, TParam>;
+            return null;
+        }
+
+        public static bool IsActionRegistered(string id)
+        {
+            return _actions.ContainsKey(id);
+        }
+
+        public static void UnregisterAction(string id)
+        {
+            _actions.Remove(id);
         }
 
         #endregion

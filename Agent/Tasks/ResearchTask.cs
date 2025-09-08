@@ -1,4 +1,6 @@
-﻿using AIToolkit.Files;
+﻿using AIToolkit.Agent.Actions;
+using AIToolkit.Files;
+using AIToolkit.GBNF;
 using AIToolkit.LLM;
 using AIToolkit.Memory;
 using Microsoft.Extensions.Logging;
@@ -17,7 +19,7 @@ namespace AIToolkit.Agent.Plugins
             // Just a small delay so i don't have to remove async and do Task.ResultFrom everywhere. It's not like we're on a timer anyway.
             await Task.Delay(10, ct).ConfigureAwait(false);
             // can't search the web? that's a bummer.
-            if (!LLMSystem.SupportsWebSearch)
+            if (!LLMSystem.SupportsWebSearch || LLMSystem.Status != SystemStatus.Ready)
                 return false;
             // Check if there's at least 2 sessions, otherwise we're in the first session and we don't have searches to make, yet.
             var sessions = owner.History.Sessions;
@@ -43,6 +45,16 @@ namespace AIToolkit.Agent.Plugins
             if (searchtopics == null || searchtopics.Count == 0)
                 return;
 
+            // Get the web search action from registry
+            var webSearchAction = AgentRuntime.GetAction<List<EnrichedSearchResult>, TopicSearch>("WebSearchAction");
+            var mergeAction = AgentRuntime.GetAction<string, MergeSearchParams>("MergeSearchResultsAction");
+
+            if (webSearchAction == null || mergeAction == null)
+            {
+                LLMSystem.Logger?.LogWarning("Required actions not found in registry. ResearchTask cancelled.");
+                return;
+            }
+
             foreach (var topic in searchtopics)
             {
                 // Cancellation requested?
@@ -52,28 +64,16 @@ namespace AIToolkit.Agent.Plugins
                 var wassearchedbefore = await LLMSystem.Bot.Brain.WasSearchedRecently(topic.Topic).ConfigureAwait(false);
                 if (wassearchedbefore)
                     continue;
-
                 LLMSystem.Bot.Brain.RecentSearches.Add(topic);
 
-                var allResults = new List<EnrichedSearchResult>();
-
-                // Execute searches for all the queries the LLM / Agent left for us to do
-                foreach (var query in topic.SearchQueries)
-                {
-                    if (ct.IsCancellationRequested)
-                        return;
-                    var hits = await LLMSystem.WebSearch(query).ConfigureAwait(false);
-                    if (hits != null && hits.Count > 0)
-                    {
-                        allResults.AddRange(hits);
-                    }
-                }
-
+                var allResults = await webSearchAction.Execute(topic, ct).ConfigureAwait(false);
                 if (allResults.Count == 0)
                     continue; // Skip this topic if no results
 
+                var mergeparams = new MergeSearchParams(session.Content, topic.Topic, topic.Reason, allResults);
+
                 // Merge all results for this topic into a single memory unit
-                var merged = await MergeResults(session, topic.Topic, topic.Reason, allResults).ConfigureAwait(false);
+                var merged = await mergeAction.Execute(mergeparams, ct).ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(merged))
                     continue; // Skip this topic if merge failed
 
@@ -94,62 +94,6 @@ namespace AIToolkit.Agent.Plugins
                 owner.Brain.Memories.Add(mem);
             }
             cfg.SetSetting<Guid>("LastSessionGuid", session.Guid);
-        }
-
-        private static async Task<string> MergeResults(ChatSession session, string topic, string reason, List<EnrichedSearchResult> webresults)
-        {
-            LLMSystem.NamesInPromptOverride = false;
-            var fullprompt = BuildMergerPrompt(session, topic, reason, webresults).PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.75) ? 0.75 : LLMSystem.Sampler.Temperature, 1024);
-            var response = await LLMSystem.SimpleQuery(fullprompt).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-            {
-                response = response.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
-            }
-            response = response.RemoveUnfinishedSentence();
-            LLMSystem.Logger?.LogInformation("WebSearch Plugin Result: {output}", response);
-            LLMSystem.NamesInPromptOverride = null;
-            return response;
-        }
-
-        private static IPromptBuilder BuildMergerPrompt(ChatSession session, string topic, string reason, List<EnrichedSearchResult> webresults)
-        {
-            var builder = LLMSystem.Client!.GetPromptBuilder();
-            var prompt = new StringBuilder();
-            prompt.AppendLinuxLine($"You are {LLMSystem.Bot.Name} and your goal is to analyze and merge information from the following documents regarding the subject of '{topic}'. This topic was made relevant during the previous chat session.");
-            prompt.AppendLinuxLine();
-            prompt.AppendLinuxLine($"# Previous Chat Session");
-            prompt.AppendLinuxLine();
-            prompt.AppendLinuxLine($"{session.Content.RemoveNewLines()}");
-            prompt.AppendLinuxLine();
-            prompt.AppendLinuxLine($"# Documents Found:");
-            prompt.AppendLinuxLine();
-            var cnt = 0;
-            foreach (var item in webresults)
-            {
-                prompt.AppendLinuxLine($"## {item.Title}").AppendLinuxLine();
-                prompt.AppendLinuxLine($"{item.Description}").AppendLinuxLine();
-                if (item.ContentExtracted && LLMSystem.GetTokenCount(item.FullContent) <= 3000)
-                    cnt++;
-            }
-            prompt.AppendLinuxLine();
-            if (cnt > 0)
-            {
-                prompt.AppendLinuxLine($"You can also use the following content to improve your response (this is extracted directly from the web pages, meaning there might be clutter in there).").AppendLinuxLine();
-                for (var i = 0; i < webresults.Count; i++)
-                {
-                    var item = webresults[i];
-                    var tks = LLMSystem.GetTokenCount(item.FullContent);
-                    if (item.ContentExtracted && tks > 100 && tks <= 2500)
-                    {
-                        prompt.AppendLinuxLine($"## {item.Title} (Full Content)");
-                        prompt.AppendLinuxLine($"{item.FullContent.CleanupAndTrim()}").AppendLinuxLine().AppendLinuxLine();
-                    }
-                }
-            }
-            builder.AddMessage(AuthorRole.SysPrompt, prompt.ToString().CleanupAndTrim());
-            var txt = new StringBuilder($"You are researching '{topic}' for the following reason: {reason}").AppendLinuxLine().Append($"Merge the information available in the system prompt to offer an explanation on this topic. Don't use markdown formatting, favor natural language. The explanation should be 1 to 3 paragraphs long.");
-            builder.AddMessage(AuthorRole.User, txt.ToString()); 
-            return builder;
         }
 
         public AgentTaskSetting GetDefaultSettings()

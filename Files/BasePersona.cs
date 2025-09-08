@@ -121,7 +121,7 @@ namespace AIToolkit.Files
         [JsonIgnore] public List<WorldInfo> MyWorlds { get; protected set; } = [];
         [JsonIgnore] public Chatlog History { get; protected set; } = new();
 
-        [JsonIgnore] public AgentLoop? AgentSystem = null;
+        [JsonIgnore] public AgentRuntime? AgentSystem = null;
 
         /// <summary>
         /// Factory method for creating Chatlog instances. Override this in derived classes to provide custom Chatlog implementations.
@@ -199,7 +199,7 @@ namespace AIToolkit.Files
         public virtual void BeginChat()
         {
             LoadBrain(LLMSystem.Settings.DataPath);
-            AgentSystem = new AgentLoop(this);
+            AgentSystem = new AgentRuntime(this);
             AgentSystem.Init();
         }
 
