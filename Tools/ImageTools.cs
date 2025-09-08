@@ -139,7 +139,7 @@ namespace AIToolkit
             try
             {
                 using HttpClient httpClient = new();
-                byte[] imageBytes = await httpClient.GetByteArrayAsync(imageUrl);
+                byte[] imageBytes = await httpClient.GetByteArrayAsync(imageUrl).ConfigureAwait(false);
                 using MemoryStream ms = new(imageBytes);
                 using Image image = Image.FromStream(ms);
                 return ImageToBase64(image);

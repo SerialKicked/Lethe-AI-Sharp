@@ -81,7 +81,7 @@ namespace AIToolkit.SearchAPI
             try
             {
                 // Step 1: Search with current provider
-                var searchResults = await _currentProvider.SearchAsync(query, maxResults);
+                var searchResults = await _currentProvider.SearchAsync(query, maxResults).ConfigureAwait(false);
 
                 // Step 2: Optionally extract full content
                 var enrichedResults = new List<EnrichedSearchResult>();
@@ -99,14 +99,14 @@ namespace AIToolkit.SearchAPI
 
                     if (extractContent && !string.IsNullOrEmpty(result.Url) && WebSearchAPI.SearchAPI != BackendSearchAPI.DuckDuckGo)
                     {
-                        enriched.FullContent = await ExtractContentWithJinaAsync(result.Url);
+                        enriched.FullContent = await ExtractContentWithJinaAsync(result.Url).ConfigureAwait(false);
                         enriched.ContentExtracted = !string.IsNullOrEmpty(enriched.FullContent);
                     }
 
                     enrichedResults.Add(enriched);
 
                     // More generous delay - 1 second between requests
-                    if (extractContent) await Task.Delay(1000);
+                    if (extractContent) await Task.Delay(1000).ConfigureAwait(false);
                 }
 
                 return enrichedResults;
@@ -125,11 +125,11 @@ namespace AIToolkit.SearchAPI
                 // Jina Reader - just prepend their URL
                 var jinaUrl = $"https://r.jina.ai/{url}";
 
-                var response = await _httpClient.GetAsync(jinaUrl);
+                var response = await _httpClient.GetAsync(jinaUrl).ConfigureAwait(false);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var content = await response.Content.ReadAsStringAsync();
+                    var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     return content.Trim();
                 }
                 else
@@ -158,11 +158,11 @@ namespace AIToolkit.SearchAPI
                 {
                     if (string.IsNullOrWhiteSpace(query)) continue;
 
-                    var results = await SearchAndEnrichAsync(query, resultsPerQuery);
+                    var results = await SearchAndEnrichAsync(query, resultsPerQuery).ConfigureAwait(false);
                     topicResults.AddRange(results);
 
                     // Be nice to the APIs - 1 second delay
-                    await Task.Delay(1000);
+                    await Task.Delay(1000).ConfigureAwait(false);
                 }
 
                 allResults[topic.Topic] = topicResults;
@@ -187,7 +187,7 @@ namespace AIToolkit.SearchAPI
             Console.WriteLine($"Using {searchService.CurrentProviderName} provider");
 
             // Search with DuckDuckGo
-            var results = await searchService.SearchAndEnrichAsync("C# async programming", 3);
+            var results = await searchService.SearchAndEnrichAsync("C# async programming", 3).ConfigureAwait(false);
 
             foreach (var result in results)
             {
@@ -201,7 +201,7 @@ namespace AIToolkit.SearchAPI
             Console.WriteLine($"Switched to {searchService.CurrentProviderName} provider");
 
             // Same search with Brave
-            var braveResults = await searchService.SearchAndEnrichAsync("C# async programming", 3);
+            var braveResults = await searchService.SearchAndEnrichAsync("C# async programming", 3).ConfigureAwait(false);
 
             foreach (var result in braveResults)
             {

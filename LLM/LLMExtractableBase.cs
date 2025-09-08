@@ -22,7 +22,7 @@ namespace AIToolkit.LLM
 
         public virtual async Task<string> GetGrammar()
         {
-            return await LLMSystem.Client!.SchemaToGrammar(typeof(T));
+            return await LLMSystem.Client!.SchemaToGrammar(typeof(T)).ConfigureAwait(false);
         }
     }
 }

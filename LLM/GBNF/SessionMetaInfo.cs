@@ -39,7 +39,7 @@ namespace AIToolkit.GBNF
         {
             if (Schema == string.Empty)
             {
-                Schema = await base.GetGrammar();
+                Schema = await base.GetGrammar().ConfigureAwait(false);
             }
             return Schema;
         }

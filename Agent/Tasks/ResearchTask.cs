@@ -15,7 +15,7 @@ namespace AIToolkit.Agent.Plugins
         public async Task<bool> Observe(BasePersona owner, AgentTaskSetting cfg, CancellationToken ct)
         {
             // Just a small delay so i don't have to remove async and do Task.ResultFrom everywhere. It's not like we're on a timer anyway.
-            await Task.Delay(10, ct);
+            await Task.Delay(10, ct).ConfigureAwait(false);
             // can't search the web? that's a bummer.
             if (!LLMSystem.SupportsWebSearch)
                 return false;
@@ -49,7 +49,7 @@ namespace AIToolkit.Agent.Plugins
                 if (ct.IsCancellationRequested)
                     return;
                 // Compare to recent searches to avoid duplicate
-                var wassearchedbefore = await LLMSystem.Bot.Brain.WasSearchedRecently(topic.Topic);
+                var wassearchedbefore = await LLMSystem.Bot.Brain.WasSearchedRecently(topic.Topic).ConfigureAwait(false);
                 if (wassearchedbefore)
                     continue;
 
@@ -62,7 +62,7 @@ namespace AIToolkit.Agent.Plugins
                 {
                     if (ct.IsCancellationRequested)
                         return;
-                    var hits = await LLMSystem.WebSearch(query);
+                    var hits = await LLMSystem.WebSearch(query).ConfigureAwait(false);
                     if (hits != null && hits.Count > 0)
                     {
                         allResults.AddRange(hits);
@@ -73,7 +73,7 @@ namespace AIToolkit.Agent.Plugins
                     continue; // Skip this topic if no results
 
                 // Merge all results for this topic into a single memory unit
-                var merged = await MergeResults(session, topic.Topic, topic.Reason, allResults);
+                var merged = await MergeResults(session, topic.Topic, topic.Reason, allResults).ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(merged))
                     continue; // Skip this topic if merge failed
 
@@ -90,7 +90,7 @@ namespace AIToolkit.Agent.Plugins
                     Priority = topic.Urgency
                 };
 
-                await mem.EmbedText();
+                await mem.EmbedText().ConfigureAwait(false);
                 owner.Brain.Memories.Add(mem);
             }
             cfg.SetSetting<Guid>("LastSessionGuid", session.Guid);
@@ -100,7 +100,7 @@ namespace AIToolkit.Agent.Plugins
         {
             LLMSystem.NamesInPromptOverride = false;
             var fullprompt = BuildMergerPrompt(session, topic, reason, webresults).PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.75) ? 0.75 : LLMSystem.Sampler.Temperature, 1024);
-            var response = await LLMSystem.SimpleQuery(fullprompt);
+            var response = await LLMSystem.SimpleQuery(fullprompt).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
             {
                 response = response.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);

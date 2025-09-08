@@ -278,7 +278,7 @@ namespace AIToolkit.Files
         {
             foreach (var item in Sessions)
             {
-                await item.UpdateSession();
+                await item.UpdateSession().ConfigureAwait(false);
             }
         }
 
@@ -300,7 +300,7 @@ namespace AIToolkit.Files
             if (archivePreviousSession && CurrentSession.Messages.Count > 2)
             {
                 CurrentSession.Scenario = LLMSystem.Settings.ScenarioOverride;
-                await CurrentSession.UpdateSession();
+                await CurrentSession.UpdateSession().ConfigureAwait(false);
                 // reset session ID
                 CurrentSessionID = -1;
                 // Create new session

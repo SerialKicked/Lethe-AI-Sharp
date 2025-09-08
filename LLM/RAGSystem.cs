@@ -160,7 +160,7 @@ namespace AIToolkit.LLM
             // Embed all the messages in the chatlog
             foreach (var session in log.Sessions)
             {
-                await session.EmbedText();
+                await session.EmbedText().ConfigureAwait(false);
                 RaidOnEmbedSession(session);
             }
         }
@@ -178,7 +178,7 @@ namespace AIToolkit.LLM
             var emb = textToEmbed;
             if (emb.Length > LLMSystem.Settings.RAGEmbeddingSize)
                 emb = emb[..LLMSystem.Settings.RAGEmbeddingSize];
-            var tsk = await embed.GetEmbeddings(emb);
+            var tsk = await embed.GetEmbeddings(emb).ConfigureAwait(false);
             return tsk[0].EuclideanNormalization();
         }
 
@@ -250,7 +250,7 @@ namespace AIToolkit.LLM
             // Check if message contains the words RP or roleplay
             var RPCheck = message.Contains(" RP", StringComparison.OrdinalIgnoreCase) || message.Contains(" roleplay", StringComparison.OrdinalIgnoreCase);
 
-            var emb = await EmbeddingText(message.ConvertToThirdPerson());
+            var emb = await EmbeddingText(message.ConvertToThirdPerson()).ConfigureAwait(false);
             var subcount = maxRes + 1;
             // If we have both titles and summaries double result count to get a better picture
             if (LLMSystem.Settings.AllowWorldInfo)
@@ -305,7 +305,7 @@ namespace AIToolkit.LLM
 
         public static async Task<List<(IEmbed session, EmbedType category, float distance)>> Search(string message)
         {
-            return await Search(message, LLMSystem.Settings.RAGMaxEntries, LLMSystem.Settings.RAGDistanceCutOff);
+            return await Search(message, LLMSystem.Settings.RAGMaxEntries, LLMSystem.Settings.RAGDistanceCutOff).ConfigureAwait(false);
         }
 
         private static List<VectorSearchResult> Search(float[] message, int count)

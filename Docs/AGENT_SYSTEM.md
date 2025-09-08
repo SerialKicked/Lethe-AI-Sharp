@@ -81,7 +81,7 @@ public class MyCustomPlugin : IAgentPlugin
         try
         {
             // Perform your custom task logic here
-            await DoCustomWork(task, ctx, ct);
+            await DoCustomWork(task, ctx, ct).ConfigureAwait(false);
             
             return AgentTaskResult.Ok();
         }
@@ -100,7 +100,7 @@ public class MyCustomPlugin : IAgentPlugin
     private async Task DoCustomWork(AgentTask task, IAgentContext ctx, CancellationToken ct)
     {
         // Implement your custom task execution logic
-        await Task.Delay(100, ct); // Placeholder
+        await Task.Delay(100, ct).ConfigureAwait(false); // Placeholder
     }
 }
 ```
@@ -297,7 +297,7 @@ public class DataProcessingPlugin : IAgentPlugin
     {
         try
         {
-            await ProcessPendingData(ct);
+            await ProcessPendingData(ct).ConfigureAwait(false);
             return AgentTaskResult.Ok();
         }
         catch

@@ -38,7 +38,7 @@ namespace AIToolkit.API
 
         public virtual async Task<List<Model>> GetModelList()
         {
-            var models = await API.ModelsEndpoint.GetModelsAsync();
+            var models = await API.ModelsEndpoint.GetModelsAsync().ConfigureAwait(false);
             var lst = new List<Model>(models);
             return lst;
         }
@@ -47,7 +47,7 @@ namespace AIToolkit.API
         {
             if (model is null)
             {
-                var models = await API.ModelsEndpoint.GetModelsAsync();
+                var models = await API.ModelsEndpoint.GetModelsAsync().ConfigureAwait(false);
                 var lst = new List<Model>(models);
                 if (lst.Count == 0)
                 {
@@ -55,13 +55,13 @@ namespace AIToolkit.API
                 }
                 return lst[0];
             }
-            var info = await API.ModelsEndpoint.GetModelDetailsAsync(model);
+            var info = await API.ModelsEndpoint.GetModelDetailsAsync(model).ConfigureAwait(false);
             return info;
         }
 
         public virtual async Task<string> GetBackendInfo()
         {
-            return await Task.FromResult("OpenAI Compatible Backend");
+            return await Task.FromResult("OpenAI Compatible Backend").ConfigureAwait(false);
         }
 
         public virtual async Task StreamChatCompletion(ChatRequest request, CancellationToken cancellationToken = default)
@@ -110,7 +110,7 @@ namespace AIToolkit.API
 
         public virtual async Task<Choice> ChatCompletion(ChatRequest request, CancellationToken cancellationToken = default)
         {
-            var response = await API.ChatEndpoint.GetCompletionAsync(request, cancellationToken);
+            var response = await API.ChatEndpoint.GetCompletionAsync(request, cancellationToken).ConfigureAwait(false);
             return response.FirstChoice;
         }
 

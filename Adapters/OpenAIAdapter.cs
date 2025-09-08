@@ -49,9 +49,9 @@ namespace AIToolkit.API
         {
             // OpenAI doesn't have a direct endpoint for this
             // Use model info to determine context length
-            // var modelInfo = await _client.GetModelInfo("default");
+            // var modelInfo = await _client.GetModelInfo("default").ConfigureAwait(false);
             // Parse context length from model info or use a default
-            return await Task.FromResult(32768);
+            return await Task.FromResult(32768).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -60,20 +60,20 @@ namespace AIToolkit.API
         /// <returns></returns>
         public async Task<string> GetModelInfo()
         {
-            var info = await _client.GetModelInfo();
+            var info = await _client.GetModelInfo().ConfigureAwait(false);
             return info.Id;
         }
 
         public async Task<string> GetBackendInfo()
         {
-            return await _client.GetBackendInfo();
+            return await _client.GetBackendInfo().ConfigureAwait(false);
         }
 
         public async Task<string> GenerateText(object parameters)
         {
             if (parameters is not ChatRequest input)
                 throw new ArgumentException("Parameters must be of type ChatRequest");
-            var result = await _client.ChatCompletion(input);
+            var result = await _client.ChatCompletion(input).ConfigureAwait(false);
             var res = result.Message.Content.ToString();
             return res;
         }
@@ -82,7 +82,7 @@ namespace AIToolkit.API
         {
             if (parameters is not ChatRequest input)
                 throw new ArgumentException("Parameters must be of type ChatRequest");
-            await _client.StreamChatCompletion(input);
+            await _client.StreamChatCompletion(input).ConfigureAwait(false);
         }
 
         public IPromptBuilder GetPromptBuilder()
@@ -121,7 +121,7 @@ namespace AIToolkit.API
         {
             if (!SupportsWebSearch)
                 return string.Empty;
-            var res = await webSearchClient.SearchAndEnrichAsync(query, 3, LLMSystem.Settings.WebSearchDetailedResults);
+            var res = await webSearchClient.SearchAndEnrichAsync(query, 3, LLMSystem.Settings.WebSearchDetailedResults).ConfigureAwait(false);
             // Convert results to a common format
             return JsonConvert.SerializeObject(res);
         }
@@ -135,7 +135,7 @@ namespace AIToolkit.API
         {
             try
             {
-                var res = await _client.GetModelList();
+                var res = await _client.GetModelList().ConfigureAwait(false);
                 return res != null;
 
             }

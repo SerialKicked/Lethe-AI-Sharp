@@ -48,7 +48,7 @@ LLMSystem.Setup("http://localhost:5001", BackendAPI.KoboldAPI);
 LLMSystem.Setup("http://localhost:1234/v1", BackendAPI.OpenAI, "your-api-key");
 
 // Connect to the backend
-await LLMSystem.Connect();
+await LLMSystem.Connect().ConfigureAwait(false);
 
 // Check if connection is successful
 if (LLMSystem.Status == SystemStatus.Ready)
@@ -74,7 +74,7 @@ LLMSystem.OnInferenceEnded += (sender, fullResponse) =>
 };
 
 // Send a message to the bot
-await LLMSystem.SendMessageToBot(AuthorRole.User, "Hello! How are you today?");
+await LLMSystem.SendMessageToBot(AuthorRole.User, "Hello! How are you today?").ConfigureAwait(false);
 ```
 
 ### 3. Persona Configuration
@@ -149,29 +149,29 @@ LLMSystem.Init();
 LLMSystem.Setup(string url, BackendAPI backend, string? apiKey = null);
 
 // Connect and retrieve backend information
-await LLMSystem.Connect();
+await LLMSystem.Connect().ConfigureAwait(false);
 
 // Check if backend is accessible
-bool isWorking = await LLMSystem.CheckBackend();
+bool isWorking = await LLMSystem.CheckBackend().ConfigureAwait(false);
 ```
 
 #### Communication Methods
 ```csharp
 // Send user message
-await LLMSystem.SendMessageToBot(AuthorRole.User, "Your message here");
+await LLMSystem.SendMessageToBot(AuthorRole.User, "Your message here").ConfigureAwait(false);
 
 // Send a complete message object
 var message = new SingleMessage(AuthorRole.User, DateTime.Now, "Hello", "user", "bot");
-await LLMSystem.SendMessageToBot(message);
+await LLMSystem.SendMessageToBot(message).ConfigureAwait(false);
 
 // Generate bot response based on chat history
-await LLMSystem.AddBotMessage();
+await LLMSystem.AddBotMessage().ConfigureAwait(false);
 
 // Make bot impersonate user
-await LLMSystem.ImpersonateUser();
+await LLMSystem.ImpersonateUser().ConfigureAwait(false);
 
 // Regenerate last bot response
-await LLMSystem.RerollLastMessage();
+await LLMSystem.RerollLastMessage().ConfigureAwait(false);
 
 // Cancel ongoing generation
 bool cancelled = LLMSystem.CancelGeneration();
@@ -195,7 +195,7 @@ string awayMsg = LLMSystem.GetAwayString();
 #### Quick Inference
 ```csharp
 // Non-streaming inference for system tasks
-string response = await LLMSystem.SimpleQuery(promptObject);
+string response = await LLMSystem.SimpleQuery(promptObject).ConfigureAwait(false);
 
 // Quick system message with optional logging
 string result = await LLMSystem.QuickInferenceForSystemPrompt(
@@ -277,7 +277,7 @@ LLMSystem.Settings.RAGIndex = 3; // Position in prompt
 // Check if backend supports web search
 if (LLMSystem.SupportsWebSearch)
 {
-    var searchResults = await LLMSystem.WebSearch("latest AI developments");
+    var searchResults = await LLMSystem.WebSearch("latest AI developments").ConfigureAwait(false);
     foreach (var result in searchResults)
     {
         Console.WriteLine($"{result.Title}: {result.Description}");
@@ -290,7 +290,7 @@ if (LLMSystem.SupportsWebSearch)
 // Generate speech from text (KoboldAPI only)
 if (LLMSystem.SupportsTTS)
 {
-    byte[] audioData = await LLMSystem.GenerateTTS("Hello world!", "Tina");
+    byte[] audioData = await LLMSystem.GenerateTTS("Hello world!", "Tina").ConfigureAwait(false);
     
     // Save or play the audio
     using var stream = new MemoryStream(audioData);
@@ -311,7 +311,7 @@ if (LLMSystem.SupportsVision)
     LLMSystem.VLM_AddB64Image("data:image/jpeg;base64,...");
     
     // Send message with images
-    await LLMSystem.SendMessageToBot(AuthorRole.User, "What do you see in this image?");
+    await LLMSystem.SendMessageToBot(AuthorRole.User, "What do you see in this image?").ConfigureAwait(false);
     
     // Clear images after use
     LLMSystem.VLM_ClearImages();
@@ -365,7 +365,7 @@ class SimpleChatApp
     {
         // Setup
         LLMSystem.Setup("http://localhost:5001", BackendAPI.KoboldAPI);
-        await LLMSystem.Connect();
+        await LLMSystem.Connect().ConfigureAwait(false);
         
         // Event handlers
         LLMSystem.OnInferenceStreamed += (s, token) => Console.Write(token);
@@ -383,11 +383,11 @@ class SimpleChatApp
             string input = Console.ReadLine();
             if (string.IsNullOrEmpty(input)) break;
             
-            await LLMSystem.SendMessageToBot(AuthorRole.User, input);
+            await LLMSystem.SendMessageToBot(AuthorRole.User, input).ConfigureAwait(false);
             
             // Wait for response to complete
             while (LLMSystem.Status == SystemStatus.Busy)
-                await Task.Delay(100);
+                await Task.Delay(100).ConfigureAwait(false);
         }
     }
 }
@@ -403,7 +403,7 @@ public async Task<string> AskQuestionAsync(string question)
     promptBuilder.AddMessage(AuthorRole.User, question);
     
     var query = promptBuilder.PromptToQuery(AuthorRole.Assistant);
-    return await LLMSystem.SimpleQuery(query);
+    return await LLMSystem.SimpleQuery(query).ConfigureAwait(false);
 }
 ```
 
@@ -457,7 +457,7 @@ LLMSystem.OnInferenceEnded += HandleResponse;
 LLMSystem.OnInferenceStreamed += HandleToken;
 
 // Then send messages
-await LLMSystem.SendMessageToBot(AuthorRole.User, "Hello");
+await LLMSystem.SendMessageToBot(AuthorRole.User, "Hello").ConfigureAwait(false);
 ```
 
 ### 2. Check System Status
@@ -466,7 +466,7 @@ Always verify the system is ready before attempting operations:
 ```csharp
 if (LLMSystem.Status == SystemStatus.Ready)
 {
-    await LLMSystem.SendMessageToBot(AuthorRole.User, message);
+    await LLMSystem.SendMessageToBot(AuthorRole.User, message).ConfigureAwait(false);
 }
 ```
 

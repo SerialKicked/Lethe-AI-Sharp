@@ -312,7 +312,7 @@ namespace AIToolkit.Memory
                 return;
             CurrentDelay++;
             // If there's a super relevant eureka to the user input, insert it immediately
-            var foundunit = await GetRelevantEureka(message.Message);
+            var foundunit = await GetRelevantEureka(message.Message).ConfigureAwait(false);
             if (foundunit != null)
             {
                 InsertEureka(foundunit);
@@ -339,7 +339,7 @@ namespace AIToolkit.Memory
 
             foreach (var item in Eurekas)
             {
-                var dist = await RAGSystem.GetDistanceAsync(userinput, item);
+                var dist = await RAGSystem.GetDistanceAsync(userinput, item).ConfigureAwait(false);
                 if (dist <= maxDistance)
                 {
                     return item;
@@ -481,7 +481,7 @@ namespace AIToolkit.Memory
         {
             foreach (var mem in Memories)
             {
-                await mem.EmbedText();
+                await mem.EmbedText().ConfigureAwait(false);
             }
         }
 

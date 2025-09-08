@@ -138,7 +138,7 @@ namespace AIToolkit.Memory
             else
             {
                 foreach (var item in Entries)
-                    await item.EmbedText();
+                    await item.EmbedText().ConfigureAwait(false);
             }
         }
     }

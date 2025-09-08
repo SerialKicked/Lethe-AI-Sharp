@@ -18,10 +18,10 @@ namespace AIToolkit.SearchAPI
                 request.Headers.Add("X-Subscription-Token", apiKey);
                 request.Headers.Add("Accept", "application/json");
 
-                var response = await httpClient.SendAsync(request);
+                var response = await httpClient.SendAsync(request).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
 
-                var content = await response.Content.ReadAsStringAsync();
+                var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 var searchResponse = JsonSerializer.Deserialize<BraveSearchResponse>(content);
 
                 return searchResponse?.Web?.Results?.Select(r => new SearchResult

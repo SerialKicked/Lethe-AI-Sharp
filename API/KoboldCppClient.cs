@@ -130,17 +130,17 @@ namespace AIToolkit.API
 
                     request.Headers.Accept.Add(MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
-                    using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                    using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
 
                     var status = (int)response.StatusCode;
                     if (status == 200)
                     {
-                        var objectResponse = await ReadObjectResponseAsync<T>(response, new Dictionary<string, IEnumerable<string>>(), cancellationToken);
+                        var objectResponse = await ReadObjectResponseAsync<T>(response, new Dictionary<string, IEnumerable<string>>(), cancellationToken).ConfigureAwait(false);
                         return objectResponse.Object;
                     }
                     else if (status == 503)
                     {
-                        var objectResponse = await ReadObjectResponseAsync<ServerBusyError>(response, new Dictionary<string, IEnumerable<string>>(), cancellationToken);
+                        var objectResponse = await ReadObjectResponseAsync<ServerBusyError>(response, new Dictionary<string, IEnumerable<string>>(), cancellationToken).ConfigureAwait(false);
                         if (objectResponse.Object == null)
                         {
                             throw new ApiException("Response was null which was not expected.", status, null, new Dictionary<string, IEnumerable<string>>(), null);
@@ -149,7 +149,7 @@ namespace AIToolkit.API
                         // Handle 503 with retry if configured
                         if (attempt <= MaxRetryAttempts && RetryStatusCodes.Contains(status))
                         {
-                            await DelayForRetryAsync(attempt);
+                            await DelayForRetryAsync(attempt).ConfigureAwait(false);
                             continue;
                         }
 
@@ -159,17 +159,17 @@ namespace AIToolkit.API
                     // For other status codes that should be retried
                     else if (attempt <= MaxRetryAttempts && RetryStatusCodes.Contains(status))
                     {
-                        await DelayForRetryAsync(attempt);
+                        await DelayForRetryAsync(attempt).ConfigureAwait(false);
                         continue;
                     }
 
-                    var responseData = response.Content == null ? null : await response.Content.ReadAsStringAsync();
+                    var responseData = response.Content == null ? null : await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     throw new ApiException($"HTTP status code {status} was not expected.", status, responseData, new Dictionary<string, IEnumerable<string>>(), null);
                 }
                 catch (HttpRequestException ex) when (attempt <= MaxRetryAttempts)
                 {
                     // Network-level exceptions (connection refused, etc.)
-                    await DelayForRetryAsync(attempt);
+                    await DelayForRetryAsync(attempt).ConfigureAwait(false);
 
                     // If this was the last attempt, rethrow
                     if (attempt == MaxRetryAttempts)
@@ -178,7 +178,7 @@ namespace AIToolkit.API
                 catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException && attempt <= MaxRetryAttempts)
                 {
                     // Timeout exceptions
-                    await DelayForRetryAsync(attempt);
+                    await DelayForRetryAsync(attempt).ConfigureAwait(false);
 
                     // If this was the last attempt, rethrow
                     if (attempt == MaxRetryAttempts)
@@ -208,7 +208,7 @@ namespace AIToolkit.API
                 delayMs = Math.Min(delayMs, 30000);
             }
 
-            await Task.Delay(delayMs);
+            await Task.Delay(delayMs).ConfigureAwait(false);
         }
 
         #endregion
@@ -223,7 +223,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<MaxContextLengthSetting> ContextLengthAsync(CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<MaxContextLengthSetting>(_httpClient, HttpMethod.Get, "api/v1/config/max_context_length", cancellationToken: cancellationToken);
+            return await SendRequestAsync<MaxContextLengthSetting>(_httpClient, HttpMethod.Get, "api/v1/config/max_context_length", cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -237,7 +237,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<MaxContextLengthSetting> TrueMaxContextLengthAsync(CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<MaxContextLengthSetting>(_httpClient, HttpMethod.Get, "api/extra/true_max_context_length", cancellationToken: cancellationToken);
+            return await SendRequestAsync<MaxContextLengthSetting>(_httpClient, HttpMethod.Get, "api/extra/true_max_context_length", cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -253,7 +253,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<GenerationOutput> GenerateAsync(GenerationInput body, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<GenerationOutput>(_httpClient, HttpMethod.Post, "api/v1/generate", body, cancellationToken: cancellationToken);
+            return await SendRequestAsync<GenerationOutput>(_httpClient, HttpMethod.Post, "api/v1/generate", body, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -308,7 +308,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<KCBasicResult> VersionAsync(CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<KCBasicResult>(_httpClient, HttpMethod.Get, "api/v1/info/version", cancellationToken: cancellationToken);
+            return await SendRequestAsync<KCBasicResult>(_httpClient, HttpMethod.Get, "api/v1/info/version", cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -322,7 +322,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<KCBasicResult> ModelAsync(CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<KCBasicResult>(_httpClient, HttpMethod.Get, "api/v1/model", cancellationToken: cancellationToken);
+            return await SendRequestAsync<KCBasicResult>(_httpClient, HttpMethod.Get, "api/v1/model", cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -336,7 +336,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<KCExtraResult> ExtraVersionAsync(CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<KCExtraResult>(_httpClient, HttpMethod.Get, "api/extra/version", cancellationToken: cancellationToken);
+            return await SendRequestAsync<KCExtraResult>(_httpClient, HttpMethod.Get, "api/extra/version", cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -350,7 +350,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<KcppPerf> PerfAsync(CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<KcppPerf>(_httpClient, HttpMethod.Get, "api/extra/perf", cancellationToken: cancellationToken);
+            return await SendRequestAsync<KcppPerf>(_httpClient, HttpMethod.Get, "api/extra/perf", cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -364,7 +364,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<GenerationOutput> CheckGETAsync(CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<GenerationOutput>(_httpClient, HttpMethod.Get, "api/extra/generate/check", cancellationToken: cancellationToken);
+            return await SendRequestAsync<GenerationOutput>(_httpClient, HttpMethod.Get, "api/extra/generate/check", cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -378,7 +378,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<GenerationOutput> CheckPOSTAsync(GenkeyData body, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<GenerationOutput>(_httpClient, HttpMethod.Post, "api/extra/generate/check", body, cancellationToken: cancellationToken);
+            return await SendRequestAsync<GenerationOutput>(_httpClient, HttpMethod.Post, "api/extra/generate/check", body, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -392,7 +392,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<KcppValueResult> TokencountAsync(KcppPrompt body, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<KcppValueResult>(_httpClient, HttpMethod.Post, "api/extra/tokencount", body, cancellationToken: cancellationToken);
+            return await SendRequestAsync<KcppValueResult>(_httpClient, HttpMethod.Post, "api/extra/tokencount", body, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -417,7 +417,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<KcppResponse> AbortAsync(GenkeyData body, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<KcppResponse>(_httpClient, HttpMethod.Post, "api/extra/abort", body, cancellationToken: cancellationToken);
+            return await SendRequestAsync<KcppResponse>(_httpClient, HttpMethod.Post, "api/extra/abort", body, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         public KcppResponse AbortSync(GenkeyData body)
@@ -437,7 +437,7 @@ namespace AIToolkit.API
         /// <returns></returns>
         public virtual async Task<List<EnrichedSearchResult>> WebQueryAsync(WebQuery body, CancellationToken cancellationToken = default)
         {
-            var res = await SendRequestAsync<WebQueryFullResponse>(_httpClient, HttpMethod.Post, "api/extra/websearch", body, cancellationToken: cancellationToken);
+            var res = await SendRequestAsync<WebQueryFullResponse>(_httpClient, HttpMethod.Post, "api/extra/websearch", body, cancellationToken: cancellationToken).ConfigureAwait(false);
             if (res == null || res.Count == 0)
                 return new List<EnrichedSearchResult>();
             // Convert WebQueryFullResponse to List<EnrichedSearchResult>
@@ -478,7 +478,7 @@ namespace AIToolkit.API
 
                     request.Headers.Accept.Add(MediaTypeWithQualityHeaderValue.Parse("audio/wav"));
 
-                    using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                    using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
 
                     var status = (int)response.StatusCode;
                     if (status == 200)
@@ -491,17 +491,17 @@ namespace AIToolkit.API
                     // For other status codes that should be retried
                     else if (attempt <= MaxRetryAttempts && RetryStatusCodes.Contains(status))
                     {
-                        await DelayForRetryAsync(attempt);
+                        await DelayForRetryAsync(attempt).ConfigureAwait(false);
                         continue;
                     }
 
-                    var responseData = response.Content == null ? null : await response.Content.ReadAsStringAsync();
+                    var responseData = response.Content == null ? null : await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     throw new ApiException($"HTTP status code {status} was not expected.", status, responseData, new Dictionary<string, IEnumerable<string>>(), null);
                 }
                 catch (HttpRequestException ex) when (attempt <= MaxRetryAttempts)
                 {
                     // Network-level exceptions (connection refused, etc.)
-                    await DelayForRetryAsync(attempt);
+                    await DelayForRetryAsync(attempt).ConfigureAwait(false);
 
                     // If this was the last attempt, rethrow
                     if (attempt == MaxRetryAttempts)
@@ -510,7 +510,7 @@ namespace AIToolkit.API
                 catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException && attempt <= MaxRetryAttempts)
                 {
                     // Timeout exceptions
-                    await DelayForRetryAsync(attempt);
+                    await DelayForRetryAsync(attempt).ConfigureAwait(false);
 
                     // If this was the last attempt, rethrow
                     if (attempt == MaxRetryAttempts)
@@ -605,7 +605,7 @@ namespace AIToolkit.API
         /// <returns></returns>
         public virtual async Task<GrammarResult> SchemaToGrammar(GrammarQuery schema, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<GrammarResult>(_httpClient, HttpMethod.Post, "api/extra/json_to_grammar", schema, cancellationToken: cancellationToken);
+            return await SendRequestAsync<GrammarResult>(_httpClient, HttpMethod.Post, "api/extra/json_to_grammar", schema, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         #endregion
@@ -615,18 +615,18 @@ namespace AIToolkit.API
         public virtual async Task<KVStateSaveResult> SaveKVState(int slot, CancellationToken cancellationToken = default)
         {
             var arg = new KVStateInput { slot = slot };
-            return await SendRequestAsync<KVStateSaveResult>(_httpClient, HttpMethod.Post, "api/admin/save_state", arg, cancellationToken: cancellationToken);
+            return await SendRequestAsync<KVStateSaveResult>(_httpClient, HttpMethod.Post, "api/admin/save_state", arg, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         public virtual async Task<KVStateLoadResult> LoadKVState(int slot, CancellationToken cancellationToken = default)
         {
             var arg = new KVStateInput { slot = slot };
-            return await SendRequestAsync<KVStateLoadResult>(_httpClient, HttpMethod.Post, "api/admin/load_state", arg, cancellationToken: cancellationToken);
+            return await SendRequestAsync<KVStateLoadResult>(_httpClient, HttpMethod.Post, "api/admin/load_state", arg, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         public virtual async Task<KVStateClearResult> ClearKVState(CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<KVStateClearResult>(_httpClient, HttpMethod.Post, "api/admin/clear_state", null, cancellationToken: cancellationToken);
+            return await SendRequestAsync<KVStateClearResult>(_httpClient, HttpMethod.Post, "api/admin/clear_state", null, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         #endregion
@@ -645,7 +645,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<ImageResponse> Txt2imgAsync(KcppImagePrompt body, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<ImageResponse>(_httpClient, HttpMethod.Post, "sdapi/v1/txt2img", body, cancellationToken: cancellationToken);
+            return await SendRequestAsync<ImageResponse>(_httpClient, HttpMethod.Post, "sdapi/v1/txt2img", body, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -659,7 +659,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<Img2ImgResponse> Img2imgAsync(KcppImg2ImgQuery body, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<Img2ImgResponse>(_httpClient, HttpMethod.Post, "sdapi/v1/img2img", body, cancellationToken: cancellationToken);
+            return await SendRequestAsync<Img2ImgResponse>(_httpClient, HttpMethod.Post, "sdapi/v1/img2img", body, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -673,7 +673,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<CaptionedImageResponse> InterrogateAsync(KcppCaptionQuery body, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<CaptionedImageResponse>(_httpClient, HttpMethod.Post, "sdapi/v1/interrogate", body, cancellationToken: cancellationToken);
+            return await SendRequestAsync<CaptionedImageResponse>(_httpClient, HttpMethod.Post, "sdapi/v1/interrogate", body, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         #endregion
@@ -689,7 +689,7 @@ namespace AIToolkit.API
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async Task<PreloadedStoryResponse> PreloadstoryAsync(CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<PreloadedStoryResponse>(_httpClient, HttpMethod.Get, "api/extra/preloadstory", cancellationToken: cancellationToken);
+            return await SendRequestAsync<PreloadedStoryResponse>(_httpClient, HttpMethod.Get, "api/extra/preloadstory", cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         protected virtual async Task<ObjectResponseResult<T>> ReadObjectResponseAsync<T>(HttpResponseMessage response, IReadOnlyDictionary<string, IEnumerable<string>> headers, CancellationToken cancellationToken)

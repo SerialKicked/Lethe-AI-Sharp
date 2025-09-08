@@ -15,10 +15,10 @@ namespace AIToolkit.SearchAPI
                 // DuckDuckGo Instant Answer API
                 var url = $"https://api.duckduckgo.com/?q={Uri.EscapeDataString(query)}&format=json&no_html=1&skip_disambig=1";
 
-                var response = await httpClient.GetAsync(url);
+                var response = await httpClient.GetAsync(url).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
 
-                var content = await response.Content.ReadAsStringAsync();
+                var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 var searchResponse = JsonSerializer.Deserialize<DuckDuckGoResponse>(content);
 
                 var results = new List<SearchResult>();

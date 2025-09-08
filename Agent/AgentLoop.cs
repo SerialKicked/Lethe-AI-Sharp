@@ -47,14 +47,14 @@ namespace AIToolkit.Agent
         {
             _running = true;
             // Initial delay to allow the system to settle. if the persona was just loaded, it means that the user is active, anyway.
-            await Task.Delay(10000, _cts!.Token);
+            await Task.Delay(10000, _cts!.Token).ConfigureAwait(false);
 
             while (_running && !_cts.Token.IsCancellationRequested)
             {
                 // don't do anything if not in agent mode, or if user was active recently
                 if (!Owner.AgentMode || (DateTime.Now - _lastuseractivity) < Config.MinInactivityTime || LLMSystem.Status == SystemStatus.NotInit)
                 {
-                    await Task.Delay(1000, _cts.Token);
+                    await Task.Delay(1000, _cts.Token).ConfigureAwait(false);
                     continue;
                 }
                 // Run through all plugins
@@ -64,10 +64,10 @@ namespace AIToolkit.Agent
                         continue;
                     try
                     {
-                        var shouldrun = await plugin.Observe(Owner, setting, _cts.Token);
+                        var shouldrun = await plugin.Observe(Owner, setting, _cts.Token).ConfigureAwait(false);
                         if (shouldrun)
                         {
-                            await plugin.Execute(Owner, setting, _cts.Token);
+                            await plugin.Execute(Owner, setting, _cts.Token).ConfigureAwait(false);
                             SaveSettings();
                         }
                     }
@@ -80,7 +80,7 @@ namespace AIToolkit.Agent
                     {
                         LLMSystem.Logger?.LogError(ex, "Error in plugin {PluginId}: {ex}", plugin.Id, ex.Message);
                     }
-                    await Task.Delay(1000, _cts.Token);
+                    await Task.Delay(1000, _cts.Token).ConfigureAwait(false);
                     if (!_running || _cts.Token.IsCancellationRequested)
                         break;
                 }
@@ -106,6 +106,11 @@ namespace AIToolkit.Agent
             _loop = Task.Run(MainLoop);
         }
 
+        public void CloseSync()
+        {
+            Close().GetAwaiter().GetResult();
+        }
+
         public async Task Close()
         {
             if (_loop == null)
@@ -118,7 +123,7 @@ namespace AIToolkit.Agent
             try
             {
                 // Wait for the loop to finish
-                await _loop;
+                await _loop.ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

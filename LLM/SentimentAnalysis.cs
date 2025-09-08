@@ -71,7 +71,7 @@ namespace AIToolkit.LLM
             var embedder = new LLamaEmbedder(ModelWeights!, ModelSettings!);
 
             // For BERT with classifier head, GetEmbeddings returns classification logits
-            var logits = await embedder.GetEmbeddings(text); // should be length 28
+            var logits = await embedder.GetEmbeddings(text).ConfigureAwait(false); // should be length 28
 
             //var tokens = ModelContext!.NativeHandle.Tokenize(text, add_bos: true, special: false, Encoding.UTF8);
             //// correctly tokenized to 8 legit tokens

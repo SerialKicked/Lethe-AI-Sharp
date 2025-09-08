@@ -208,11 +208,10 @@ namespace AIToolkit.Files
         /// Override this in derived classes to implement custom saving behavior. Ideally, you should save the ChatLog in your derived class.
         /// </summary>
         /// <param name="backup"></param>
-        public virtual async Task EndChat(bool backup = false)
+        public virtual void EndChat(bool backup = false)
         {
             SaveBrain("data/chars/", backup);
-            if (AgentSystem is not null)
-                await AgentSystem.Close();
+            AgentSystem?.CloseSync();
             AgentSystem = null;
         }
 
@@ -333,7 +332,7 @@ namespace AIToolkit.Files
             var rln = SelfEditTokens;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 rln += 1024;
-            var finalstr = await LLMSystem.SimpleQuery(promptbuilder.PromptToQuery(AuthorRole.Assistant, -1, rln));
+            var finalstr = await LLMSystem.SimpleQuery(promptbuilder.PromptToQuery(AuthorRole.Assistant, -1, rln)).ConfigureAwait(false);
             LLMSystem.NamesInPromptOverride = null;
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);

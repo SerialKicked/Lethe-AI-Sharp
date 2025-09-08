@@ -97,26 +97,26 @@ namespace AIToolkit.Files
 
             if (LLMSystem.Client?.SupportsSchema == true)
             {
-                var meta = await GetSessionInfo();
+                var meta = await GetSessionInfo().ConfigureAwait(false);
                 MetaData = meta;
-                var sum = await GenerateSummary();
+                var sum = await GenerateSummary().ConfigureAwait(false);
                 if (sum.Length > MetaData.Summary.Length)
                     MetaData.Summary = sum;
-                var topics = await GetResearchTopics();
+                var topics = await GetResearchTopics().ConfigureAwait(false);
                 NewTopics = topics;
             }
             else
             {
-                var sum = await GenerateSummary();
+                var sum = await GenerateSummary().ConfigureAwait(false);
                 MetaData.Summary = sum;
-                var kw = await GenerateKeywords();
+                var kw = await GenerateKeywords().ConfigureAwait(false);
                 MetaData.Keywords = [.. kw];
-                var goals = await GenerateGoals();
+                var goals = await GenerateGoals().ConfigureAwait(false);
                 MetaData.FutureGoals = [.. goals.Split('\n').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x))];
-                MetaData.IsRoleplaySession = await IsRoleplay();
-                MetaData.Title = await GenerateTitle(sum);
+                MetaData.IsRoleplaySession = await IsRoleplay().ConfigureAwait(false);
+                MetaData.Title = await GenerateTitle(sum).ConfigureAwait(false);
             }
-            await EmbedText();
+            await EmbedText().ConfigureAwait(false);
         }
 
         /// <summary>
@@ -126,7 +126,7 @@ namespace AIToolkit.Files
         protected virtual async Task<SessionMetaInfo> GetSessionInfo()
         {
             var session = new SessionMetaInfo();
-            var grammar = await session.GetGrammar();
+            var grammar = await session.GetGrammar().ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(grammar))
                 throw new Exception("Something went wrong when building summary grammar and json format.");
 
@@ -164,7 +164,7 @@ namespace AIToolkit.Files
             {
                 input.Grammar = grammar;
             }
-            var finalstr = await LLMSystem.SimpleQuery(ct);
+            var finalstr = await LLMSystem.SimpleQuery(ct).ConfigureAwait(false);
             session = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
             session?.ClampRelevance();
             LLMSystem.NamesInPromptOverride = null;
@@ -181,7 +181,7 @@ namespace AIToolkit.Files
         protected virtual async Task<TopicLookup> GetResearchTopics()
         {
             var session = new TopicLookup();
-            var grammar = await session.GetGrammar();
+            var grammar = await session.GetGrammar().ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(grammar))
                 throw new Exception("Something went wrong when building summary grammar and json format.");
 
@@ -219,7 +219,7 @@ namespace AIToolkit.Files
             {
                 input.Grammar = grammar;
             }
-            var finalstr = await LLMSystem.SimpleQuery(ct);
+            var finalstr = await LLMSystem.SimpleQuery(ct).ConfigureAwait(false);
             session = JsonConvert.DeserializeObject<TopicLookup>(finalstr);
             session?.ClampRelevance();
             LLMSystem.NamesInPromptOverride = null;
@@ -235,7 +235,7 @@ namespace AIToolkit.Files
         protected virtual async Task<string[]> GenerateKeywords()
         {
             var query = "Based on the exchange between {{user}} and {{char}} shown above, write a comma-separated list of keywords {{char}} would associate with this chat. The list must be between 1 and 5 keywords long.";
-            var res = await GenerateTaskRes(query, 512, true, false);
+            var res = await GenerateTaskRes(query, 512, true, false).ConfigureAwait(false);
             return res.Split(',');
         }
 
@@ -246,7 +246,7 @@ namespace AIToolkit.Files
         protected virtual async Task<string> GenerateGoals()
         {
             var query = "Based on the exchange between {{user}} and {{char}} shown above, write a list of the plans they both setup for the near future. This list should contain between 0 and 4 items. Each item should be summarized in a single sentence. If there's no items, don't answer with anything. Make sure those plans aren't already resolved within the span of the dialog." + LLMSystem.NewLine + "Example:" + LLMSystem.NewLine + "- They promised to eat together tomorrow." + LLMSystem.NewLine + "- {{user}} will watch the movie recommanded by {{char}}.";
-            var res = await GenerateTaskRes(query, 1024, true, false);
+            var res = await GenerateTaskRes(query, 1024, true, false).ConfigureAwait(false);
             return res;
         }
 
@@ -262,7 +262,7 @@ namespace AIToolkit.Files
                 "- Both {{user}} and {{char}} are in a situation involving physical contact in a defined location." + LLMSystem.NewLine +
                 "- Heavy use of narrative text (between asterisks)" + LLMSystem.NewLine +
                 "- Clearly takes place outside of a chat interface." + LLMSystem.NewLine + LLMSystem.NewLine + "Your response must begin by either Yes or No.";
-            var res = await GenerateTaskRes(query, 1024, true, false);
+            var res = await GenerateTaskRes(query, 1024, true, false).ConfigureAwait(false);
             var s = res.ToLowerInvariant().Replace(" ", string.Empty);
             return s.StartsWith("yes");
         }
@@ -284,7 +284,7 @@ namespace AIToolkit.Files
             {
                 query += " The summary should be 1 to 2 paragraphs long.";
             }
-            return await GenerateTaskRes(query, 1024, true, false);
+            return await GenerateTaskRes(query, 1024, true, false).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -308,7 +308,7 @@ namespace AIToolkit.Files
             if (temp > 0.5f)
                 temp = 0.5f;
             var genparam = promptBuilder.PromptToQuery(AuthorRole.Assistant, temp, replyln);
-            var finalstr = await LLMSystem.SimpleQuery(genparam);
+            var finalstr = await LLMSystem.SimpleQuery(genparam).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
             finalstr = finalstr.Replace("\"", "").Trim();
@@ -364,7 +364,7 @@ namespace AIToolkit.Files
             promptbuild.AddMessage(AuthorRole.User, requestedTask);
 
             var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.5) ? 0.5 : LLMSystem.Sampler.Temperature, replyln);
-            var finalstr = await LLMSystem.SimpleQuery(ct);
+            var finalstr = await LLMSystem.SimpleQuery(ct).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
             {
                 finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);

@@ -24,17 +24,17 @@ public class MyCustomChatSession : ChatSession
 
     public override async Task UpdateSession()
     {
-        await base.UpdateSession(); // Always call base implementation
+        await base.UpdateSession().ConfigureAwait(false); // Always call base implementation
         
         // Add your custom logic
-        CustomMoodAnalysis = await AnalyzeConversationMood();
-        CustomTags = await GenerateCustomTags();
+        CustomMoodAnalysis = await AnalyzeConversationMood().ConfigureAwait(false);
+        CustomTags = await GenerateCustomTags().ConfigureAwait(false);
     }
 
     private async Task<string> AnalyzeConversationMood()
     {
         var query = "Analyze the overall mood of this conversation in one word.";
-        return await GenerateTaskRes(query, 50, true, false);
+        return await GenerateTaskRes(query, 50, true, false).ConfigureAwait(false);
     }
 }
 ```

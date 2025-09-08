@@ -178,7 +178,7 @@ namespace AIToolkit.LLM
 
         internal static async Task<ModelSlotGuard> AcquireModelSlotAsync(CancellationToken ct)
         {
-            await ModelSemaphore.WaitAsync(ct);
+            await ModelSemaphore.WaitAsync(ct).ConfigureAwait(false);
             return new ModelSlotGuard();
         }
 
@@ -247,7 +247,7 @@ namespace AIToolkit.LLM
         {
             if (Client == null)
                 return false;
-            return await Client.CheckBackend();
+            return await Client.CheckBackend().ConfigureAwait(false);
         }
 
         /// <summary>
@@ -265,9 +265,9 @@ namespace AIToolkit.LLM
             }
             try
             {
-                MaxContextLength = await Client.GetMaxContextLength();
-                CurrentModel = await Client.GetModelInfo();
-                Backend = await Client.GetBackendInfo();
+                MaxContextLength = await Client.GetMaxContextLength().ConfigureAwait(false);
+                CurrentModel = await Client.GetModelInfo().ConfigureAwait(false);
+                Backend = await Client.GetBackendInfo().ConfigureAwait(false);
                 Status = SystemStatus.Ready;
             }
             catch (Exception ex)
@@ -292,7 +292,7 @@ namespace AIToolkit.LLM
         {
             if (Status == SystemStatus.Busy)
                 return;
-            await StartGeneration(AuthorRole.Assistant, string.Empty);
+            await StartGeneration(AuthorRole.Assistant, string.Empty).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -304,7 +304,7 @@ namespace AIToolkit.LLM
         {
             if (Status == SystemStatus.Busy)
                 return;
-            await StartGeneration(AuthorRole.User, string.Empty);
+            await StartGeneration(AuthorRole.User, string.Empty).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -317,7 +317,7 @@ namespace AIToolkit.LLM
         {
             if (Status == SystemStatus.Busy)
                 return;
-            await StartGeneration(message.Role, message.Message, message.Guid);
+            await StartGeneration(message.Role, message.Message, message.Guid).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -331,7 +331,7 @@ namespace AIToolkit.LLM
         {
             if (Status == SystemStatus.Busy)
                 return;
-            await StartGeneration(role, message);
+            await StartGeneration(role, message).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -346,11 +346,11 @@ namespace AIToolkit.LLM
             History.RemoveLast();
             if (PromptBuilder.Count == 0)
             {
-                await StartGeneration(AuthorRole.Assistant, string.Empty);
+                await StartGeneration(AuthorRole.Assistant, string.Empty).ConfigureAwait(false);
             }
             else
             {
-                using var _ = await AcquireModelSlotAsync(CancellationToken.None);
+                using var _ = await AcquireModelSlotAsync(CancellationToken.None).ConfigureAwait(false);
                 if (Status == SystemStatus.Busy)
                     return;
                 Status = SystemStatus.Busy;
@@ -360,7 +360,7 @@ namespace AIToolkit.LLM
                     RaiseOnInferenceStreamed(StreamingTextProgress);
                 }
                 RaiseOnFullPromptReady(PromptBuilder.PromptToText());
-                await Client.GenerateTextStreaming(PromptBuilder.PromptToQuery(AuthorRole.Assistant));
+                await Client.GenerateTextStreaming(PromptBuilder.PromptToQuery(AuthorRole.Assistant)).ConfigureAwait(false);
             }
         }
 
@@ -397,10 +397,10 @@ namespace AIToolkit.LLM
         {
             if (Client == null)
                 return string.Empty;
-            using var _ = await AcquireModelSlotAsync(CancellationToken.None);
+            using var _ = await AcquireModelSlotAsync(CancellationToken.None).ConfigureAwait(false);
             var oldst = status;
             Status = SystemStatus.Busy;
-            var result = await Client.GenerateText(chatlog);
+            var result = await Client.GenerateText(chatlog).ConfigureAwait(false);
             Status = oldst;
             RaiseOnQuickInferenceEnded(result);
             return string.IsNullOrEmpty(result) ? string.Empty : result;
@@ -416,17 +416,17 @@ namespace AIToolkit.LLM
         {
             if (Client == null)
                 return string.Empty;
-            using var _ = await AcquireModelSlotAsync(ct);
+            using var _ = await AcquireModelSlotAsync(ct).ConfigureAwait(false);
             if (Status == SystemStatus.Busy)
                 return string.Empty;
 
             var inputText = systemMessage;
             StreamingTextProgress = Instruct.GetThinkPrefill();
-            var genparams = await GenerateFullPrompt(AuthorRole.System, inputText, null, 0);
+            var genparams = await GenerateFullPrompt(AuthorRole.System, inputText, null, 0).ConfigureAwait(false);
             if (!string.IsNullOrEmpty(systemMessage) && logSystemPrompt)
                 Bot.History.LogMessage(AuthorRole.System, systemMessage, User, Bot);
             Status = SystemStatus.Busy;
-            var result = await Client.GenerateText(genparams);
+            var result = await Client.GenerateText(genparams).ConfigureAwait(false);
             Status = SystemStatus.Ready;
             return string.IsNullOrEmpty(result) ? string.Empty : result;
         }
@@ -607,7 +607,7 @@ namespace AIToolkit.LLM
         {
             if (Client == null || !SupportsWebSearch)
                 return [];
-            var res = await Client.WebSearch(query);
+            var res = await Client.WebSearch(query).ConfigureAwait(false);
             var webres = JsonConvert.DeserializeObject<List<EnrichedSearchResult>>(res);
             if (webres is null)
             {
@@ -632,7 +632,7 @@ namespace AIToolkit.LLM
                 logger?.LogError("TTS is not supported by the current backend.");
                 return [];
             }
-            var audioData = await Client.TextToSpeech(input, voiceID);
+            var audioData = await Client.TextToSpeech(input, voiceID).ConfigureAwait(false);
             return audioData;
         }
 
@@ -847,7 +847,7 @@ namespace AIToolkit.LLM
             var searchmessage = string.IsNullOrWhiteSpace(newMessage) ? History.GetLastUserMessageContent() : newMessage;
             if (RAGSystem.Enabled)
             {
-                var search = await RAGSystem.Search(ReplaceMacros(searchmessage));
+                var search = await RAGSystem.Search(ReplaceMacros(searchmessage)).ConfigureAwait(false);
                 search.RemoveAll(search => usedGuidInSession.Contains(search.session.Guid));
                 dataInserts.AddMemories(search);
             }
@@ -926,7 +926,7 @@ namespace AIToolkit.LLM
             }
 
             // update the RAG, world info, and summary stuff
-            await UpdateRagAndInserts(newMessage);
+            await UpdateRagAndInserts(newMessage).ConfigureAwait(false);
             // Prepare the full system prompt and count the tokens used
             var rawprompt = GenerateSystemPromptContent(newMessage);
             availtokens -= PromptBuilder.AddMessage(AuthorRole.SysPrompt, rawprompt);
@@ -981,7 +981,7 @@ namespace AIToolkit.LLM
                     continue;
                 // Plugins may call LLMSystem.SimpleQuery here. We are intentionally NOT
                 // holding the model semaphore yet to avoid re-entrancy deadlocks.
-                var plugres = await ctxplug.ReplaceUserInput(ReplaceMacros(lastuserinput));
+                var plugres = await ctxplug.ReplaceUserInput(ReplaceMacros(lastuserinput)).ConfigureAwait(false);
                 if (plugres.IsHandled && !string.IsNullOrEmpty(plugres.Response))
                 {
                     if (plugres.Replace)
@@ -1006,7 +1006,7 @@ namespace AIToolkit.LLM
 
             // Plugin pre-pass OUTSIDE the model slot to avoid deadlocks
             var lastuserinput = string.IsNullOrEmpty(userInput) ? History.GetLastUserMessageContent() : userInput;
-            var pluginmessage = await BuildPluginSystemInsertAsync(lastuserinput);
+            var pluginmessage = await BuildPluginSystemInsertAsync(lastuserinput).ConfigureAwait(false);
 
             // build the message if relevant
             SingleMessage? singlemsg = null;
@@ -1020,14 +1020,14 @@ namespace AIToolkit.LLM
             // call the brain if there's no plugin interfering
             if (singlemsg is not null && string.IsNullOrEmpty(pluginmessage))
             {
-                await Bot.Brain.HandleMessages(singlemsg!);
+                await Bot.Brain.HandleMessages(singlemsg!).ConfigureAwait(false);
             }
 
-            using var _ = await AcquireModelSlotAsync(CancellationToken.None);
+            using var _ = await AcquireModelSlotAsync(CancellationToken.None).ConfigureAwait(false);
             Status = SystemStatus.Busy;
 
             var inputText = userInput;
-            var genparams = await GenerateFullPrompt(MsgSender, inputText, pluginmessage, vlm_pictures.Count > 0 ? vlm_pictures.Count * 1024 : 0);
+            var genparams = await GenerateFullPrompt(MsgSender, inputText, pluginmessage, vlm_pictures.Count > 0 ? vlm_pictures.Count * 1024 : 0).ConfigureAwait(false);
 
             StreamingTextProgress = Instruct.GetThinkPrefill();
             if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
@@ -1041,7 +1041,7 @@ namespace AIToolkit.LLM
             }
 
             RaiseOnFullPromptReady(PromptBuilder.PromptToText());
-            await Client.GenerateTextStreaming(genparams);
+            await Client.GenerateTextStreaming(genparams).ConfigureAwait(false);
         }
 
         #endregion

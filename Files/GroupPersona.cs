@@ -119,10 +119,8 @@ namespace AIToolkit.Files
         /// <param name="uniqueName">The unique name of the persona to set as current.</param>
         public void SetCurrentBot(string uniqueName)
         {
-            var persona = BotPersonas.FirstOrDefault(p => p.UniqueName == uniqueName);
-            if (persona == null)
+            var persona = BotPersonas.FirstOrDefault(p => p.UniqueName == uniqueName) ?? 
                 throw new ArgumentException($"No persona found with unique name: {uniqueName}");
-
             SetCurrentBot(persona);
         }
 
@@ -246,21 +244,21 @@ namespace AIToolkit.Files
         /// Override EndChat to properly save all bot personas in the group.
         /// </summary>
         /// <param name="backup">Whether to create backup files.</param>
-        public override async Task EndChat(bool backup = false)
+        public override void EndChat(bool backup = false)
         {
             // Save current bot ID for restoration
             CurrentBotId = CurrentBot?.UniqueName ?? string.Empty;
             
             // Ensure BotPersonaNames is synchronized with BotPersonas
-            BotPersonaNames = BotPersonas.Select(p => p.UniqueName).ToList();
+            BotPersonaNames = [.. BotPersonas.Select(p => p.UniqueName)];
             
             // End chat for all bot personas
             foreach (var persona in BotPersonas)
             {
-                await persona.EndChat(backup);
+                persona.EndChat(backup);
             }
             
-            await base.EndChat(backup);
+            base.EndChat(backup);
         }
     }
 }
