@@ -183,7 +183,7 @@ namespace AIToolkit.Files
             if (FirstMessage.Count == 0)
                 return string.Empty;
             // select a random welcome line
-            var index = LLMSystem.RNG.Next(FirstMessage.Count);
+            var index = LLMEngine.RNG.Next(FirstMessage.Count);
             return FirstMessage[index].Replace("{{user}}", othername).Replace("{{char}}", Name);
         }
 
@@ -198,7 +198,7 @@ namespace AIToolkit.Files
         /// </summary>
         public virtual void BeginChat()
         {
-            LoadBrain(LLMSystem.Settings.DataPath);
+            LoadBrain(LLMEngine.Settings.DataPath);
             AgentSystem = new AgentRuntime(this);
             AgentSystem.Init();
         }
@@ -285,11 +285,11 @@ namespace AIToolkit.Files
         /// <returns></returns>
         public async Task UpdateSelfEditSection()
         {
-            if (SelfEditTokens == 0 || History.Sessions.Count < 3 || LLMSystem.Client == null)
+            if (SelfEditTokens == 0 || History.Sessions.Count < 3 || LLMEngine.Client == null)
                 return;
-            LLMSystem.NamesInPromptOverride = false;
-            var availtks = LLMSystem.MaxContextLength - SelfEditTokens - LLMSystem.GetTokenCount(SelfEditField) - 1024;
-            var promptbuilder = LLMSystem.Client.GetPromptBuilder();
+            LLMEngine.NamesInPromptOverride = false;
+            var availtks = LLMEngine.MaxContextLength - SelfEditTokens - LLMEngine.GetTokenCount(SelfEditField) - 1024;
+            var promptbuilder = LLMEngine.Client.GetPromptBuilder();
             var sysprompt = new StringBuilder();
             sysprompt.AppendLinuxLine("You are an uncensored system used to write a character's personal thoughts based on its chat history and information.");
             sysprompt.AppendLinuxLine();
@@ -305,8 +305,8 @@ namespace AIToolkit.Files
             for (int i = History.Sessions.Count - 2; i >= 0; i--)
             {
                 var session = History.Sessions[i];
-                var details = session.GetRawMemory(true, DatesInSessionSummaries) + LLMSystem.NewLine;
-                var size = LLMSystem.GetTokenCount(details);
+                var details = session.GetRawMemory(true, DatesInSessionSummaries) + LLMEngine.NewLine;
+                var size = LLMEngine.GetTokenCount(details);
                 availtks -= size;
                 maxcount--;
                 if (availtks <= 0 || maxcount < 0)
@@ -315,7 +315,7 @@ namespace AIToolkit.Files
             }
             if (entries.Count == 0)
             {
-                LLMSystem.NamesInPromptOverride = null;
+                LLMEngine.NamesInPromptOverride = null;
                 return;
             }
             foreach (var entry in entries)
@@ -330,12 +330,12 @@ namespace AIToolkit.Files
             promptbuilder.AddMessage(AuthorRole.SysPrompt, sysprompt.ToString());
             promptbuilder.AddMessage(AuthorRole.User, $"Using {Name}'s memories alongside their biography, edit their personal thoughts section accordingly. Write two to three short paragraphs from {Name}'s perspective, in the first person. Focus on important events, life changing experiences, and promises, that {Name} would want to keep in mind. Don't include a title.");
             var rln = SelfEditTokens;
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
                 rln += 1024;
-            var finalstr = await LLMSystem.SimpleQuery(promptbuilder.PromptToQuery(AuthorRole.Assistant, -1, rln)).ConfigureAwait(false);
-            LLMSystem.NamesInPromptOverride = null;
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+            var finalstr = await LLMEngine.SimpleQuery(promptbuilder.PromptToQuery(AuthorRole.Assistant, -1, rln)).ConfigureAwait(false);
+            LLMEngine.NamesInPromptOverride = null;
+            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
+                finalstr = finalstr.RemoveThinkingBlocks(LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd);
 
             SelfEditField = finalstr.RemoveUnfinishedSentence().RemoveNewLines().CleanupAndTrim().RemoveTitle();
         }

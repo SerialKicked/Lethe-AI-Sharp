@@ -34,7 +34,7 @@ namespace AIToolkit.Files.Tests
             };
 
             // Set up LLMSystem.LoadedPersonas for the test
-            LLMSystem.LoadPersona(new List<BasePersona> { alice, bob });
+            LLMEngine.LoadPersona(new List<BasePersona> { alice, bob });
 
             // Create group persona
             var groupPersona = new GroupPersona
@@ -210,7 +210,7 @@ namespace AIToolkit.Files.Tests
 
             // Test macro replacement with group context
             var testString = "Current character: {{char}}, Group: {{group}}, Current bio: {{charbio}}";
-            var result = LLMSystem.ReplaceMacros(testString, user, groupPersona);
+            var result = LLMEngine.ReplaceMacros(testString, user, groupPersona);
 
             // Should use Alice as current character
             if (!result.Contains("Current character: Alice"))
@@ -221,7 +221,7 @@ namespace AIToolkit.Files.Tests
 
             // Test switching current bot affects macros
             groupPersona.SetCurrentBot("bob_bot");
-            var result2 = LLMSystem.ReplaceMacros(testString, user, groupPersona);
+            var result2 = LLMEngine.ReplaceMacros(testString, user, groupPersona);
 
             if (!result2.Contains("Current character: Bob"))
                 throw new Exception("{{char}} should resolve to current bot (Bob) after switching");
@@ -235,8 +235,8 @@ namespace AIToolkit.Files.Tests
         public static void TestLLMSystemGroupSupport()
         {
             // Save original bot to restore later
-            var originalBot = LLMSystem.Bot;
-            var originalUser = LLMSystem.User;
+            var originalBot = LLMEngine.Bot;
+            var originalUser = LLMEngine.User;
 
             try
             {
@@ -275,30 +275,30 @@ namespace AIToolkit.Files.Tests
                 groupPersona.AddBotPersona(bob);
 
                 // Set up LLMSystem
-                LLMSystem.User = user;
-                LLMSystem.Bot = groupPersona;
+                LLMEngine.User = user;
+                LLMEngine.Bot = groupPersona;
 
                 // Test group detection
-                if (!LLMSystem.IsGroupConversation)
+                if (!LLMEngine.IsGroupConversation)
                     throw new Exception("LLMSystem should detect group conversation");
 
-                var detectedGroup = LLMSystem.GetGroupPersona();
+                var detectedGroup = LLMEngine.GetGroupPersona();
                 if (detectedGroup == null)
                     throw new Exception("Should be able to get group persona from LLMSystem");
 
                 // Test getting group bots
-                var groupBots = LLMSystem.GetGroupBots();
+                var groupBots = LLMEngine.GetGroupBots();
                 if (groupBots.Count != 2)
                     throw new Exception("Should return 2 group bots");
 
                 // Test current bot management
-                var currentBot = LLMSystem.GetCurrentGroupBot();
+                var currentBot = LLMEngine.GetCurrentGroupBot();
                 if (currentBot?.Name != "Alice")
                     throw new Exception("Current group bot should be Alice");
 
                 // Test switching current bot
-                LLMSystem.SetCurrentGroupBot("bob_bot");
-                currentBot = LLMSystem.GetCurrentGroupBot();
+                LLMEngine.SetCurrentGroupBot("bob_bot");
+                currentBot = LLMEngine.GetCurrentGroupBot();
                 if (currentBot?.Name != "Bob")
                     throw new Exception("Current group bot should be Bob after switching");
 
@@ -307,8 +307,8 @@ namespace AIToolkit.Files.Tests
             finally
             {
                 // Restore original state
-                LLMSystem.Bot = originalBot;
-                LLMSystem.User = originalUser;
+                LLMEngine.Bot = originalBot;
+                LLMEngine.User = originalUser;
             }
         }
 
@@ -317,8 +317,8 @@ namespace AIToolkit.Files.Tests
         /// </summary>
         public static void TestBrainDisableInGroupChat()
         {
-            var originalBot = LLMSystem.Bot;
-            var originalUser = LLMSystem.User;
+            var originalBot = LLMEngine.Bot;
+            var originalUser = LLMEngine.User;
 
             try
             {
@@ -339,10 +339,10 @@ namespace AIToolkit.Files.Tests
                 };
 
                 // Test regular bot first (Brain should work)
-                LLMSystem.User = user;
-                LLMSystem.Bot = alice;
+                LLMEngine.User = user;
+                LLMEngine.Bot = alice;
                 
-                if (LLMSystem.IsGroupConversation)
+                if (LLMEngine.IsGroupConversation)
                     throw new Exception("Single bot should not be detected as group conversation");
 
                 // Test with group (Brain should be disabled)
@@ -353,9 +353,9 @@ namespace AIToolkit.Files.Tests
                 };
 
                 groupPersona.AddBotPersona(alice);
-                LLMSystem.Bot = groupPersona;
+                LLMEngine.Bot = groupPersona;
 
-                if (!LLMSystem.IsGroupConversation)
+                if (!LLMEngine.IsGroupConversation)
                     throw new Exception("Group should be detected as group conversation");
 
                 // Test Brain functionality (OnUserPost should exit early for group chats)
@@ -367,8 +367,8 @@ namespace AIToolkit.Files.Tests
             finally
             {
                 // Restore original state
-                LLMSystem.Bot = originalBot;
-                LLMSystem.User = originalUser;
+                LLMEngine.Bot = originalBot;
+                LLMEngine.User = originalUser;
             }
         }
 

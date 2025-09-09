@@ -58,7 +58,7 @@ namespace AIToolkit.Agent
             while (_running && !_cts.Token.IsCancellationRequested)
             {
                 // don't do anything if not in agent mode, or if user was active recently
-                if (!Owner.AgentMode || (DateTime.Now - _lastuseractivity) < Config.MinInactivityTime || LLMSystem.Status == SystemStatus.NotInit)
+                if (!Owner.AgentMode || (DateTime.Now - _lastuseractivity) < Config.MinInactivityTime || LLMEngine.Status == SystemStatus.NotInit)
                 {
                     await Task.Delay(1000, _cts.Token).ConfigureAwait(false);
                     continue;
@@ -84,7 +84,7 @@ namespace AIToolkit.Agent
                     }
                     catch (Exception ex)
                     {
-                        LLMSystem.Logger?.LogError(ex, "Error in plugin {PluginId}: {ex}", plugin.Id, ex.Message);
+                        LLMEngine.Logger?.LogError(ex, "Error in plugin {PluginId}: {ex}", plugin.Id, ex.Message);
                     }
                     await Task.Delay(1000, _cts.Token).ConfigureAwait(false);
                     if (!_running || _cts.Token.IsCancellationRequested)
@@ -157,7 +157,7 @@ namespace AIToolkit.Agent
             if (string.IsNullOrEmpty(Owner.UniqueName))
                 return;
             // if path doesn't have a trailing slash, add one
-            var selpath = LLMSystem.Settings.DataPath;
+            var selpath = LLMEngine.Settings.DataPath;
             if (!selpath.EndsWith('/') && !selpath.EndsWith('\\'))
                 selpath += Path.DirectorySeparatorChar;
 
@@ -174,7 +174,7 @@ namespace AIToolkit.Agent
             if (string.IsNullOrEmpty(Owner.UniqueName))
                 return;
             // if path doesn't have a trailing slash, add one
-            var selpath = LLMSystem.Settings.DataPath;
+            var selpath = LLMEngine.Settings.DataPath;
             if (!selpath.EndsWith('/') && !selpath.EndsWith('\\'))
                 selpath += Path.DirectorySeparatorChar;
             var filepath = selpath + Owner.UniqueName + ".agent";
@@ -189,7 +189,7 @@ namespace AIToolkit.Agent
             }
             catch (Exception ex)
             {
-                LLMSystem.Logger?.LogError(ex, "Failed to load agent config for {UniqueName}: {ex}", Owner.UniqueName, ex.Message);
+                LLMEngine.Logger?.LogError(ex, "Failed to load agent config for {UniqueName}: {ex}", Owner.UniqueName, ex.Message);
             }
         }
 

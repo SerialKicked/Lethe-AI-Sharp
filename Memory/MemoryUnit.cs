@@ -93,7 +93,7 @@ namespace AIToolkit.Memory
 
         public virtual async Task EmbedText()
         {
-            if (!RAGSystem.Enabled)
+            if (!RAGEngine.Enabled)
                 return;
             var mixedcat = new HashSet<MemoryType>() 
             { 
@@ -101,12 +101,12 @@ namespace AIToolkit.Memory
             };
             if (!mixedcat.Contains(Category))
             {
-                EmbedSummary = await RAGSystem.EmbeddingText(LLMSystem.ReplaceMacros(Content)).ConfigureAwait(false);
+                EmbedSummary = await RAGEngine.EmbeddingText(LLMEngine.ReplaceMacros(Content)).ConfigureAwait(false);
                 return;
             }
-            var titleembed = await RAGSystem.EmbeddingText(Name).ConfigureAwait(false);
-            var sumembed = await RAGSystem.EmbeddingText(LLMSystem.ReplaceMacros(Content)).ConfigureAwait(false);
-            EmbedSummary = RAGSystem.MergeEmbeddings(titleembed, sumembed);
+            var titleembed = await RAGEngine.EmbeddingText(Name).ConfigureAwait(false);
+            var sumembed = await RAGEngine.EmbeddingText(LLMEngine.ReplaceMacros(Content)).ConfigureAwait(false);
+            EmbedSummary = RAGEngine.MergeEmbeddings(titleembed, sumembed);
         }
 
         /// <summary>

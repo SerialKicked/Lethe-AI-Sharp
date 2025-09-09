@@ -12,7 +12,7 @@ namespace AIToolkit.LLM
     /// <summary>
     /// Basic RNG for the SmallWorld implementation (not thread safe)
     /// </summary>
-    class RNGPlus : IProvideRandomValues
+    internal class RNGPlus : IProvideRandomValues
     {
         private readonly Random RNG = new();
         public bool IsThreadSafe => false;
@@ -28,7 +28,7 @@ namespace AIToolkit.LLM
     /// <summary>
     /// Thread-safe RNG for the SmallWorld implementation
     /// </summary>
-    class ThreadSafeRNG : IProvideRandomValues
+    internal class ThreadSafeRNG : IProvideRandomValues
     {
         private readonly ThreadLocal<Random> threadLocalRandom = new(() => new Random(Interlocked.Increment(ref seed)));
         private static int seed = Environment.TickCount;
@@ -58,7 +58,7 @@ namespace AIToolkit.LLM
     /// Retrieval Augmented Generation System
     /// 
     /// </summary>
-    public static class RAGSystem
+    public static class RAGEngine
     {
         /// <summary> Called when the system embedded a session </summary>
         public static event EventHandler<Files.ChatSession>? OnEmbedSession;
@@ -68,11 +68,11 @@ namespace AIToolkit.LLM
         /// <summary> Toggle RAG functionalities on/off </summary>
         public static bool Enabled
         {
-            get => LLMSystem.Settings.RAGEnabled;
+            get => LLMEngine.Settings.RAGEnabled;
             set
             {
-                LLMSystem.Settings.RAGEnabled = value;
-                if (!LLMSystem.Settings.RAGEnabled)
+                LLMEngine.Settings.RAGEnabled = value;
+                if (!LLMEngine.Settings.RAGEnabled)
                     UnloadEmbedder();
             }
         }
@@ -91,17 +91,17 @@ namespace AIToolkit.LLM
             if (!Enabled)
                 return;
             ResetVectorDB();
-            if (LLMSystem.History != null)
-                VectorizeChatBot(LLMSystem.Bot);
+            if (LLMEngine.History != null)
+                VectorizeChatBot(LLMEngine.Bot);
         }
 
         private static void ResetVectorDB()
         {
             var parameters = new SmallWorld<float[], float>.Parameters()
             {
-                M = LLMSystem.Settings.RAGMValue,
-                LevelLambda = 1 / Math.Log(LLMSystem.Settings.RAGMValue),
-                NeighbourHeuristic = LLMSystem.Settings.RAGHeuristic,
+                M = LLMEngine.Settings.RAGMValue,
+                LevelLambda = 1 / Math.Log(LLMEngine.Settings.RAGMValue),
+                NeighbourHeuristic = LLMEngine.Settings.RAGHeuristic,
             };
             VectorDB = new SmallWorld<float[], float>(Vector.IsHardwareAccelerated ? CosineDistance.SIMDForUnits : CosineDistance.ForUnits, new RNGPlus(), parameters, false);
             IsVectorDBLoaded = false;
@@ -115,13 +115,13 @@ namespace AIToolkit.LLM
         {
             if (EmbedSettings != null)
                 UnloadEmbedder();
-            if (!File.Exists(LLMSystem.Settings.RAGModelPath))
+            if (!File.Exists(LLMEngine.Settings.RAGModelPath))
             {
                 EmbedSettings = null;
                 Enabled = false;
-                throw new FileNotFoundException("Embedding model not found: " + LLMSystem.Settings.RAGModelPath);
+                throw new FileNotFoundException("Embedding model not found: " + LLMEngine.Settings.RAGModelPath);
             }
-            EmbedSettings = new ModelParams(LLMSystem.Settings.RAGModelPath)
+            EmbedSettings = new ModelParams(LLMEngine.Settings.RAGModelPath)
             { 
                 GpuLayerCount = 255,
                 Embeddings = true
@@ -176,8 +176,8 @@ namespace AIToolkit.LLM
                 return [];
             var embed = Embedder ?? LoadEmbedder();
             var emb = textToEmbed;
-            if (emb.Length > LLMSystem.Settings.RAGEmbeddingSize)
-                emb = emb[..LLMSystem.Settings.RAGEmbeddingSize];
+            if (emb.Length > LLMEngine.Settings.RAGEmbeddingSize)
+                emb = emb[..LLMEngine.Settings.RAGEmbeddingSize];
             var tsk = await embed.GetEmbeddings(emb).ConfigureAwait(false);
             return tsk[0].EuclideanNormalization();
         }
@@ -205,7 +205,7 @@ namespace AIToolkit.LLM
                 currentID++;
             }
 
-            foreach (var doc in LLMSystem.Bot.Brain.Memories)
+            foreach (var doc in LLMEngine.Bot.Brain.Memories)
             {
                 if (doc.EmbedSummary.Length == 0 || doc.Insertion != Memory.MemoryInsertion.Trigger)
                     continue;
@@ -245,7 +245,7 @@ namespace AIToolkit.LLM
                 return [];
             if (!IsVectorDBLoaded || VectorDB == null || VectorDBCount == 0)
             {
-                VectorizeChatBot(LLMSystem.Bot);
+                VectorizeChatBot(LLMEngine.Bot);
             }
             // Check if message contains the words RP or roleplay
             var RPCheck = message.Contains(" RP", StringComparison.OrdinalIgnoreCase) || message.Contains(" roleplay", StringComparison.OrdinalIgnoreCase);
@@ -253,7 +253,7 @@ namespace AIToolkit.LLM
             var emb = await EmbeddingText(message.ConvertToThirdPerson()).ConfigureAwait(false);
             var subcount = maxRes + 1;
             // If we have both titles and summaries double result count to get a better picture
-            if (LLMSystem.Settings.AllowWorldInfo)
+            if (LLMEngine.Settings.AllowWorldInfo)
                 subcount += 2;
             var res = Search(emb, subcount);
 
@@ -261,7 +261,7 @@ namespace AIToolkit.LLM
             {
                 if (item.Category == EmbedType.Session)
                 {
-                    var found = LLMSystem.History.GetSessionByID(item.ID);
+                    var found = LLMEngine.History.GetSessionByID(item.ID);
                     if (found != null && found.MetaData.IsRoleplaySession)
                     {
                         if (RPCheck)
@@ -283,19 +283,19 @@ namespace AIToolkit.LLM
                     continue;
                 if (item.Category == EmbedType.WorldInfo)
                 {
-                    var found = LLMSystem.Bot.GetWIEntryByGUID(item.ID);
+                    var found = LLMEngine.Bot.GetWIEntryByGUID(item.ID);
                     if (found != null)
                         list.Add((found, item.Category, item.Distance));
                 }
                 else if (item.Category == EmbedType.Brain)
                 {
-                    var found = LLMSystem.Bot.Brain.GetEmbedByID(item.ID);
+                    var found = LLMEngine.Bot.Brain.GetEmbedByID(item.ID);
                     if (found != null)
                         list.Add((found, item.Category, item.Distance));
                 }
                 else
                 {
-                    var found = LLMSystem.History.GetSessionByID(item.ID);
+                    var found = LLMEngine.History.GetSessionByID(item.ID);
                     if (found != null)
                         list.Add((found, item.Category, item.Distance));
                 }
@@ -305,12 +305,12 @@ namespace AIToolkit.LLM
 
         public static async Task<List<(IEmbed session, EmbedType category, float distance)>> Search(string message)
         {
-            return await Search(message, LLMSystem.Settings.RAGMaxEntries, LLMSystem.Settings.RAGDistanceCutOff).ConfigureAwait(false);
+            return await Search(message, LLMEngine.Settings.RAGMaxEntries, LLMEngine.Settings.RAGDistanceCutOff).ConfigureAwait(false);
         }
 
         private static List<VectorSearchResult> Search(float[] message, int count)
         {
-            LLMSystem.Logger?.LogInformation("LTM Size: {size} out of {logsize}", VectorDBCount.ToString(), LLMSystem.History.Sessions.Count.ToString());
+            LLMEngine.Logger?.LogInformation("LTM Size: {size} out of {logsize}", VectorDBCount.ToString(), LLMEngine.History.Sessions.Count.ToString());
             if (!IsVectorDBLoaded || VectorDBCount == 0)
                 return [];
             var found = VectorDB.KNNSearch(message, count);
@@ -318,7 +318,7 @@ namespace AIToolkit.LLM
             foreach (var item in found)
             {
                 res.Add(new VectorSearchResult(LookupDB[item.Id].ID, LookupDB[item.Id].embedType, item.Distance));
-                LLMSystem.Logger?.LogInformation("LTM Found: {id} ({distance})", item.Id.ToString(), item.Distance.ToString());
+                LLMEngine.Logger?.LogInformation("LTM Found: {id} ({distance})", item.Id.ToString(), item.Distance.ToString());
             }
             res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
             return res;

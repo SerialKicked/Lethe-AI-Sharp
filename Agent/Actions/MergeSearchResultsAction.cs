@@ -26,24 +26,24 @@ namespace AIToolkit.Agent.Actions
             if (ct.IsCancellationRequested)
                 return string.Empty;
 
-            LLMSystem.NamesInPromptOverride = false;
-            var fullprompt = BuildMergerPrompt(param.Context, param.Topic, param.Reason, param.Results).PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.75) ? 0.75 : LLMSystem.Sampler.Temperature, 1024);
-            var response = await LLMSystem.SimpleQuery(fullprompt).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+            LLMEngine.NamesInPromptOverride = false;
+            var fullprompt = BuildMergerPrompt(param.Context, param.Topic, param.Reason, param.Results).PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, 1024);
+            var response = await LLMEngine.SimpleQuery(fullprompt).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
             {
-                response = response.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+                response = response.RemoveThinkingBlocks(LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd);
             }
             response = response.RemoveUnfinishedSentence();
-            LLMSystem.Logger?.LogInformation("WebSearch Plugin Result: {output}", response);
-            LLMSystem.NamesInPromptOverride = null;
+            LLMEngine.Logger?.LogInformation("WebSearch Plugin Result: {output}", response);
+            LLMEngine.NamesInPromptOverride = null;
             return response;
         }
 
         private static IPromptBuilder BuildMergerPrompt(string summary, string topic, string reason, List<EnrichedSearchResult> webresults)
         {
-            var builder = LLMSystem.Client!.GetPromptBuilder();
+            var builder = LLMEngine.Client!.GetPromptBuilder();
             var prompt = new StringBuilder();
-            prompt.AppendLinuxLine($"You are {LLMSystem.Bot.Name} and your goal is to analyze and merge information from the following documents regarding the subject of '{topic}'. This topic was made relevant during this chat session.");
+            prompt.AppendLinuxLine($"You are {LLMEngine.Bot.Name} and your goal is to analyze and merge information from the following documents regarding the subject of '{topic}'. This topic was made relevant during this chat session.");
             prompt.AppendLinuxLine();
             prompt.AppendLinuxLine($"# Chat Session");
             prompt.AppendLinuxLine();
@@ -56,7 +56,7 @@ namespace AIToolkit.Agent.Actions
             {
                 prompt.AppendLinuxLine($"## {item.Title}").AppendLinuxLine();
                 prompt.AppendLinuxLine($"{item.Description}").AppendLinuxLine();
-                if (item.ContentExtracted && LLMSystem.GetTokenCount(item.FullContent) <= 3000)
+                if (item.ContentExtracted && LLMEngine.GetTokenCount(item.FullContent) <= 3000)
                     cnt++;
             }
             prompt.AppendLinuxLine();
@@ -66,7 +66,7 @@ namespace AIToolkit.Agent.Actions
                 for (var i = 0; i < webresults.Count; i++)
                 {
                     var item = webresults[i];
-                    var tks = LLMSystem.GetTokenCount(item.FullContent);
+                    var tks = LLMEngine.GetTokenCount(item.FullContent);
                     if (item.ContentExtracted && tks > 100 && tks <= 2500)
                     {
                         prompt.AppendLinuxLine($"## {item.Title} (Full Content)");

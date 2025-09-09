@@ -215,7 +215,7 @@ namespace AIToolkit.Files
             // Load personas from LLMSystem.LoadedPersonas based on BotPersonaNames
             foreach (var personaName in BotPersonaNames)
             {
-                if (LLMSystem.LoadedPersonas.TryGetValue(personaName, out var persona))
+                if (LLMEngine.LoadedPersonas.TryGetValue(personaName, out var persona))
                 {
                     BotPersonas.Add(persona);
                     persona.BeginChat();

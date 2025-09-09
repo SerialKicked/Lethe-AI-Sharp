@@ -63,13 +63,13 @@ space ::= | " " | "\n"{1,2} [ \t]{0,20}
 
         public override string GetQuery()
         {
-            var requestedTask = "Review the conversation log above. Identify between 1 and 3 topics or concepts that {{char}} is not familiar with. Inform your choices based on the information presented in the log and the character descriptions. Only include topics that are of interest to {{char}} and {{user}}. Respond in valid JSON using this schema:" + LLMSystem.NewLine;
+            var requestedTask = "Review the conversation log above. Identify between 1 and 3 topics or concepts that {{char}} is not familiar with. Inform your choices based on the information presented in the log and the character descriptions. Only include topics that are of interest to {{char}} and {{user}}. Respond in valid JSON using this schema:" + LLMEngine.NewLine;
             var schema = DescriptionHelper.GetAllDescriptionsRecursive<TopicLookup>();
             foreach (var prop in schema)
             {
                 requestedTask += $"- {prop.Key}: {prop.Value}\n";
             }
-            requestedTask = LLMSystem.ReplaceMacros(requestedTask);
+            requestedTask = LLMEngine.ReplaceMacros(requestedTask);
             return requestedTask;
         }
 

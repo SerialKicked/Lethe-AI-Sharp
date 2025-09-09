@@ -32,7 +32,7 @@ namespace AIToolkit.API
             _httpClient = httpclient;
             _httpClient.DefaultRequestHeaders.ConnectionClose = false;
             _httpClient.Timeout = TimeSpan.FromMinutes(2);
-            var settings = new OpenAISettings(LLMSystem.Settings.BackendUrl);
+            var settings = new OpenAISettings(LLMEngine.Settings.BackendUrl);
             API = new OpenAIClient(new OpenAIAuthentication("123"), settings, _httpClient);
         }
 
@@ -99,13 +99,13 @@ namespace AIToolkit.API
             {
                 RaiseOnStreamingResponse(new OpenTokenResponse
                 {
-                    Token = $" [Error Streaming Message: {ex.Message}] " + LLMSystem.NewLine + LLMSystem.NewLine + "This is likely an issue with the Jinja chat template used by this model. It might not support some of w(AI)fu's features or it can just be incorrect." + LLMSystem.NewLine + LLMSystem.NewLine + "You can either:" + LLMSystem.NewLine + "- Edit the Jinja chat template in your backend." + LLMSystem.NewLine + "- Use a different model." + LLMSystem.NewLine + "- Use a text completion backend like KoboldCpp.",
+                    Token = $" [Error Streaming Message: {ex.Message}] " + LLMEngine.NewLine + LLMEngine.NewLine + "This is likely an issue with the Jinja chat template used by this model. It might not support some of w(AI)fu's features or it can just be incorrect." + LLMEngine.NewLine + LLMEngine.NewLine + "You can either:" + LLMEngine.NewLine + "- Edit the Jinja chat template in your backend." + LLMEngine.NewLine + "- Use a different model." + LLMEngine.NewLine + "- Use a text completion backend like KoboldCpp.",
                     FinishReason = "error"
                 });
             }
 
             // CA2254 fix: Use a constant message template and pass cumulativeDelta as an argument
-            LLMSystem.Logger?.LogInformation("[OpenAI API] Final response: {CumulativeDelta}", cumulativeDelta);
+            LLMEngine.Logger?.LogInformation("[OpenAI API] Final response: {CumulativeDelta}", cumulativeDelta);
         }
 
         public virtual async Task<Choice> ChatCompletion(ChatRequest request, CancellationToken cancellationToken = default)

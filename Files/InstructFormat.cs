@@ -129,7 +129,7 @@ namespace AIToolkit.Files
         /// </summary>
         public bool ForceRAGToThinkingPrompt { get; set; } = false;
 
-        [JsonIgnore] private bool RealAddNameToPrompt => LLMSystem.NamesInPromptOverride ?? AddNamesToPrompt;
+        [JsonIgnore] private bool RealAddNameToPrompt => LLMEngine.NamesInPromptOverride ?? AddNamesToPrompt;
 
         public string GetThinkPrefill()
         {
@@ -138,48 +138,48 @@ namespace AIToolkit.Files
             {
                 res = ThinkingStart;
                 if (!string.IsNullOrWhiteSpace(ThinkingForcedThought))
-                    res += LLMSystem.ReplaceMacros(ThinkingForcedThought);
+                    res += LLMEngine.ReplaceMacros(ThinkingForcedThought);
 
-                if (LLMSystem.Settings.RAGMoveToThinkBlock && LLMSystem.dataInserts.Count > 0)
+                if (LLMEngine.Settings.RAGMoveToThinkBlock && LLMEngine.dataInserts.Count > 0)
                 {
-                    if (!res.EndsWith(LLMSystem.NewLine))
-                        res += LLMSystem.NewLine;
+                    if (!res.EndsWith(LLMEngine.NewLine))
+                        res += LLMEngine.NewLine;
 
-                    if (LLMSystem.Settings.DisableThinking)
+                    if (LLMEngine.Settings.DisableThinking)
                     {
                         // Better formatting to make it easier to read as it won't interfere with the thinking process
-                        res += LLMSystem.NewLine + "The following information might be relevant to the conversation:" + LLMSystem.NewLine;
-                        foreach (var insert in LLMSystem.dataInserts)
+                        res += LLMEngine.NewLine + "The following information might be relevant to the conversation:" + LLMEngine.NewLine;
+                        foreach (var insert in LLMEngine.dataInserts)
                         {
                             if (insert?.Location > -1)
                             {
-                                res += "- " + LLMSystem.ReplaceMacros(insert.Content).RemoveNewLines().CleanupAndTrim() + LLMSystem.NewLine;
+                                res += "- " + LLMEngine.ReplaceMacros(insert.Content).RemoveNewLines().CleanupAndTrim() + LLMEngine.NewLine;
                             }
                         }
-                        res += LLMSystem.NewLine;
+                        res += LLMEngine.NewLine;
                     }
                     else
                     {
                         // Raw information in paragraphs to mimick thinking, making it easier for the bot to continue from there.
-                        foreach (var insert in LLMSystem.dataInserts)
+                        foreach (var insert in LLMEngine.dataInserts)
                         {
                             if (insert?.Location > -1)
                             {
-                                res += LLMSystem.ReplaceMacros(insert.Content).RemoveNewLines().CleanupAndTrim() + LLMSystem.NewLine + LLMSystem.NewLine;
+                                res += LLMEngine.ReplaceMacros(insert.Content).RemoveNewLines().CleanupAndTrim() + LLMEngine.NewLine + LLMEngine.NewLine;
                             }
                         }
                     }
 
                 }
-                if (LLMSystem.Settings.DisableThinking)
-                    res += LLMSystem.NewLine + ThinkingEnd + LLMSystem.NewLine;
+                if (LLMEngine.Settings.DisableThinking)
+                    res += LLMEngine.NewLine + ThinkingEnd + LLMEngine.NewLine;
             }
             return res;
         }
 
         public string GetResponseStart(BasePersona bot)
         {
-            var res = LLMSystem.ReplaceMacros(BotStart);
+            var res = LLMEngine.ReplaceMacros(BotStart);
             if (RealAddNameToPrompt)
                 res += bot.Name + ":";
             if (PrefillThinking)
@@ -189,7 +189,7 @@ namespace AIToolkit.Files
 
         public string GetUserStart(BasePersona user)
         {
-            var res = LLMSystem.ReplaceMacros(UserStart);
+            var res = LLMEngine.ReplaceMacros(UserStart);
             if (RealAddNameToPrompt)
                 res += user.Name + ":";
             return res;
@@ -208,25 +208,25 @@ namespace AIToolkit.Files
             switch (role)
             {
                 case AuthorRole.Unknown:
-                    realprompt = "[" + LLMSystem.ReplaceMacros(realprompt, userName, bot) + "]";
+                    realprompt = "[" + LLMEngine.ReplaceMacros(realprompt, userName, bot) + "]";
                     break;
                 case AuthorRole.System:
-                    realprompt =  LLMSystem.ReplaceMacros(SystemStart + realprompt + SystemEnd, userName, bot) ;
+                    realprompt =  LLMEngine.ReplaceMacros(SystemStart + realprompt + SystemEnd, userName, bot) ;
                     break;
                 case AuthorRole.User:
-                    realprompt = LLMSystem.ReplaceMacros(UserStart + realprompt + UserEnd, userName, bot);
+                    realprompt = LLMEngine.ReplaceMacros(UserStart + realprompt + UserEnd, userName, bot);
                     break;
                 case AuthorRole.Assistant:
-                    realprompt = LLMSystem.ReplaceMacros(BotStart + realprompt + BotEnd, userName, bot);
+                    realprompt = LLMEngine.ReplaceMacros(BotStart + realprompt + BotEnd, userName, bot);
                     break;
                 case AuthorRole.SysPrompt:
-                    realprompt = LLMSystem.ReplaceMacros(SysPromptStart + realprompt + SysPromptEnd, userName, bot);
+                    realprompt = LLMEngine.ReplaceMacros(SysPromptStart + realprompt + SysPromptEnd, userName, bot);
                     break;
                 default:
                     break;
             }
             if (NewLinesBetweenMessages)
-                realprompt += LLMSystem.NewLine;
+                realprompt += LLMEngine.NewLine;
             return realprompt;
         }
 
@@ -247,25 +247,25 @@ namespace AIToolkit.Files
             switch (role)
             {
                 case AuthorRole.Unknown:
-                    realprompt = "[" + LLMSystem.ReplaceMacros(realprompt, user, bot) + "]";
+                    realprompt = "[" + LLMEngine.ReplaceMacros(realprompt, user, bot) + "]";
                     break;
                 case AuthorRole.System:
-                    realprompt = LLMSystem.ReplaceMacros(SystemStart + realprompt + SystemEnd, user, bot);
+                    realprompt = LLMEngine.ReplaceMacros(SystemStart + realprompt + SystemEnd, user, bot);
                     break;
                 case AuthorRole.User:
-                    realprompt = LLMSystem.ReplaceMacros(UserStart + realprompt + UserEnd, user, bot);
+                    realprompt = LLMEngine.ReplaceMacros(UserStart + realprompt + UserEnd, user, bot);
                     break;
                 case AuthorRole.Assistant:
-                    realprompt = LLMSystem.ReplaceMacros(BotStart + realprompt + BotEnd, user, bot);
+                    realprompt = LLMEngine.ReplaceMacros(BotStart + realprompt + BotEnd, user, bot);
                     break;
                 case AuthorRole.SysPrompt:
-                    realprompt = LLMSystem.ReplaceMacros(SysPromptStart + realprompt + SysPromptEnd, user, bot);
+                    realprompt = LLMEngine.ReplaceMacros(SysPromptStart + realprompt + SysPromptEnd, user, bot);
                     break;
                 default:
                     break;
             }
             if (NewLinesBetweenMessages)
-                realprompt += LLMSystem.NewLine;
+                realprompt += LLMEngine.NewLine;
             return realprompt;
         }
 
@@ -276,7 +276,7 @@ namespace AIToolkit.Files
 
         public List<string> GetStoppingStrings(BasePersona user, BasePersona bot)
         {
-            var res = string.IsNullOrEmpty(ThinkingStart) ? [LLMSystem.NewLine + user.Name + ":", LLMSystem.NewLine + bot.Name + ":"] : new List<string>();
+            var res = string.IsNullOrEmpty(ThinkingStart) ? [LLMEngine.NewLine + user.Name + ":", LLMEngine.NewLine + bot.Name + ":"] : new List<string>();
 
             if (!string.IsNullOrEmpty(BotStart))
                 res.Add(BotStart);
@@ -293,8 +293,8 @@ namespace AIToolkit.Files
             if (!string.IsNullOrEmpty(StopSequence))
                 res.Add(StopSequence);
             res.AddRange(StopStrings);
-            if (LLMSystem.Settings.StopGenerationOnFirstParagraph)
-                res.Add(LLMSystem.NewLine);
+            if (LLMEngine.Settings.StopGenerationOnFirstParagraph)
+                res.Add(LLMEngine.NewLine);
 
             // Remove duplicates from the list
             res = [.. res.Distinct()];
@@ -306,7 +306,7 @@ namespace AIToolkit.Files
         {
             if (string.IsNullOrEmpty(ThinkingStart) || string.IsNullOrEmpty(ThinkingEnd) || string.IsNullOrEmpty(prompt))
                 return false;
-            return prompt.Contains(LLMSystem.Instruct.ThinkingStart) && !prompt.Contains(LLMSystem.Instruct.ThinkingEnd);
+            return prompt.Contains(LLMEngine.Instruct.ThinkingStart) && !prompt.Contains(LLMEngine.Instruct.ThinkingEnd);
         }
     }
 }

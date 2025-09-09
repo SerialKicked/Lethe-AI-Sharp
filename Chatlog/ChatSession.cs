@@ -95,7 +95,7 @@ namespace AIToolkit.Files
             }
             EndTime = Messages.Last().Date;
 
-            if (LLMSystem.Client?.SupportsSchema == true)
+            if (LLMEngine.Client?.SupportsSchema == true)
             {
                 var meta = await GetSessionInfo().ConfigureAwait(false);
                 MetaData = meta;
@@ -130,24 +130,24 @@ namespace AIToolkit.Files
             if (string.IsNullOrWhiteSpace(grammar))
                 throw new Exception("Something went wrong when building summary grammar and json format.");
 
-            LLMSystem.NamesInPromptOverride = false;
-            var prefill = LLMSystem.Instruct.PrefillThinking;
-            LLMSystem.Instruct.PrefillThinking = false;
+            LLMEngine.NamesInPromptOverride = false;
+            var prefill = LLMEngine.Instruct.PrefillThinking;
+            LLMEngine.Instruct.PrefillThinking = false;
             var replyln = 2048;
-            var availtokens = LLMSystem.MaxContextLength - replyln - 20;
+            var availtokens = LLMEngine.MaxContextLength - replyln - 20;
 
-            var promptbuild = LLMSystem.Client!.GetPromptBuilder();
+            var promptbuild = LLMEngine.Client!.GetPromptBuilder();
 
-            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Character Information:" + LLMSystem.NewLine +
-                "## Name: {{char}}" + LLMSystem.NewLine +
-                "{{charbio}}" + LLMSystem.NewLine +
-                "## Name: {{user}}" + LLMSystem.NewLine +
-                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "# Chat Session:" + LLMSystem.NewLine +
-                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
-                "## Duration: " + StringExtensions.TimeSpanToHumanString(EndTime-StartTime) + LLMSystem.NewLine + LLMSystem.NewLine;
+            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMEngine.NewLine +
+                LLMEngine.NewLine +
+                "# Character Information:" + LLMEngine.NewLine +
+                "## Name: {{char}}" + LLMEngine.NewLine +
+                "{{charbio}}" + LLMEngine.NewLine +
+                "## Name: {{user}}" + LLMEngine.NewLine +
+                "{{userbio}}" + LLMEngine.NewLine + LLMEngine.NewLine +
+                "# Chat Session:" + LLMEngine.NewLine +
+                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMEngine.NewLine +
+                "## Duration: " + StringExtensions.TimeSpanToHumanString(EndTime-StartTime) + LLMEngine.NewLine + LLMEngine.NewLine;
 
 
             var requestedTask = session.GetQuery();
@@ -159,16 +159,16 @@ namespace AIToolkit.Files
             promptbuild.AddMessage(AuthorRole.SysPrompt, sysprompt + docs);
             promptbuild.AddMessage(AuthorRole.User, requestedTask);
 
-            var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.75) ? 0.75 : LLMSystem.Sampler.Temperature, replyln);
+            var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, replyln);
             if (ct is GenerationInput input)
             {
                 input.Grammar = grammar;
             }
-            var finalstr = await LLMSystem.SimpleQuery(ct).ConfigureAwait(false);
+            var finalstr = await LLMEngine.SimpleQuery(ct).ConfigureAwait(false);
             session = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
             session?.ClampRelevance();
-            LLMSystem.NamesInPromptOverride = null;
-            LLMSystem.Instruct.PrefillThinking = prefill;
+            LLMEngine.NamesInPromptOverride = null;
+            LLMEngine.Instruct.PrefillThinking = prefill;
             return session!;
         }
 
@@ -185,24 +185,24 @@ namespace AIToolkit.Files
             if (string.IsNullOrWhiteSpace(grammar))
                 throw new Exception("Something went wrong when building summary grammar and json format.");
 
-            LLMSystem.NamesInPromptOverride = false;
-            var prefill = LLMSystem.Instruct.PrefillThinking;
-            LLMSystem.Instruct.PrefillThinking = false;
+            LLMEngine.NamesInPromptOverride = false;
+            var prefill = LLMEngine.Instruct.PrefillThinking;
+            LLMEngine.Instruct.PrefillThinking = false;
             var replyln = 2048;
-            var availtokens = LLMSystem.MaxContextLength - replyln - 20;
+            var availtokens = LLMEngine.MaxContextLength - replyln - 20;
 
-            var promptbuild = LLMSystem.Client!.GetPromptBuilder();
+            var promptbuild = LLMEngine.Client!.GetPromptBuilder();
 
-            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Character Information:" + LLMSystem.NewLine +
-                "## Name: {{char}}" + LLMSystem.NewLine +
-                "{{charbio}}" + LLMSystem.NewLine +
-                "## Name: {{user}}" + LLMSystem.NewLine +
-                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "# Chat Session:" + LLMSystem.NewLine +
-                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
-                "## Duration: " + StringExtensions.TimeSpanToHumanString(EndTime - StartTime) + LLMSystem.NewLine + LLMSystem.NewLine;
+            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMEngine.NewLine +
+                LLMEngine.NewLine +
+                "# Character Information:" + LLMEngine.NewLine +
+                "## Name: {{char}}" + LLMEngine.NewLine +
+                "{{charbio}}" + LLMEngine.NewLine +
+                "## Name: {{user}}" + LLMEngine.NewLine +
+                "{{userbio}}" + LLMEngine.NewLine + LLMEngine.NewLine +
+                "# Chat Session:" + LLMEngine.NewLine +
+                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMEngine.NewLine +
+                "## Duration: " + StringExtensions.TimeSpanToHumanString(EndTime - StartTime) + LLMEngine.NewLine + LLMEngine.NewLine;
 
 
             var requestedTask = session.GetQuery();
@@ -214,16 +214,16 @@ namespace AIToolkit.Files
             promptbuild.AddMessage(AuthorRole.SysPrompt, sysprompt + docs);
             promptbuild.AddMessage(AuthorRole.User, requestedTask);
 
-            var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.75) ? 0.75 : LLMSystem.Sampler.Temperature, replyln);
+            var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, replyln);
             if (ct is GenerationInput input)
             {
                 input.Grammar = grammar;
             }
-            var finalstr = await LLMSystem.SimpleQuery(ct).ConfigureAwait(false);
+            var finalstr = await LLMEngine.SimpleQuery(ct).ConfigureAwait(false);
             session = JsonConvert.DeserializeObject<TopicLookup>(finalstr);
             session?.ClampRelevance();
-            LLMSystem.NamesInPromptOverride = null;
-            LLMSystem.Instruct.PrefillThinking = prefill;
+            LLMEngine.NamesInPromptOverride = null;
+            LLMEngine.Instruct.PrefillThinking = prefill;
             return session!;
         }
 
@@ -245,7 +245,7 @@ namespace AIToolkit.Files
         /// <returns></returns>
         protected virtual async Task<string> GenerateGoals()
         {
-            var query = "Based on the exchange between {{user}} and {{char}} shown above, write a list of the plans they both setup for the near future. This list should contain between 0 and 4 items. Each item should be summarized in a single sentence. If there's no items, don't answer with anything. Make sure those plans aren't already resolved within the span of the dialog." + LLMSystem.NewLine + "Example:" + LLMSystem.NewLine + "- They promised to eat together tomorrow." + LLMSystem.NewLine + "- {{user}} will watch the movie recommanded by {{char}}.";
+            var query = "Based on the exchange between {{user}} and {{char}} shown above, write a list of the plans they both setup for the near future. This list should contain between 0 and 4 items. Each item should be summarized in a single sentence. If there's no items, don't answer with anything. Make sure those plans aren't already resolved within the span of the dialog." + LLMEngine.NewLine + "Example:" + LLMEngine.NewLine + "- They promised to eat together tomorrow." + LLMEngine.NewLine + "- {{user}} will watch the movie recommanded by {{char}}.";
             var res = await GenerateTaskRes(query, 1024, true, false).ConfigureAwait(false);
             return res;
         }
@@ -256,12 +256,12 @@ namespace AIToolkit.Files
         /// <returns></returns>
         public virtual async Task<bool> IsRoleplay()
         {
-            var query = "Based on the exchange between {{user}} and {{char}} shown above, determine if {{user}} and {{char}} are roleplaying a scenario. Respond Yes if they are acting a roleplay. Discussing a future roleplay doesn't count as a roleplay. Respond No if this is a just a chat." + LLMSystem.NewLine + LLMSystem.NewLine +
-                "To qualify as a roleplay, the vast majority of the exchange must follow the following guidelines:" + LLMSystem.NewLine +
-                "- Contains explicit actions (not just discussions)." + LLMSystem.NewLine +
-                "- Both {{user}} and {{char}} are in a situation involving physical contact in a defined location." + LLMSystem.NewLine +
-                "- Heavy use of narrative text (between asterisks)" + LLMSystem.NewLine +
-                "- Clearly takes place outside of a chat interface." + LLMSystem.NewLine + LLMSystem.NewLine + "Your response must begin by either Yes or No.";
+            var query = "Based on the exchange between {{user}} and {{char}} shown above, determine if {{user}} and {{char}} are roleplaying a scenario. Respond Yes if they are acting a roleplay. Discussing a future roleplay doesn't count as a roleplay. Respond No if this is a just a chat." + LLMEngine.NewLine + LLMEngine.NewLine +
+                "To qualify as a roleplay, the vast majority of the exchange must follow the following guidelines:" + LLMEngine.NewLine +
+                "- Contains explicit actions (not just discussions)." + LLMEngine.NewLine +
+                "- Both {{user}} and {{char}} are in a situation involving physical contact in a defined location." + LLMEngine.NewLine +
+                "- Heavy use of narrative text (between asterisks)" + LLMEngine.NewLine +
+                "- Clearly takes place outside of a chat interface." + LLMEngine.NewLine + LLMEngine.NewLine + "Your response must begin by either Yes or No.";
             var res = await GenerateTaskRes(query, 1024, true, false).ConfigureAwait(false);
             var s = res.ToLowerInvariant().Replace(" ", string.Empty);
             return s.StartsWith("yes");
@@ -293,26 +293,26 @@ namespace AIToolkit.Files
         /// <returns></returns>
         protected virtual async Task<string> GenerateTitle(string sum)
         {
-            if (LLMSystem.Client == null)
+            if (LLMEngine.Client == null)
                 return string.Empty;
-            LLMSystem.NamesInPromptOverride = false;
+            LLMEngine.NamesInPromptOverride = false;
             var replyln = 350;
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
                 replyln += 1024;
-            var promptBuilder = LLMSystem.Client.GetPromptBuilder();
-            var msgtxt = "You are an automated system designed to give titles to summaries." + LLMSystem.NewLine +
-                LLMSystem.NewLine + "# Summary:" + LLMSystem.NewLine + LLMSystem.NewLine + sum;
+            var promptBuilder = LLMEngine.Client.GetPromptBuilder();
+            var msgtxt = "You are an automated system designed to give titles to summaries." + LLMEngine.NewLine +
+                LLMEngine.NewLine + "# Summary:" + LLMEngine.NewLine + LLMEngine.NewLine + sum;
             promptBuilder.AddMessage(AuthorRole.SysPrompt, msgtxt);
             promptBuilder.AddMessage(AuthorRole.User, "Give a title to the summary above. This title should be a single short and descriptive sentence. Write only the title, nothing else.");
-            var temp = LLMSystem.Sampler.Temperature;
+            var temp = LLMEngine.Sampler.Temperature;
             if (temp > 0.5f)
                 temp = 0.5f;
             var genparam = promptBuilder.PromptToQuery(AuthorRole.Assistant, temp, replyln);
-            var finalstr = await LLMSystem.SimpleQuery(genparam).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
-                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+            var finalstr = await LLMEngine.SimpleQuery(genparam).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
+                finalstr = finalstr.RemoveThinkingBlocks(LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd);
             finalstr = finalstr.Replace("\"", "").Trim();
-            LLMSystem.NamesInPromptOverride = null;
+            LLMEngine.NamesInPromptOverride = null;
             return finalstr;
         }
 
@@ -335,26 +335,26 @@ namespace AIToolkit.Files
         /// is returned.</returns>
         public virtual async Task<string> GenerateTaskRes(string requestedTask, int responseLen, bool lightDialogs = true, bool showHidden = false)
         {
-            if (LLMSystem.Client == null)
+            if (LLMEngine.Client == null)
                 return string.Empty;
-            LLMSystem.NamesInPromptOverride = false;
+            LLMEngine.NamesInPromptOverride = false;
             var replyln = responseLen;
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
                 replyln += 1024;
-            var availtokens = LLMSystem.MaxContextLength - replyln - 20;
+            var availtokens = LLMEngine.MaxContextLength - replyln - 20;
 
-            var promptbuild = LLMSystem.Client.GetPromptBuilder();
+            var promptbuild = LLMEngine.Client.GetPromptBuilder();
 
-            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMSystem.NewLine +
-                LLMSystem.NewLine +
-                "# Character Information:" + LLMSystem.NewLine +
-                "## Name: {{char}}" + LLMSystem.NewLine +
-                "{{charbio}}" + LLMSystem.NewLine +
-                "## Name: {{user}}" + LLMSystem.NewLine +
-                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "# Chat Session:" + LLMSystem.NewLine +
-                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMSystem.NewLine +
-                "## Duration: " + StringExtensions.TimeSpanToHumanString(EndTime - StartTime) + LLMSystem.NewLine + LLMSystem.NewLine;
+            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMEngine.NewLine +
+                LLMEngine.NewLine +
+                "# Character Information:" + LLMEngine.NewLine +
+                "## Name: {{char}}" + LLMEngine.NewLine +
+                "{{charbio}}" + LLMEngine.NewLine +
+                "## Name: {{user}}" + LLMEngine.NewLine +
+                "{{userbio}}" + LLMEngine.NewLine + LLMEngine.NewLine +
+                "# Chat Session:" + LLMEngine.NewLine +
+                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMEngine.NewLine +
+                "## Duration: " + StringExtensions.TimeSpanToHumanString(EndTime - StartTime) + LLMEngine.NewLine + LLMEngine.NewLine;
 
             availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
             availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
@@ -363,13 +363,13 @@ namespace AIToolkit.Files
             promptbuild.AddMessage(AuthorRole.SysPrompt, sysprompt + docs);
             promptbuild.AddMessage(AuthorRole.User, requestedTask);
 
-            var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.5) ? 0.5 : LLMSystem.Sampler.Temperature, replyln);
-            var finalstr = await LLMSystem.SimpleQuery(ct).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Instruct.ThinkingStart))
+            var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.5) ? 0.5 : LLMEngine.Sampler.Temperature, replyln);
+            var finalstr = await LLMEngine.SimpleQuery(ct).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
             {
-                finalstr = finalstr.RemoveThinkingBlocks(LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+                finalstr = finalstr.RemoveThinkingBlocks(LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd);
             }
-            LLMSystem.NamesInPromptOverride = null;
+            LLMEngine.NamesInPromptOverride = null;
             return finalstr.CleanupAndTrim();
         }
 
@@ -439,19 +439,19 @@ namespace AIToolkit.Files
                     case AuthorRole.SysPrompt:
                         if (ignoresystem)
                             continue;
-                        text = msg.Message.StartsWith('*') ? LLMSystem.NewLine + msg.Message.Trim() + LLMSystem.NewLine : LLMSystem.NewLine + "*" + msg.Message.Trim() + "*" + LLMSystem.NewLine;
+                        text = msg.Message.StartsWith('*') ? LLMEngine.NewLine + msg.Message.Trim() + LLMEngine.NewLine : LLMEngine.NewLine + "*" + msg.Message.Trim() + "*" + LLMEngine.NewLine;
                         break;
                     case AuthorRole.User:
                     case AuthorRole.Assistant:
                         if (lightDialogs)
-                            text = LLMSystem.NewLine + msg.Sender?.Name + ": " + msg.Message.Trim().Replace(LLMSystem.NewLine, " ") + LLMSystem.NewLine;
+                            text = LLMEngine.NewLine + msg.Sender?.Name + ": " + msg.Message.Trim().Replace(LLMEngine.NewLine, " ") + LLMEngine.NewLine;
                         else
-                            text = "**" + msg.Sender?.Name + ":** " + msg.Message.Trim().Replace(LLMSystem.NewLine, " ") + LLMSystem.NewLine;
+                            text = "**" + msg.Sender?.Name + ":** " + msg.Message.Trim().Replace(LLMEngine.NewLine, " ") + LLMEngine.NewLine;
                         break;
                 }
                 if (text == string.Empty)
                     continue;
-                var tks = maxTokens == int.MaxValue ? 0 : LLMSystem.GetTokenCount(text);
+                var tks = maxTokens == int.MaxValue ? 0 : LLMEngine.GetTokenCount(text);
                 totaltks -= tks;
                 if (totaltks <= 0)
                     return sb.ToString();

@@ -22,18 +22,18 @@ namespace AIToolkit.SearchAPI
         // Search API Settings
         public static string BraveAPIKey
         {
-            get => LLMSystem.Settings.WebSearchBraveAPIKey;
-            set => LLMSystem.Settings.WebSearchBraveAPIKey = value;
+            get => LLMEngine.Settings.WebSearchBraveAPIKey;
+            set => LLMEngine.Settings.WebSearchBraveAPIKey = value;
         }
         public static BackendSearchAPI SearchAPI
         {
-            get => LLMSystem.Settings.WebSearchAPI;
-            set => LLMSystem.Settings.WebSearchAPI = value;
+            get => LLMEngine.Settings.WebSearchAPI;
+            set => LLMEngine.Settings.WebSearchAPI = value;
         }
         public static bool SearchDetailedResults
         {
-            get => LLMSystem.Settings.WebSearchDetailedResults;
-            set => LLMSystem.Settings.WebSearchDetailedResults = value;
+            get => LLMEngine.Settings.WebSearchDetailedResults;
+            set => LLMEngine.Settings.WebSearchDetailedResults = value;
         }
 
 

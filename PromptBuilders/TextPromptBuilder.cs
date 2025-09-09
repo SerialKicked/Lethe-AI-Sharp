@@ -16,8 +16,8 @@ namespace AIToolkit
 
         public int AddMessage(AuthorRole role, string message)
         {
-            var msg = LLMSystem.Instruct.FormatSinglePrompt(role, LLMSystem.User, LLMSystem.Bot, message);
-            var res = LLMSystem.GetTokenCount(msg);
+            var msg = LLMEngine.Instruct.FormatSinglePrompt(role, LLMEngine.User, LLMEngine.Bot, message);
+            var res = LLMEngine.GetTokenCount(msg);
             _prompt.Add(msg);
             return res;
         }
@@ -38,24 +38,24 @@ namespace AIToolkit
 
             if (responserole == AuthorRole.User)
             {
-                fullquery += LLMSystem.Instruct.GetUserStart(LLMSystem.User);
+                fullquery += LLMEngine.Instruct.GetUserStart(LLMEngine.User);
             }
             else
             {
-                fullquery += LLMSystem.Instruct.GetResponseStart(LLMSystem.Bot);
+                fullquery += LLMEngine.Instruct.GetResponseStart(LLMEngine.Bot);
             }
             fullquery = fullquery.TrimEnd();
 
-            GenerationInput genparams = LLMSystem.Sampler.GetCopy();
+            GenerationInput genparams = LLMEngine.Sampler.GetCopy();
             if (tempoverride >= 0)
                 genparams.Temperature = tempoverride;
-            else if (LLMSystem.ForceTemperature >= 0)
-                genparams.Temperature = LLMSystem.ForceTemperature;
-            genparams.Max_context_length = LLMSystem.MaxContextLength;
-            genparams.Max_length = responseoverride == -1 ? LLMSystem.Settings.MaxReplyLength : responseoverride;
-            genparams.Stop_sequence = LLMSystem.Instruct.GetStoppingStrings(LLMSystem.User, LLMSystem.Bot);
+            else if (LLMEngine.ForceTemperature >= 0)
+                genparams.Temperature = LLMEngine.ForceTemperature;
+            genparams.Max_context_length = LLMEngine.MaxContextLength;
+            genparams.Max_length = responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride;
+            genparams.Stop_sequence = LLMEngine.Instruct.GetStoppingStrings(LLMEngine.User, LLMEngine.Bot);
             genparams.Prompt = fullquery;
-            genparams.Images = [.. LLMSystem.vlm_pictures];
+            genparams.Images = [.. LLMEngine.vlm_pictures];
             return genparams;
         }
 
@@ -66,9 +66,9 @@ namespace AIToolkit
                 return AddMessage(role, message);
             }
 
-            var msg = LLMSystem.Instruct.FormatSinglePrompt(role, LLMSystem.User, LLMSystem.Bot, message);
-            var res = LLMSystem.GetTokenCount(msg);
-            _prompt.Insert(index, LLMSystem.Instruct.FormatSinglePrompt(role, LLMSystem.User, LLMSystem.Bot, message));
+            var msg = LLMEngine.Instruct.FormatSinglePrompt(role, LLMEngine.User, LLMEngine.Bot, message);
+            var res = LLMEngine.GetTokenCount(msg);
+            _prompt.Insert(index, LLMEngine.Instruct.FormatSinglePrompt(role, LLMEngine.User, LLMEngine.Bot, message));
             return res;
         }
 
@@ -79,13 +79,13 @@ namespace AIToolkit
 
         public int GetTokenUsage()
         {
-            return LLMSystem.GetTokenCount((string)GetFullPrompt());
+            return LLMEngine.GetTokenCount((string)GetFullPrompt());
         }
 
         public int GetTokenCount(AuthorRole role, string message)
         {
-            var msg = LLMSystem.Instruct.FormatSinglePrompt(role, LLMSystem.User, LLMSystem.Bot, message);
-            return LLMSystem.GetTokenCount(msg);
+            var msg = LLMEngine.Instruct.FormatSinglePrompt(role, LLMEngine.User, LLMEngine.Bot, message);
+            return LLMEngine.GetTokenCount(msg);
         }
 
         public string PromptToText()

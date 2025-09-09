@@ -29,20 +29,20 @@ namespace AIToolkit.Files
         public bool Hidden = hidden;
         public string Note = string.Empty;
         [JsonIgnore] public BasePersona User => 
-            !string.IsNullOrEmpty(UserID) && LLMSystem.LoadedPersonas.TryGetValue(UserID, out var u) ? u : LLMSystem.User;
+            !string.IsNullOrEmpty(UserID) && LLMEngine.LoadedPersonas.TryGetValue(UserID, out var u) ? u : LLMEngine.User;
         [JsonIgnore] public BasePersona Bot => 
-            !string.IsNullOrEmpty(CharID) && LLMSystem.LoadedPersonas.TryGetValue(CharID, out var c) ? c : LLMSystem.Bot;
+            !string.IsNullOrEmpty(CharID) && LLMEngine.LoadedPersonas.TryGetValue(CharID, out var c) ? c : LLMEngine.Bot;
         [JsonIgnore] public BasePersona? Sender => 
             Role == AuthorRole.User? User : Role == AuthorRole.Assistant ? Bot : null;
 
         public string ToTextCompletion()
         {
-            return LLMSystem.Instruct.FormatSingleMessage(this);
+            return LLMEngine.Instruct.FormatSingleMessage(this);
         }
 
         public Message ToChatCompletion()
         {
-            var addname = LLMSystem.NamesInPromptOverride ?? LLMSystem.Instruct.AddNamesToPrompt;
+            var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt;
             if (Role == AuthorRole.System || Role == AuthorRole.SysPrompt)
             {
                 addname = false;

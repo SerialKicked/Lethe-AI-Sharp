@@ -19,7 +19,7 @@ namespace AIToolkit.Agent.Plugins
             // Just a small delay so i don't have to remove async and do Task.ResultFrom everywhere. It's not like we're on a timer anyway.
             await Task.Delay(10, ct).ConfigureAwait(false);
             // can't search the web? that's a bummer.
-            if (!LLMSystem.SupportsWebSearch || LLMSystem.Status != SystemStatus.Ready)
+            if (!LLMEngine.SupportsWebSearch || LLMEngine.Status != SystemStatus.Ready)
                 return false;
             // Check if there's at least 2 sessions, otherwise we're in the first session and we don't have searches to make, yet.
             var sessions = owner.History.Sessions;
@@ -51,7 +51,7 @@ namespace AIToolkit.Agent.Plugins
 
             if (webSearchAction == null || mergeAction == null)
             {
-                LLMSystem.Logger?.LogWarning("Required actions not found in registry. ResearchTask cancelled.");
+                LLMEngine.Logger?.LogWarning("Required actions not found in registry. ResearchTask cancelled.");
                 return;
             }
 
@@ -61,10 +61,10 @@ namespace AIToolkit.Agent.Plugins
                 if (ct.IsCancellationRequested)
                     return;
                 // Compare to recent searches to avoid duplicate
-                var wassearchedbefore = await LLMSystem.Bot.Brain.WasSearchedRecently(topic.Topic).ConfigureAwait(false);
+                var wassearchedbefore = await LLMEngine.Bot.Brain.WasSearchedRecently(topic.Topic).ConfigureAwait(false);
                 if (wassearchedbefore)
                     continue;
-                LLMSystem.Bot.Brain.RecentSearches.Add(topic);
+                LLMEngine.Bot.Brain.RecentSearches.Add(topic);
 
                 var allResults = await webSearchAction.Execute(topic, ct).ConfigureAwait(false);
                 if (allResults.Count == 0)

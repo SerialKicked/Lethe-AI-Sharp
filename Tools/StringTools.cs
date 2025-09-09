@@ -57,7 +57,7 @@ namespace AIToolkit
 
         public static StringBuilder AppendLinuxLine(this StringBuilder sb, string? text = null)
         {
-            return text == null ? sb.Append(LLMSystem.NewLine) : sb.Append(text).Append(LLMSystem.NewLine);
+            return text == null ? sb.Append(LLMEngine.NewLine) : sb.Append(text).Append(LLMEngine.NewLine);
         }
 
         public static string ToWinFormat(this string text) => text.Replace("\n", "\r\n");
@@ -172,7 +172,7 @@ namespace AIToolkit
                 result = Regex.Replace(result, pattern, match =>
                 {
                     // Preserve the space before/after when removing the word
-                    bool removeWord = LLMSystem.RNG.NextDouble() < removechance;
+                    bool removeWord = LLMEngine.RNG.NextDouble() < removechance;
                     if (!removeWord) return match.Value;
                     
                     // Keep one space unless we're at start/end of string
@@ -254,7 +254,7 @@ namespace AIToolkit
                 var matches = Regex.Matches(workstring, @"\*[^*]+\*");
                 foreach (Match match in matches)
                 {
-                    if (LLMSystem.RNG.NextDouble() < fix.RemoveItalicRatio)
+                    if (LLMEngine.RNG.NextDouble() < fix.RemoveItalicRatio)
                     {
                         // count words in the match
                         var words = match.Value.Split(' ');
@@ -295,7 +295,7 @@ namespace AIToolkit
             return text;
         }
 
-        public static string RemoveThinkingBlocks(this string text) => RemoveThinkingBlocks(text, LLMSystem.Instruct.ThinkingStart, LLMSystem.Instruct.ThinkingEnd);
+        public static string RemoveThinkingBlocks(this string text) => RemoveThinkingBlocks(text, LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd);
 
         /// <summary>
         /// Tries to fix missing asterisks in the text
@@ -305,7 +305,7 @@ namespace AIToolkit
         public static string FixAsterisks(this string text)
         {
             // Automatically close asterisks if they are not closed before the end of each paragraph delimited by a newline
-            var lines = text.Split(LLMSystem.NewLine);
+            var lines = text.Split(LLMEngine.NewLine);
             for (int i = 0; i < lines.Length; i++)
             {
                 // skip small lines
@@ -328,7 +328,7 @@ namespace AIToolkit
                         lines[i] = lines[i].Trim() + "*";
                 }
             }
-            return string.Join(LLMSystem.NewLine, lines);
+            return string.Join(LLMEngine.NewLine, lines);
         }
 
         /// <summary>
@@ -427,7 +427,7 @@ namespace AIToolkit
                 // RegexOptions.IgnoreCase for case-insensitive matching
                 output = Regex.Replace(output, pattern, replacement, RegexOptions.IgnoreCase);
             }
-            return LLMSystem.ReplaceMacros(output);
+            return LLMEngine.ReplaceMacros(output);
         }
 
 

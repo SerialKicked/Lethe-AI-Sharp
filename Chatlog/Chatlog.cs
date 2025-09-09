@@ -70,7 +70,7 @@ namespace AIToolkit.Files
         /// Retrieves a concatenated summary of previous sessions, formatted with a specified section header,  while
         /// adhering to token limits and optional filtering criteria.
         /// </summary>
-        /// <remarks>Sessions that already used for memory recall (use <seealso cref="LLMSystem.InvalidatePromptCache"/> before call to include everything), are empty, or do not meet
+        /// <remarks>Sessions that already used for memory recall (use <seealso cref="LLMEngine.InvalidatePromptCache"/> before call to include everything), are empty, or do not meet
         /// the filtering  criteria (e.g., roleplay sessions when <paramref name="allowRP"/> is <see langword="false"/>)
         /// are skipped. The method stops adding content once the maxTokens or maxCount limit are reached.</remarks>
         /// <param name="maxTokens">The maximum number of tokens allowed in the resulting summary. The method will truncate content to stay
@@ -99,21 +99,21 @@ namespace AIToolkit.Files
             for (int i = entrydepth; i >= 0; i--)
             {
                 var session = Sessions[i];
-                if (LLMSystem.usedGuidInSession.Contains(session.Guid) || string.IsNullOrWhiteSpace(session.Content))
+                if (LLMEngine.usedGuidInSession.Contains(session.Guid) || string.IsNullOrWhiteSpace(session.Content))
                     continue;
                 if (!allowRP && session.MetaData.IsRoleplaySession)
                     continue;
                 var sb = new StringBuilder();
                 sb.AppendLinuxLine($"{sectionHeader} {session.Name}");
-                sb.AppendLinuxLine(session.GetRawMemory(false, LLMSystem.Bot.DatesInSessionSummaries));
-                var tks = LLMSystem.GetTokenCount(sb.ToString());
+                sb.AppendLinuxLine(session.GetRawMemory(false, LLMEngine.Bot.DatesInSessionSummaries));
+                var tks = LLMEngine.GetTokenCount(sb.ToString());
                 if (tks <= tokensleft)
                 {
                     res.Insert(0, sb.ToString());
                 }
                 else
                     break;
-                tokensleft = maxTokens - LLMSystem.GetTokenCount(res.ToString());
+                tokensleft = maxTokens - LLMEngine.GetTokenCount(res.ToString());
                 count++;
                 if (count >= maxCount)
                     break;
@@ -125,7 +125,7 @@ namespace AIToolkit.Files
         {
             var tokensleft = maxTokens;
             var entrydepth = 0;
-            var startpos = LLMSystem.PromptBuilder!.Count;
+            var startpos = LLMEngine.PromptBuilder!.Count;
             // add all messages together in the same list
             var messagelist = new List<(int, SingleMessage)>();
             var curSessionID = CurrentSessionID == -1 ? Sessions.Count - 1 : CurrentSessionID;
@@ -148,20 +148,20 @@ namespace AIToolkit.Files
             {
                 var msg = messagelist[i];
                 oldest = Math.Min(oldest, msg.Item1);
-                tokensleft -= LLMSystem.PromptBuilder.GetTokenCount(msg.Item2.Role, msg.Item2.Message);
+                tokensleft -= LLMEngine.PromptBuilder.GetTokenCount(msg.Item2.Role, msg.Item2.Message);
                 if (tokensleft <= 0)
                     break;
-                LLMSystem.PromptBuilder.InsertMessage(startpos, msg.Item2.Role, msg.Item2.Message);
+                LLMEngine.PromptBuilder.InsertMessage(startpos, msg.Item2.Role, msg.Item2.Message);
                 // check if we need to add a memory
-                if (memories?.Count > 0 && !LLMSystem.Settings.MoveAllInsertsToSysPrompt)
+                if (memories?.Count > 0 && !LLMEngine.Settings.MoveAllInsertsToSysPrompt)
                 {
                     var foundmemory = memories.GetContentByPosition(entrydepth);
                     if (!string.IsNullOrEmpty(foundmemory))
                     {
-                        tokensleft -= LLMSystem.PromptBuilder.GetTokenCount(AuthorRole.System, foundmemory.CleanupAndTrim());
+                        tokensleft -= LLMEngine.PromptBuilder.GetTokenCount(AuthorRole.System, foundmemory.CleanupAndTrim());
                         if (tokensleft > 0)
                         {
-                            LLMSystem.PromptBuilder.InsertMessage(startpos, AuthorRole.System, foundmemory.CleanupAndTrim());
+                            LLMEngine.PromptBuilder.InsertMessage(startpos, AuthorRole.System, foundmemory.CleanupAndTrim());
                         }
                     }
                 }
@@ -208,11 +208,11 @@ namespace AIToolkit.Files
 
             // Remove thinking block if any
             var stringfix = msg;
-            if (!string.IsNullOrEmpty(LLMSystem.Instruct.ThinkingStart) && stringfix.Contains(LLMSystem.Instruct.ThinkingStart) && stringfix.Contains(LLMSystem.Instruct.ThinkingEnd))
+            if (!string.IsNullOrEmpty(LLMEngine.Instruct.ThinkingStart) && stringfix.Contains(LLMEngine.Instruct.ThinkingStart) && stringfix.Contains(LLMEngine.Instruct.ThinkingEnd))
             {
                 // remove everything before the thinking end tag (included)
-                var idx = stringfix.IndexOf(LLMSystem.Instruct.ThinkingEnd);
-                stringfix = stringfix[(idx + LLMSystem.Instruct.ThinkingEnd.Length)..].CleanupAndTrim();
+                var idx = stringfix.IndexOf(LLMEngine.Instruct.ThinkingEnd);
+                stringfix = stringfix[(idx + LLMEngine.Instruct.ThinkingEnd.Length)..].CleanupAndTrim();
             }
             var single = new SingleMessage(role, DateTime.Now, stringfix, bot.UniqueName, user.UniqueName);
             RaiseBeforeMessageAdded(single);
@@ -294,12 +294,12 @@ namespace AIToolkit.Files
         /// langword="true"/>, the current session is archived if it contains more than two messages; otherwise, it is
         /// reset. The default value is <see langword="true"/>.</param>
         /// <returns></returns>
-        public async Task StartNewChatSession(bool archivePreviousSession = true, bool addDateInfo = true)
+        public async Task StartNewChatSession(bool archivePreviousSession = true, bool addDateInfo = false)
         {
             // Save current session if it has enough messages otherwise just reset it
             if (archivePreviousSession && CurrentSession.Messages.Count > 2)
             {
-                CurrentSession.Scenario = LLMSystem.Settings.ScenarioOverride;
+                CurrentSession.Scenario = LLMEngine.Settings.ScenarioOverride;
                 await CurrentSession.UpdateSession().ConfigureAwait(false);
                 // reset session ID
                 CurrentSessionID = -1;
@@ -330,7 +330,7 @@ namespace AIToolkit.Files
                 else
                     msgtxt += " The last chat was " + ((int)timespan.TotalMinutes).ToString() + " minutes ago.";
             }
-            LogMessage(AuthorRole.System, LLMSystem.ReplaceMacros(msgtxt, LLMSystem.User, LLMSystem.Bot), LLMSystem.User, LLMSystem.Bot);
+            LogMessage(AuthorRole.System, LLMEngine.ReplaceMacros(msgtxt, LLMEngine.User, LLMEngine.Bot), LLMEngine.User, LLMEngine.Bot);
         }
 
         /// <summary>
@@ -379,7 +379,7 @@ namespace AIToolkit.Files
                 var validinitmessage = (msg.Role == AuthorRole.User || msg.Role == AuthorRole.System) && (
                     Regex.IsMatch(msg.Message, pattern) ||
                     msg.Message.StartsWith("Hello ") || msg.Message.StartsWith("Hi!") || msg.Message.StartsWith("Hi ") ||
-                    msg.Message.StartsWith("*" + LLMSystem.User.Name + " comes back ") || msg.Message.StartsWith("*" + LLMSystem.User.Name + " logged in.") || 
+                    msg.Message.StartsWith("*" + LLMEngine.User.Name + " comes back ") || msg.Message.StartsWith("*" + LLMEngine.User.Name + " logged in.") || 
                     msg.Message.StartsWith("*A few days later") ||
                     msg.Message.StartsWith("*We're a day later") || msg.Message.StartsWith("*We're a week"));
                 // Minimum session length should be about 30 messages
@@ -412,9 +412,9 @@ namespace AIToolkit.Files
             var sb = new StringBuilder();
             foreach (var message in messagesCopy)
             {
-                sb.Append(LLMSystem.Instruct.FormatSingleMessage(message));
+                sb.Append(LLMEngine.Instruct.FormatSingleMessage(message));
             }
-            var tokencount = LLMSystem.GetTokenCount(sb.ToString());
+            var tokencount = LLMEngine.GetTokenCount(sb.ToString());
             var duration = CurrentSession.Messages.Last().Date - CurrentSession.Messages.First().Date;
             return (tokencount, duration);
         }
@@ -438,6 +438,22 @@ namespace AIToolkit.Files
         {
             if (AreYouSure)
                 Sessions.Clear();
+        }
+
+        public SingleMessage? GetLastMessageFrom(AuthorRole author)
+        {
+            var res = CurrentSession.Messages.LastOrDefault(m => m.Role == author);
+            // if not found, search in previous sessions until found
+            if (res == null)
+            {
+                for (int i = Sessions.Count - 2; i >= 0; i--)
+                {
+                    res = Sessions[i].Messages.LastOrDefault(m => m.Role == author);
+                    if (res != null)
+                        break;
+                }
+            }
+            return res;
         }
 
     }

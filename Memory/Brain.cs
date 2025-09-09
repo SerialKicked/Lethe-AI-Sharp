@@ -145,7 +145,7 @@ namespace AIToolkit.Memory
             Curiosity += (0.5 - Curiosity) * 0.005;
 
             // Special cases based on time since last message exchanged
-            var msg = LLMSystem.History.LastMessage();
+            var msg = LLMEngine.History.GetLastMessageFrom(AuthorRole.User);
             if (msg != null)
             {
                 var timeSinceLast = (DateTime.Now - msg.Date);
@@ -221,7 +221,7 @@ namespace AIToolkit.Memory
         /// <summary>
         /// Checks if Brain functionality should be disabled (currently returns true for group conversations)
         /// </summary>
-        private bool IsBrainDisabled => LLMSystem.IsGroupConversation;
+        private bool IsBrainDisabled => LLMEngine.IsGroupConversation;
 
         /// <summary>
         /// Called to initialize the brain with its owner persona.
@@ -286,29 +286,36 @@ namespace AIToolkit.Memory
         /// <returns></returns>
         public virtual async Task HandleMessages(SingleMessage message)
         {
-            if (IsBrainDisabled || message.Role != AuthorRole.User || Owner.History.CurrentSession.Messages.Count < 1)
+            if (IsBrainDisabled || message.Role != AuthorRole.User)
                 return;
 
             // First, check if there's a long time between message and last message, if so do the mood related stuff
             if (Owner.SenseOfTime)
             {
+                // no previous user message, nothing to do
+                var lastmsg = LLMEngine.History.GetLastMessageFrom(AuthorRole.User);
+                if (lastmsg == null)
+                    return;
                 Mood.Update();
                 Mood.Interpret(message.Message);
-                var lastmsg = Owner.History.CurrentSession.Messages[^1];
+                // check if we have a previous message in current session, and if it's already a system msg, gtfo
+                if (LLMEngine.History.CurrentSession.Messages.Count > 1 && LLMEngine.History.CurrentSession.Messages[^2].Role == AuthorRole.System)
+                    return;
+
                 var timeSinceLast = (DateTime.Now - lastmsg.Date);
                 if (timeSinceLast >= TimeSpan.FromHours(4))
                 {
-                    var info = LLMSystem.GetAwayString() + " " + Mood.Describe();
-                    info = LLMSystem.ReplaceMacros(info.CleanupAndTrim());
-                    var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, info, Owner.UniqueName, LLMSystem.User.UniqueName, true);
-                    LLMSystem.History.LogMessage(tosend);
+                    var info = LLMEngine.GetAwayString() + " " + Mood.Describe();
+                    info = LLMEngine.ReplaceMacros(info.CleanupAndTrim());
+                    var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, info, Owner.UniqueName, LLMEngine.User.UniqueName, true);
+                    LLMEngine.History.LogMessage(tosend);
                     // Stop here, don't insert a eureka right after this one.
                     return;
                 }
             }
 
             RefreshMemories();
-            if (!string.IsNullOrWhiteSpace(LLMSystem.Settings.ScenarioOverride) || Eurekas.Count == 0)
+            if (!string.IsNullOrWhiteSpace(LLMEngine.Settings.ScenarioOverride) || Eurekas.Count == 0)
                 return;
             CurrentDelay++;
             // If there's a super relevant eureka to the user input, insert it immediately
@@ -334,12 +341,12 @@ namespace AIToolkit.Memory
         /// <returns>A <see cref="MemoryUnit"/> representing the most relevant Eureka if one is found within the specified distance; otherwise null.</returns>
         protected virtual async Task<MemoryUnit?> GetRelevantEureka(string userinput, float maxDistance = 0.075f)
         {
-            if (IsBrainDisabled ||!RAGSystem.Enabled)
+            if (IsBrainDisabled ||!RAGEngine.Enabled)
                 return null;
 
             foreach (var item in Eurekas)
             {
-                var dist = await RAGSystem.GetDistanceAsync(userinput, item).ConfigureAwait(false);
+                var dist = await RAGEngine.GetDistanceAsync(userinput, item).ConfigureAwait(false);
                 if (dist <= maxDistance)
                 {
                     return item;
@@ -396,10 +403,10 @@ namespace AIToolkit.Memory
                 DateTime.Now,
                 selected.ToEureka(),
                 Owner.UniqueName,
-                LLMSystem.User.UniqueName,
+                LLMEngine.User.UniqueName,
                 true);
 
-            LLMSystem.History.LogMessage(tosend);
+            LLMEngine.History.LogMessage(tosend);
         }
 
         /// <summary>
@@ -420,11 +427,11 @@ namespace AIToolkit.Memory
                 return true;
             }
 
-            if (RAGSystem.Enabled)
+            if (RAGEngine.Enabled)
             {
                 foreach (var item in RecentSearches)
                 {
-                    if (await RAGSystem.GetDistanceAsync(item.Topic, topic) < maxDistance)
+                    if (await RAGEngine.GetDistanceAsync(item.Topic, topic) < maxDistance)
                     {
                         return true;
                     }

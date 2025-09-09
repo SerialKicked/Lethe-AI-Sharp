@@ -21,7 +21,7 @@ namespace AIToolkit.API
         public OpenAIAdapter(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _httpClient.BaseAddress = new Uri(LLMSystem.Settings.BackendUrl);
+            _httpClient.BaseAddress = new Uri(LLMEngine.Settings.BackendUrl);
             _client = new OpenAI_APIClient(_httpClient);
             webSearchClient = new WebSearchAPI(httpClient);
 
@@ -34,11 +34,11 @@ namespace AIToolkit.API
 
         public string BaseUrl
         {
-            get => LLMSystem.Settings.BackendUrl;
+            get => LLMEngine.Settings.BackendUrl;
             set
             {
-                LLMSystem.Settings.BackendUrl = value;
-                _httpClient.BaseAddress = new Uri(LLMSystem.Settings.BackendUrl);
+                LLMEngine.Settings.BackendUrl = value;
+                _httpClient.BaseAddress = new Uri(LLMEngine.Settings.BackendUrl);
             }
         }
 
@@ -121,7 +121,7 @@ namespace AIToolkit.API
         {
             if (!SupportsWebSearch)
                 return string.Empty;
-            var res = await webSearchClient.SearchAndEnrichAsync(query, 3, LLMSystem.Settings.WebSearchDetailedResults).ConfigureAwait(false);
+            var res = await webSearchClient.SearchAndEnrichAsync(query, 3, LLMEngine.Settings.WebSearchDetailedResults).ConfigureAwait(false);
             // Convert results to a common format
             return JsonConvert.SerializeObject(res);
         }

@@ -16,13 +16,13 @@ namespace AIToolkit.LLM
                 requestedTask += $"- {prop.Key}: {prop.Value}\n";
             }
 
-            requestedTask = LLMSystem.ReplaceMacros(requestedTask);
+            requestedTask = LLMEngine.ReplaceMacros(requestedTask);
             return requestedTask;
         }
 
         public virtual async Task<string> GetGrammar()
         {
-            return await LLMSystem.Client!.SchemaToGrammar(typeof(T)).ConfigureAwait(false);
+            return await LLMEngine.Client!.SchemaToGrammar(typeof(T)).ConfigureAwait(false);
         }
     }
 }

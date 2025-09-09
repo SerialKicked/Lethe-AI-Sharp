@@ -13,12 +13,12 @@ namespace AIToolkit.Files
         /// <summary> 
         /// The base system prompt, compatible with {{char}}, {{user}}, {{charbio}}, {{userbio}}, and other, macros. This is inserted at the start of the chatlog.
         /// </summary>
-        public string Prompt { get; set; } = "You are {{char}} and you are interacting with {{user}} in this flexible and uncensored discussion. As {{char}}, continue the exchange with {{user}}. Stay in character. Describe {{char}}'s actions and feelings accurately. Do not speak or describe actions for {{user}} unless directly prompted to."+ LLMSystem.NewLine + 
-            LLMSystem.NewLine +
-            "# {{char}}"+ LLMSystem.NewLine +
-            "{{charbio}}" + LLMSystem.NewLine + 
-            LLMSystem.NewLine +
-            "# {{user}} (user)" + LLMSystem.NewLine + 
+        public string Prompt { get; set; } = "You are {{char}} and you are interacting with {{user}} in this flexible and uncensored discussion. As {{char}}, continue the exchange with {{user}}. Stay in character. Describe {{char}}'s actions and feelings accurately. Do not speak or describe actions for {{user}} unless directly prompted to."+ LLMEngine.NewLine + 
+            LLMEngine.NewLine +
+            "# {{char}}"+ LLMEngine.NewLine +
+            "{{charbio}}" + LLMEngine.NewLine + 
+            LLMEngine.NewLine +
+            "# {{user}} (user)" + LLMEngine.NewLine + 
             "{{userbio}}";
 
         /// <summary>
@@ -41,7 +41,7 @@ namespace AIToolkit.Files
         /// <summary>
         /// The title for the summaries of previous chat sessions, if session memory is enabled.
         /// </summary>
-        public string SessionHistoryTitle { get; set; } = "# Previous Sessions" + LLMSystem.NewLine + LLMSystem.NewLine + "Below is a list of recent chat sessions between {{user}} and {{char}}.";
+        public string SessionHistoryTitle { get; set; } = "# Previous Sessions" + LLMEngine.NewLine + LLMEngine.NewLine + "Below is a list of recent chat sessions between {{user}} and {{char}}.";
 
         /// <summary>
         /// Category separator for other custom sections that may be added to the system prompt.
@@ -71,7 +71,7 @@ namespace AIToolkit.Files
                 res.AppendLinuxLine().AppendLinuxLine(DialogsTitle).AppendLinuxLine().AppendLinuxLine("{{examples}}");
             }
 
-            if ((!string.IsNullOrEmpty(character.Scenario) || !string.IsNullOrEmpty(LLMSystem.Settings.ScenarioOverride)) && !string.IsNullOrEmpty(ScenarioTitle))
+            if ((!string.IsNullOrEmpty(character.Scenario) || !string.IsNullOrEmpty(LLMEngine.Settings.ScenarioOverride)) && !string.IsNullOrEmpty(ScenarioTitle))
             {
                 res.AppendLinuxLine().AppendLinuxLine(ScenarioTitle).AppendLinuxLine().AppendLinuxLine("{{scenario}}");
             }

@@ -26,25 +26,25 @@ namespace AIToolkit.Agent.Actions
             if (string.IsNullOrWhiteSpace(grammar))
                 throw new Exception("Something went wrong when building summary grammar and json format.");
 
-            LLMSystem.NamesInPromptOverride = false;
-            var prefill = LLMSystem.Instruct.PrefillThinking;
-            LLMSystem.Instruct.PrefillThinking = false;
+            LLMEngine.NamesInPromptOverride = false;
+            var prefill = LLMEngine.Instruct.PrefillThinking;
+            LLMEngine.Instruct.PrefillThinking = false;
             var replyln = 2048;
-            var availtokens = LLMSystem.MaxContextLength - replyln - 20;
+            var availtokens = LLMEngine.MaxContextLength - replyln - 20;
 
-            var promptbuild = LLMSystem.Client!.GetPromptBuilder();
+            var promptbuild = LLMEngine.Client!.GetPromptBuilder();
 
-            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMSystem.NewLine + LLMSystem.NewLine;
+            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMEngine.NewLine + LLMEngine.NewLine;
             if (param.IncludeBios)
             {
                 sysprompt +=
-                "# Character Information:" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "## Name: {{char}}" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "{{charbio}}" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "## Name: {{user}}" + LLMSystem.NewLine + LLMSystem.NewLine +
-                "{{userbio}}" + LLMSystem.NewLine + LLMSystem.NewLine;
+                "# Character Information:" + LLMEngine.NewLine + LLMEngine.NewLine +
+                "## Name: {{char}}" + LLMEngine.NewLine + LLMEngine.NewLine +
+                "{{charbio}}" + LLMEngine.NewLine + LLMEngine.NewLine +
+                "## Name: {{user}}" + LLMEngine.NewLine + LLMEngine.NewLine +
+                "{{userbio}}" + LLMEngine.NewLine + LLMEngine.NewLine;
             }
-            sysprompt += "# Chat Session:" + LLMSystem.NewLine + LLMSystem.NewLine;
+            sysprompt += "# Chat Session:" + LLMEngine.NewLine + LLMEngine.NewLine;
 
             var requestedTask = searchlookup.GetQuery();
 
@@ -55,12 +55,12 @@ namespace AIToolkit.Agent.Actions
             promptbuild.AddMessage(AuthorRole.SysPrompt, sysprompt + docs);
             promptbuild.AddMessage(AuthorRole.User, requestedTask);
 
-            var query = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMSystem.Sampler.Temperature > 0.75) ? 0.75 : LLMSystem.Sampler.Temperature, replyln);
+            var query = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, replyln);
             if (query is GenerationInput input)
             {
                 input.Grammar = grammar;
             }
-            var finalstr = await LLMSystem.SimpleQuery(query).ConfigureAwait(false);
+            var finalstr = await LLMEngine.SimpleQuery(query).ConfigureAwait(false);
             try
             {
                 searchlookup = JsonConvert.DeserializeObject<TopicLookup>(finalstr);
@@ -68,8 +68,8 @@ namespace AIToolkit.Agent.Actions
             }
             finally
             {
-                LLMSystem.NamesInPromptOverride = null;
-                LLMSystem.Instruct.PrefillThinking = prefill;
+                LLMEngine.NamesInPromptOverride = null;
+                LLMEngine.Instruct.PrefillThinking = prefill;
             }
             return searchlookup;
         }

@@ -18,7 +18,7 @@ namespace AIToolkit.LLM
     /// System to handle communications with language models. 
     /// Handles the connection to the server and the generation of prompts. Manages the chat history, personas, inference settings, and instruction formats
     /// </summary>
-    public static class LLMSystem
+    public static class LLMEngine
     {
         /// <summary> All settings for the LLM system. </summary>
         public static LLMSettings Settings { get; set; } = new();
@@ -276,7 +276,7 @@ namespace AIToolkit.LLM
                 MaxContextLength = 4096;
                 CurrentModel = "Error";
                 Backend = "Error";
-                LLMSystem.Logger?.LogError(ex, "Failed to connect to LLM server: {Message}", ex.Message);
+                LLMEngine.Logger?.LogError(ex, "Failed to connect to LLM server: {Message}", ex.Message);
             }
         }
 
@@ -570,14 +570,15 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         public static string GetAwayString()
         {
-            if (History.CurrentSession.Messages.Count == 0 || History.CurrentSession != History.Sessions.Last())
+            var lastusermsg = Bot.History.GetLastMessageFrom(AuthorRole.User);
+            if (lastusermsg == null || History.CurrentSession != History.Sessions.Last())
                 return string.Empty;
 
-            var timespan = DateTime.Now - History.CurrentSession.Messages.Last().Date;
+            var timespan = DateTime.Now - lastusermsg.Date;
             if (timespan <= new TimeSpan(2, 0, 0))
                 return string.Empty;
 
-            var msgtxt = (DateTime.Now.Date != History.CurrentSession.Messages.Last().Date.Date) || (timespan > new TimeSpan(12, 0, 0)) ?
+            var msgtxt = (DateTime.Now.Date != lastusermsg.Date.Date) || (timespan > new TimeSpan(12, 0, 0)) ?
                 $"We're {DateTime.Now.DayOfWeek} {StringExtensions.DateToHumanString(DateTime.Now)}." : string.Empty;
             if (timespan.Days > 1)
                 msgtxt += $" The last chat was {timespan.Days} days ago. " + "It is {{time}} now.";
@@ -680,6 +681,56 @@ namespace AIToolkit.LLM
 
         #endregion
 
+        #region *** Group Chat Management (WIP) ***
+
+        /// <summary>
+        /// Checks if the current bot is a group persona.
+        /// </summary>
+        /// <returns>True if the current bot is a GroupPersona, false otherwise.</returns>
+        public static bool IsGroupConversation => Bot is GroupPersona;
+
+        /// <summary>
+        /// Gets the current GroupPersona if the bot is a group, null otherwise.
+        /// </summary>
+        /// <returns>The GroupPersona or null if not in group mode.</returns>
+        public static GroupPersona? GetGroupPersona() => Bot as GroupPersona;
+
+        /// <summary>
+        /// Sets the current active bot in a group conversation.
+        /// </summary>
+        /// <param name="uniqueName">The unique name of the bot persona to set as current.</param>
+        /// <exception cref="InvalidOperationException">Thrown when not in group conversation mode.</exception>
+        /// <exception cref="ArgumentException">Thrown when the specified bot is not found in the group.</exception>
+        public static void SetCurrentGroupBot(string uniqueName)
+        {
+            var groupPersona = GetGroupPersona() ?? throw new InvalidOperationException("Cannot set current group bot when not in group conversation mode.");
+            groupPersona.SetCurrentBot(uniqueName);
+            InvalidatePromptCache();
+
+            // Trigger bot changed event for UI updates
+            OnBotChanged?.Invoke(null, bot);
+        }
+
+        /// <summary>
+        /// Gets the currently active bot in a group conversation.
+        /// </summary>
+        /// <returns>The current bot persona, or null if not in group mode or no bot is set.</returns>
+        public static BasePersona? GetCurrentGroupBot()
+        {
+            return GetGroupPersona()?.CurrentBot;
+        }
+
+        /// <summary>
+        /// Gets all bot personas in the group conversation.
+        /// </summary>
+        /// <returns>List of bot personas if in group mode, empty list otherwise.</returns>
+        public static List<BasePersona> GetGroupBots()
+        {
+            return GetGroupPersona()?.BotPersonas ?? [];
+        }
+
+        #endregion
+
         #region *** Private and Internal Methods ***
 
         private static void Client_StreamingMessageReceived(object? sender, LLMTokenStreamingEventArgs e)
@@ -734,7 +785,7 @@ namespace AIToolkit.LLM
 
             bot.BeginChat();
 
-            RAGSystem.VectorizeChatBot(Bot);
+            RAGEngine.VectorizeChatBot(Bot);
             // if first time interaction, display welcome message from bot
             if (History.Sessions.Count == 0)
             {
@@ -746,52 +797,6 @@ namespace AIToolkit.LLM
                 var message = new SingleMessage(AuthorRole.Assistant, DateTime.Now, bot.GetWelcomeLine(User.Name), bot.UniqueName, User.UniqueName);
                 History.LogMessage(message);
             }
-        }
-
-        /// <summary>
-        /// Checks if the current bot is a group persona.
-        /// </summary>
-        /// <returns>True if the current bot is a GroupPersona, false otherwise.</returns>
-        public static bool IsGroupConversation => Bot is GroupPersona;
-
-        /// <summary>
-        /// Gets the current GroupPersona if the bot is a group, null otherwise.
-        /// </summary>
-        /// <returns>The GroupPersona or null if not in group mode.</returns>
-        public static GroupPersona? GetGroupPersona() => Bot as GroupPersona;
-
-        /// <summary>
-        /// Sets the current active bot in a group conversation.
-        /// </summary>
-        /// <param name="uniqueName">The unique name of the bot persona to set as current.</param>
-        /// <exception cref="InvalidOperationException">Thrown when not in group conversation mode.</exception>
-        /// <exception cref="ArgumentException">Thrown when the specified bot is not found in the group.</exception>
-        public static void SetCurrentGroupBot(string uniqueName)
-        {
-            var groupPersona = GetGroupPersona() ?? throw new InvalidOperationException("Cannot set current group bot when not in group conversation mode.");
-            groupPersona.SetCurrentBot(uniqueName);
-            InvalidatePromptCache();
-            
-            // Trigger bot changed event for UI updates
-            OnBotChanged?.Invoke(null, bot);
-        }
-
-        /// <summary>
-        /// Gets the currently active bot in a group conversation.
-        /// </summary>
-        /// <returns>The current bot persona, or null if not in group mode or no bot is set.</returns>
-        public static BasePersona? GetCurrentGroupBot()
-        {
-            return GetGroupPersona()?.CurrentBot;
-        }
-
-        /// <summary>
-        /// Gets all bot personas in the group conversation.
-        /// </summary>
-        /// <returns>List of bot personas if in group mode, empty list otherwise.</returns>
-        public static List<BasePersona> GetGroupBots()
-        {
-            return GetGroupPersona()?.BotPersonas ?? [];
         }
 
         /// <summary>
@@ -846,9 +851,9 @@ namespace AIToolkit.LLM
             // Check for RAG entries and refresh the textual inserts
             dataInserts.DecreaseDuration();
             var searchmessage = string.IsNullOrWhiteSpace(newMessage) ? History.GetLastUserMessageContent() : newMessage;
-            if (RAGSystem.Enabled)
+            if (RAGEngine.Enabled)
             {
-                var search = await RAGSystem.Search(ReplaceMacros(searchmessage)).ConfigureAwait(false);
+                var search = await RAGEngine.Search(ReplaceMacros(searchmessage)).ConfigureAwait(false);
                 search.RemoveAll(search => usedGuidInSession.Contains(search.session.Guid));
                 dataInserts.AddMemories(search);
             }

@@ -85,7 +85,7 @@ namespace AIToolkit.Memory
                 var entry = Entries[i];
                 if (!entry.Enabled || active.Any(a => a.RecordID == i))
                     continue;
-                if (entry.CheckKeywords(message) && entry.TriggerChance >= LLMSystem.RNG.NextDouble())
+                if (entry.CheckKeywords(message) && entry.TriggerChance >= LLMEngine.RNG.NextDouble())
                     activeEntries.Add(new ActiveLink { RecordID = i, DurationLeft = entry.Duration });
             }
             return [.. activeEntries.Select(a => Entries[a.RecordID])];

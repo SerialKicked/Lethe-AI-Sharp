@@ -20,7 +20,7 @@ namespace AIToolkit.Agent.Actions
             {
                 if (ct.IsCancellationRequested)
                     return allResults;
-                var hits = await LLMSystem.WebSearch(query).ConfigureAwait(false);
+                var hits = await LLMEngine.WebSearch(query).ConfigureAwait(false);
                 if (hits != null && hits.Count > 0)
                 {
                     allResults.AddRange(hits);

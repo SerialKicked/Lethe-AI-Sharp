@@ -18,9 +18,9 @@ namespace AIToolkit
 
         public int AddMessage(AuthorRole role, string message)
         {
-            var msg = FormatSingleMessage(role, LLMSystem.User, LLMSystem.Bot, message);
+            var msg = FormatSingleMessage(role, LLMEngine.User, LLMEngine.Bot, message);
             _prompt.Add(msg);
-            return LLMSystem.GetTokenCount(msg.Content.ToString()) + 4;
+            return LLMEngine.GetTokenCount(msg.Content.ToString()) + 4;
         }
 
         public object GetFullPrompt()
@@ -33,7 +33,7 @@ namespace AIToolkit
             var total = 0;
             foreach (var message in _prompt)
             {
-                total += LLMSystem.GetTokenCount(message.Content.ToString()) + 4;
+                total += LLMEngine.GetTokenCount(message.Content.ToString()) + 4;
             }
             return total;
         }
@@ -44,21 +44,21 @@ namespace AIToolkit
             {
                 return AddMessage(role, message);
             }
-            var msg = FormatSingleMessage(role, LLMSystem.User, LLMSystem.Bot, message);
+            var msg = FormatSingleMessage(role, LLMEngine.User, LLMEngine.Bot, message);
             _prompt.Insert(index, msg);
-            return LLMSystem.GetTokenCount(msg.Content.ToString()) + 4;
+            return LLMEngine.GetTokenCount(msg.Content.ToString()) + 4;
         }
 
         public object PromptToQuery(AuthorRole responserole, double tempoverride = -1, int responseoverride = -1)
         {
             var chatrq = new ChatRequest(_prompt,
-                topP: LLMSystem.Sampler.Top_p,
-                frequencyPenalty: LLMSystem.Sampler.Rep_pen - 1,
-                seed: LLMSystem.Sampler.Sampler_seed != -1 ? LLMSystem.Sampler.Sampler_seed : null,
-                user: LLMSystem.NamesInPromptOverride ?? LLMSystem.Instruct.AddNamesToPrompt ? LLMSystem.User.Name : null,
-                stops: [.. LLMSystem.Instruct.GetStoppingStrings(LLMSystem.User, LLMSystem.Bot)],
-                maxTokens: responseoverride == -1 ? LLMSystem.Settings.MaxReplyLength : responseoverride,
-                temperature: tempoverride >= 0 ? tempoverride : (LLMSystem.ForceTemperature >= 0) ? LLMSystem.ForceTemperature : LLMSystem.Sampler.Temperature);
+                topP: LLMEngine.Sampler.Top_p,
+                frequencyPenalty: LLMEngine.Sampler.Rep_pen - 1,
+                seed: LLMEngine.Sampler.Sampler_seed != -1 ? LLMEngine.Sampler.Sampler_seed : null,
+                user: LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt ? LLMEngine.User.Name : null,
+                stops: [.. LLMEngine.Instruct.GetStoppingStrings(LLMEngine.User, LLMEngine.Bot)],
+                maxTokens: responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride,
+                temperature: tempoverride >= 0 ? tempoverride : (LLMEngine.ForceTemperature >= 0) ? LLMEngine.ForceTemperature : LLMEngine.Sampler.Temperature);
             return chatrq;
         }
 
@@ -69,8 +69,8 @@ namespace AIToolkit
 
         public int GetTokenCount(AuthorRole role, string message)
         {
-            var msg = FormatSingleMessage(role, LLMSystem.User, LLMSystem.Bot, message);
-            return LLMSystem.GetTokenCount(msg.Content.ToString());
+            var msg = FormatSingleMessage(role, LLMEngine.User, LLMEngine.Bot, message);
+            return LLMEngine.GetTokenCount(msg.Content.ToString());
         }
 
         public string PromptToText()
@@ -79,9 +79,9 @@ namespace AIToolkit
             foreach (var message in _prompt)
             {
                 if (message.Role == OpenAI.Role.User)
-                    sb.AppendLine(LLMSystem.User.Name + ": " + message.Content.ToString());
+                    sb.AppendLine(LLMEngine.User.Name + ": " + message.Content.ToString());
                 else if (message.Role == OpenAI.Role.Assistant)
-                    sb.AppendLine(LLMSystem.Bot.Name + ": " + message.Content.ToString());
+                    sb.AppendLine(LLMEngine.Bot.Name + ": " + message.Content.ToString());
                 else
                     sb.AppendLine("SYSTEM" + ": " + message.Content.ToString());
             }
@@ -91,7 +91,7 @@ namespace AIToolkit
         private static Message FormatSingleMessage(AuthorRole role, BasePersona user, BasePersona bot, string prompt)
         {
             var realprompt = prompt;
-            var addname = LLMSystem.NamesInPromptOverride ?? LLMSystem.Instruct.AddNamesToPrompt;
+            var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt;
 
             // In group conversations, ALWAYS add names so the LLM knows which persona is speaking
             if (bot is GroupPersona)
@@ -116,7 +116,7 @@ namespace AIToolkit
                     selname = user.Name;
                 }
             }
-            return new Message(TokenTools.InternalRoleToChatRole(role), LLMSystem.ReplaceMacros(realprompt, user, bot), selname);
+            return new Message(TokenTools.InternalRoleToChatRole(role), LLMEngine.ReplaceMacros(realprompt, user, bot), selname);
         }
     }
 }
