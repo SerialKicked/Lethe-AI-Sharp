@@ -82,6 +82,9 @@ namespace AIToolkit.LLM
         /// <summary> Set to true if the backend supports vision </summary>
         public static bool SupportsVision => Client?.SupportsVision ?? false;
 
+        /// <summary> Set to true if the backend supports GBNF grammar output </summary>
+        public static bool SupportsGrammar => Client?.SupportsSchema ?? false;
+
         public static CompletionType CompletionAPIType => Client?.CompletionType ?? CompletionType.Text;
 
         private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(null, fullprompt);

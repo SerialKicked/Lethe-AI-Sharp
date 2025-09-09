@@ -95,7 +95,7 @@ namespace AIToolkit.Files
             }
             EndTime = Messages.Last().Date;
 
-            if (LLMEngine.Client?.SupportsSchema == true)
+            if (LLMEngine.SupportsGrammar == true)
             {
                 var meta = await GetSessionInfo().ConfigureAwait(false);
                 MetaData = meta;
