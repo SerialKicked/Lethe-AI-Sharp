@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace AIToolkit.Memory
@@ -25,7 +26,7 @@ namespace AIToolkit.Memory
     /// <summary>
     /// Individual long term and contextual memory entry
     /// </summary>
-    public class MemoryUnit : KeywordEntry, IEmbed
+    public class MemoryUnit : IEmbed
     {
         /// <summary>
         /// Unique Identifier
@@ -91,6 +92,12 @@ namespace AIToolkit.Memory
         public WEPosition Position { get; set; } = WEPosition.SystemPrompt;
         public float TriggerChance { get; set; } = 1;
 
+        public bool Enabled = true;
+        public List<string> KeyWordsMain = [];
+        public List<string> KeyWordsSecondary = [];
+        public KeyWordLink WordLink = KeyWordLink.And;
+        public bool CaseSensitive = false;
+
         public virtual async Task EmbedText()
         {
             if (!RAGEngine.Enabled)
@@ -141,6 +148,29 @@ namespace AIToolkit.Memory
             }
             text.AppendLinuxLine().AppendLinuxLine($"{Content}").AppendLinuxLine().Append("Mention this information when there's a lull in the discussion, if the user makes a mention of it, or if you feel like it's a good idea to talk about it.");
             return text.ToString();
+        }
+
+        public bool CheckKeywords(string message)
+        {
+            if (!Enabled || (KeyWordsMain.Count == 0 && KeyWordsSecondary.Count == 0))
+                return false;
+
+            var comparison = CaseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase;
+            bool ContainsWholeWord(string input, string word)
+            {
+                return Regex.IsMatch(input, $@"\b{Regex.Escape(word)}\b", comparison);
+            }
+
+            var main = KeyWordsMain.Any(kw => ContainsWholeWord(message, kw));
+            var secondary = KeyWordsSecondary.Count == 0 || KeyWordsSecondary.Any(kw => ContainsWholeWord(message, kw));
+
+            return WordLink switch
+            {
+                KeyWordLink.And => main && secondary,
+                KeyWordLink.Or => main || secondary,
+                KeyWordLink.Not => main && !secondary,
+                _ => false
+            };
         }
     }
 }

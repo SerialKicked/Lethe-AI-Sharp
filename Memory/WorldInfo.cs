@@ -22,38 +22,6 @@ namespace AIToolkit.Memory
         Not
     }
 
-    public class KeywordEntry
-    {
-        public bool Enabled = true;
-        public List<string> KeyWordsMain = [];
-        public List<string> KeyWordsSecondary = [];
-        public KeyWordLink WordLink = KeyWordLink.And;
-        public bool CaseSensitive = false;
-
-        public bool CheckKeywords(string message)
-        {
-            if (!Enabled || (KeyWordsMain.Count == 0 && KeyWordsSecondary.Count == 0))
-                return false;
-
-            var comparison = CaseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase;
-            bool ContainsWholeWord(string input, string word)
-            {
-                return Regex.IsMatch(input, $@"\b{Regex.Escape(word)}\b", comparison);
-            }
-
-            var main = KeyWordsMain.Any(kw => ContainsWholeWord(message, kw));
-            var secondary = KeyWordsSecondary.Count == 0 || KeyWordsSecondary.Any(kw => ContainsWholeWord(message, kw));
-
-            return WordLink switch
-            {
-                KeyWordLink.And => main && secondary,
-                KeyWordLink.Or => main || secondary,
-                KeyWordLink.Not => main && !secondary,
-                _ => false
-            };
-        }
-    }
-
     public class WorldInfo : BaseFile
     {
         private class ActiveLink
