@@ -213,13 +213,24 @@ namespace AIToolkit.Files
         /// <summary>
         /// Retrieves a message with the specified unique identifier.
         /// </summary>
-        /// <remarks>This method searches the current session's collection of messages and returns the
-        /// first match  based on the provided identifier. If no match is found, the method returns <see
-        /// langword="null"/>.</remarks>
-        /// <param name="id">The unique identifier of the message to retrieve.</param>
+        /// <remarks>This method searches the messages and returns the first match based on the provided GUID. 
+        /// If no match is found, the method returns null.</remarks>
+        /// <param name="id">The unique GUID of the message to retrieve.</param>
+        /// <param name="currentSessionOnly">If set to <see langword="true"/>, the search is limited to the current session only.</param>
         /// <returns>The <see cref="SingleMessage"/> instance with the specified identifier, or <see langword="null"/>  if no
         /// message with the given identifier is found.</returns>
-        public SingleMessage? GetMessageByID(Guid id) => CurrentSession.Messages.FirstOrDefault(m => m.Guid == id);
+        public SingleMessage? GetMessageByID(Guid id, bool currentSessionOnly = false)
+        {
+            if (currentSessionOnly)
+                return CurrentSession.Messages.FirstOrDefault(m => m.Guid == id);
+            foreach (var session in Sessions)
+            {
+                var msg = session.Messages.FirstOrDefault(m => m.Guid == id);
+                if (msg != null)
+                    return msg;
+            }
+            return null;
+        }
 
         /// <summary>
         /// Logs a message in the current chat session and returns the created message object.
