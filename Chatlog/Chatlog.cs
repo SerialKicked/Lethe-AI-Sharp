@@ -11,18 +11,54 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices.Marshalling;
 using System.Text;
 using System.Text.RegularExpressions;
+using static System.Collections.Specialized.BitVector32;
 
 namespace AIToolkit.Files
 {
-    public enum SessionHandling { CurrentOnly, FitAll }
 
-    public class Chatlog : BaseFile, IFile
+    /// <summary>
+    /// Specifies the behavior for handling session messages in a chat log.
+    /// </summary>
+    /// <remarks>This enumeration defines how messages from different sessions are included in the chat log. 
+    /// Use <see cref="CurrentOnly"/> to restrict the log to the current session, or <see cref="FitAll"/>  to include
+    /// messages from all sessions within the token limit.</remarks>
+    public enum SessionHandling 
     {
-        public string Name { get; set; } = string.Empty;
-        public int CurrentSessionID { get; set; } = -1;
-        public readonly List<ChatSession> Sessions = [];
-        private int lastSessionID = -1;
+        /// <summary>
+        /// If set to CurrentOnly, the chatlog will only include messages from the current session.
+        /// </summary>
+        CurrentOnly,
+        /// <summary>
+        /// If set to FitAll, the chatlog will include messages from all sessions, fitting as many as possible within the token limit.
+        /// </summary>
+        FitAll
+    }
 
+    /// <summary>
+    /// Represents the full chatlog for a specific agent.
+    /// It provides functionality to manage, retrieve, and manipulate chat history.
+    /// </summary>
+    /// <remarks>The <see cref="Chatlog"/> class maintains a collection of chat sessions and provides methods
+    /// to interact with the chat history, such as retrieving specific messages, logging new messages, and managing
+    /// session boundaries. It supports event-driven notifications for key actions, such as adding messages or creating
+    /// new sessions.</remarks>
+    public class Chatlog : BaseFile
+    {
+        /// <summary>
+        /// Current active session ID. If -1 (or out of rangeà, the last session in the list is considered current. This allows
+        /// the user to continue chatting with the persona in previous sessions if needed.
+        /// </summary>
+        public int CurrentSessionID { get; set; } = -1;
+
+        /// <summary>
+        /// List of all chat sessions in this log.
+        /// </summary>
+        public readonly List<ChatSession> Sessions = [];
+
+        /// <summary>
+        /// Accessor for the current chat session. If no sessions exist, a new session is created automatically.
+        /// This points to the session at CurrentSessionID, or the last session if CurrentSessionID is out of range.
+        /// </summary>
         [JsonIgnore]
         public ChatSession CurrentSession
         {
@@ -38,24 +74,20 @@ namespace AIToolkit.Files
             }
         }
 
+        /// <summary>
+        /// Events raised by the Chatlog class to notify listeners before a message is added to the current session.
+        /// </summary>
         [JsonIgnore] public EventHandler<SingleMessage>? OnBeforeMessageAdded;
+        /// <summary>
+        /// Events raised by the Chatlog class to notify listeners after a message is added to the current session.
+        /// </summary>
         [JsonIgnore] public EventHandler<SingleMessage>? OnMessageAdded;
+        /// <summary>
+        /// Events raised by the Chatlog class to notify listeners when a new session is created.
+        /// </summary>
         [JsonIgnore] public EventHandler<ChatSession>? OnNewSession;
 
-        private void RaiseBeforeMessageAdded(SingleMessage message)
-        {
-            OnBeforeMessageAdded?.Invoke(this, message);
-        }
-
-        private void RaiseOnMessageAdded(SingleMessage message)
-        {
-            OnMessageAdded?.Invoke(this, message);
-        }
-
-        private void RaiseOnNewSession(ChatSession session)
-        {
-            OnNewSession?.Invoke(this, session);
-        }
+        private int lastSessionID = -1;
 
         /// <summary>
         /// Factory method for creating ChatSession instances. Override this in derived classes to provide custom ChatSession implementations.
@@ -215,9 +247,9 @@ namespace AIToolkit.Files
                 stringfix = stringfix[(idx + LLMEngine.Instruct.ThinkingEnd.Length)..].CleanupAndTrim();
             }
             var single = new SingleMessage(role, DateTime.Now, stringfix, bot.UniqueName, user.UniqueName);
-            RaiseBeforeMessageAdded(single);
+            OnBeforeMessageAdded?.Invoke(this, single);
             CurrentSession.Messages.Add(single);
-            RaiseOnMessageAdded(single);
+            OnMessageAdded?.Invoke(this, single);
             return single;
         }
 
@@ -229,12 +261,10 @@ namespace AIToolkit.Files
         {
             if (Sessions.Count == 0)
                 Sessions.Add(CreateChatSession());
-            RaiseBeforeMessageAdded(single);
+            OnBeforeMessageAdded?.Invoke(this, single);
             CurrentSession.Messages.Add(single);
-            RaiseOnMessageAdded(single);
+            OnMessageAdded?.Invoke(this, single);
         }
-
-        public void RemoveAt(int id) => CurrentSession.Messages.RemoveAt(id);
 
         /// <summary>
         /// Removes the last message from the current chat session, if any messages exist.
@@ -262,6 +292,11 @@ namespace AIToolkit.Files
         /// <returns></returns>
         public SingleMessage? LastMessage() => CurrentSession.Messages.Count >= 1 ? CurrentSession.Messages.Last() : null;
 
+        /// <summary>
+        /// Removes all embedded summaries from the sessions.
+        /// </summary>
+        /// <remarks>This method iterates through all sessions and clears their embedded summaries. After
+        /// calling this method, the EmbedSummary property of each session will be empty.</remarks>
         public void RemoveEmbeds()
         {
             foreach (var item in Sessions)
@@ -312,7 +347,7 @@ namespace AIToolkit.Files
             {
                 CurrentSession.Messages.Clear();
             }
-            RaiseOnNewSession(CurrentSession);
+            OnNewSession?.Invoke(this, CurrentSession);
             if (!addDateInfo)
                 return;
             // Generate new system message about the new session
@@ -402,6 +437,14 @@ namespace AIToolkit.Files
             Messages.Clear();
         }
 
+        /// <summary>
+        /// Retrieves information about the current chat session, including the total token count and the session
+        /// duration.
+        /// </summary>
+        /// <returns>A tuple containing the total number of tokens in the current chat session and the duration of the session.
+        /// The token count is calculated based on the content of all messages in the session, and the duration is the 
+        /// time span between the first and last message timestamps. If the session contains one or no messages,  the
+        /// token count will be 0 and the duration will be <see cref="TimeSpan.Zero"/>.</returns>
         public (int tokens, TimeSpan duration) GetCurrentChatSessionInfo()
         {
             if (CurrentSession.Messages.Count <= 1)
@@ -419,10 +462,37 @@ namespace AIToolkit.Files
             return (tokencount, duration);
         }
 
-        public string GetLastUserMessageContent()
+        /// <summary>
+        /// Fetches the last message from a specified author role within the current chat session.
+        /// </summary>
+        /// <param name="author"></param>
+        /// <returns></returns>
+        public SingleMessage? GetLastFromInSession(AuthorRole author)
         {
-            return CurrentSession.Messages.LastOrDefault(m => m.Role == AuthorRole.User)?.Message ?? string.Empty;
+            return CurrentSession.Messages.LastOrDefault(m => m.Role == author);
         }
+
+        /// <summary>
+        /// Fetches the last message from a specified author role, searching through previous sessions if necessary.
+        /// </summary>
+        /// <param name="author"></param>
+        /// <returns></returns>
+        public SingleMessage? GetLastMessageFrom(AuthorRole author)
+        {
+            var res = CurrentSession.Messages.LastOrDefault(m => m.Role == author);
+            // if not found, search in previous sessions until found
+            if (res == null)
+            {
+                for (int i = Sessions.Count - 2; i >= 0; i--)
+                {
+                    res = Sessions[i].Messages.LastOrDefault(m => m.Role == author);
+                    if (res != null)
+                        break;
+                }
+            }
+            return res;
+        }
+
 
         public virtual void SaveToFile(string pPath) 
         {
@@ -438,22 +508,6 @@ namespace AIToolkit.Files
         {
             if (AreYouSure)
                 Sessions.Clear();
-        }
-
-        public SingleMessage? GetLastMessageFrom(AuthorRole author)
-        {
-            var res = CurrentSession.Messages.LastOrDefault(m => m.Role == author);
-            // if not found, search in previous sessions until found
-            if (res == null)
-            {
-                for (int i = Sessions.Count - 2; i >= 0; i--)
-                {
-                    res = Sessions[i].Messages.LastOrDefault(m => m.Role == author);
-                    if (res != null)
-                        break;
-                }
-            }
-            return res;
         }
 
     }

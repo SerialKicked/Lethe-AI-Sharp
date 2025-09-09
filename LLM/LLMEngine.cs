@@ -807,7 +807,10 @@ namespace AIToolkit.LLM
         /// <returns></returns>
         private static string GenerateSystemPromptContent(string newMessage)
         {
-            var searchmessage = string.IsNullOrWhiteSpace(newMessage) ? History.GetLastUserMessageContent() : newMessage;
+            var searchmessage = string.IsNullOrWhiteSpace(newMessage) ? 
+                History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty : 
+                newMessage;
+
             var rawprompt = new StringBuilder(SystemPrompt.GetSystemPromptRaw(Bot));
 
             // Check if the plugin has anything to add to system prompts
@@ -850,7 +853,9 @@ namespace AIToolkit.LLM
         {
             // Check for RAG entries and refresh the textual inserts
             dataInserts.DecreaseDuration();
-            var searchmessage = string.IsNullOrWhiteSpace(newMessage) ? History.GetLastUserMessageContent() : newMessage;
+            var searchmessage = string.IsNullOrWhiteSpace(newMessage) ?
+                History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty :
+                newMessage;
             if (RAGEngine.Enabled)
             {
                 var search = await RAGEngine.Search(ReplaceMacros(searchmessage)).ConfigureAwait(false);
@@ -1011,7 +1016,10 @@ namespace AIToolkit.LLM
                 return;
 
             // Plugin pre-pass OUTSIDE the model slot to avoid deadlocks
-            var lastuserinput = string.IsNullOrEmpty(userInput) ? History.GetLastUserMessageContent() : userInput;
+            var lastuserinput = string.IsNullOrWhiteSpace(userInput) ?
+                History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty :
+                userInput;
+            
             var pluginmessage = await BuildPluginSystemInsertAsync(lastuserinput).ConfigureAwait(false);
 
             // build the message if relevant
