@@ -10,6 +10,14 @@ using static AIToolkit.SearchAPI.WebSearchAPI;
 
 namespace AIToolkit.Agent.Plugins
 {
+    /// <summary>
+    /// Represents a task that performs research by analyzing unfamiliar topics from a persona's session history and
+    /// executing web searches to gather and merge relevant information. It works on archived sessions only and works
+    /// well in tandem with <seealso cref="ActiveResearchTask"/>.
+    /// </summary>
+    /// <remarks>This task is designed to operate within the context of an agent's workflow. It observes the
+    /// persona's session history to determine if research is required, and if so, it performs web searches on
+    /// unfamiliar topics and stores the results in the persona's memory./remarks>
     public sealed class ResearchTask : IAgentTask
     {
         public string Id => "ResearchTask";

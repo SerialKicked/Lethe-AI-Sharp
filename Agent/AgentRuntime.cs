@@ -228,6 +228,10 @@ namespace AIToolkit.Agent
                     case "ResearchTask":
                         _plugins.Add(new ResearchTask());
                         break;
+                    case "ActiveResearchTask":
+                        _plugins.Add(new ActiveResearchTask());
+                        break;
+
                 }
             }
             // Now that everything is loaded check the config, and initialize new configs if needed
