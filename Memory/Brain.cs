@@ -202,7 +202,10 @@ namespace AIToolkit.Memory
         }
     }
 
-
+    /// <summary>
+    /// Brain functionality for a persona, handles memories, mood, and message inserts
+    /// </summary>
+    /// <param name="basePersona">Owner</param>
     public class Brain(BasePersona basePersona)
     {
         [JsonIgnore] private BasePersona Owner { get; set; } = basePersona;

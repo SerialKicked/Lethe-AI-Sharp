@@ -11,7 +11,7 @@ using System.Globalization;
 
 namespace AIToolkit
 {
-    public class StringFix(bool removeAllBoldedText, bool fixQuotes, bool removeSingleWorldEmphasis, bool removeAllQuotes, bool removeItalic, float removeItalicRatio, int removeItalicMaxWords)
+    public class StringFix(bool removeAllBoldedText, bool fixQuotes, bool removeSingleWorldEmphasis, bool removeAllQuotes, bool removeItalic, float removeItalicRatio, int removeItalicMaxWords, bool lastParagraphDeleter)
     {
         public bool RemoveAllBoldedText = removeAllBoldedText;
         public bool RemoveAllQuotes = removeAllQuotes;
@@ -20,6 +20,7 @@ namespace AIToolkit
         public bool RemoveItalic = removeItalic;
         public float RemoveItalicRatio = removeItalicRatio;
         public int RemoveItalicMaxWords = removeItalicMaxWords;
+        public bool LastParagraphDeleter = lastParagraphDeleter;
     }
 
     public static class StringExtensions
@@ -263,7 +264,53 @@ namespace AIToolkit
                     }
                 }
             }
-            // 
+
+            if (fix.LastParagraphDeleter && !streamed)
+            {
+                /*
+                 Pseudocode / Plan:
+                 1. Detect paragraph separators: paragraphs are blocks separated by at least one blank line (i.e. one or more empty lines -> double newline).
+                 2. Work in Linux newline format to simplify splitting (normalize with ToLinuxFormat()).
+                 3. Split using a regex on blank lines: pattern \n\s*\n
+                 4. Filter out completely empty paragraphs (trimmed length == 0).
+                 5. If paragraph count >= 3:
+                    a. Inspect all paragraphs except the last: if ANY contains '?' -> we must delete the last paragraph.
+                    b. Else (no '?' in earlier paragraphs) delete last paragraph with 66% probability (RNG.NextDouble() < 0.66).
+                 6. If deletion happens:
+                    a. Reconstruct text by joining remaining paragraphs with two newlines.
+                    b. Preserve original newline style (detect if original used \r\n).
+                 7. Assign back to workstring.
+                 Edge Cases:
+                  - If after filtering there are <3 paragraphs do nothing.
+                  - If last paragraph is empty after trimming, treat as normal paragraph (it can still be deleted).
+                */
+                var originalHadWindowsNewlines = workstring.Contains("\r\n");
+                var linux = originalHadWindowsNewlines ? workstring.ToLinuxFormat() : workstring;
+
+                // Split on one or more blank lines
+                var rawParagraphs = Regex.Split(linux, @"\n\s*\n");
+                // Filter out paragraphs that are entirely whitespace only if they are not meaningful
+                var paragraphs = rawParagraphs
+                    .Select(p => p.TrimEnd()) // keep leading spaces inside RP blocks but trim end
+                    .Where(p => p.Length > 0)
+                    .ToList();
+
+                if (paragraphs.Count >= 3)
+                {
+                    bool earlierHasQuestion = paragraphs.Take(paragraphs.Count - 1)
+                                                         .Any(p => p.Contains('?'));
+                    bool deleteLast = earlierHasQuestion || LLMEngine.RNG.NextDouble() < 0.66;
+
+                    if (deleteLast)
+                    {
+                        paragraphs.RemoveAt(paragraphs.Count - 1);
+                        // Reconstruct with double newline as separator
+                        linux = string.Join("\n\n", paragraphs);
+                        workstring = originalHadWindowsNewlines ? linux.ToWinFormat() : linux;
+                    }
+                }
+            }
+
             workstring = workstring.Replace("  ", " ");
             workstring = workstring.Replace("... ...", "... ");
             workstring = workstring.Replace("… …", "… ");
