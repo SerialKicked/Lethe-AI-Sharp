@@ -16,7 +16,8 @@ namespace AIToolkit.LLM
 
     /// <summary>
     /// System to handle communications with language models. 
-    /// Handles the connection to the server and the generation of prompts. Manages the chat history, personas, inference settings, and instruction formats
+    /// Handles the connection to the server and the generation of prompts. 
+    /// Manages the chat history, personas, inference settings, and instruction formats
     /// </summary>
     public static class LLMEngine
     {
@@ -87,11 +88,11 @@ namespace AIToolkit.LLM
 
         public static CompletionType CompletionAPIType => Client?.CompletionType ?? CompletionType.Text;
 
-        private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(null, fullprompt);
-        private static void RaiseOnStatusChange(SystemStatus newStatus) => OnStatusChanged?.Invoke(null, newStatus);
-        private static void RaiseOnInferenceStreamed(string addedString) => OnInferenceStreamed?.Invoke(null, addedString);
-        private static void RaiseOnInferenceEnded(string fullString) => OnInferenceEnded?.Invoke(null, fullString);
-        private static void RaiseOnQuickInferenceEnded(string fullprompt) => OnQuickInferenceEnded?.Invoke(null, fullprompt);
+        private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(Bot, fullprompt);
+        private static void RaiseOnStatusChange(SystemStatus newStatus) => OnStatusChanged?.Invoke(Bot, newStatus);
+        private static void RaiseOnInferenceStreamed(string addedString) => OnInferenceStreamed?.Invoke(Bot, addedString);
+        private static void RaiseOnInferenceEnded(string fullString) => OnInferenceEnded?.Invoke(Bot, fullString);
+        private static void RaiseOnQuickInferenceEnded(string fullprompt) => OnQuickInferenceEnded?.Invoke(Bot, fullprompt);
 
         /// <summary> List of loaded plugins </summary>
         public static List<IContextPlugin> ContextPlugins { get; set; } = [];

@@ -38,32 +38,30 @@ namespace AIToolkit.Agent.Plugins
             var lastguidtest = cfg.GetSetting<Guid>("LastSessionGuid");
             if (lastsession.Guid == lastguidtest)
                 return false;
-            // Check if the last session has search requests
-            if (lastsession.NewTopics.Unfamiliar_Topics == null || lastsession.NewTopics.Unfamiliar_Topics.Count == 0)
-                return false;
             return true;
         }
 
         public async Task Execute(BasePersona owner, AgentTaskSetting cfg, CancellationToken ct)
         {
             var session = owner.History.Sessions[^2];
-            // retrieve search requests
-            var searchtopics = session.NewTopics.Unfamiliar_Topics;
-            // really shouldn't happen, but hey maybe some third party shenanigans
-            if (searchtopics == null || searchtopics.Count == 0)
-                return;
 
             // Get the web search action from registry
+            var findTopicAction = AgentRuntime.GetAction<TopicLookup?, FindResearchTopicsParams>("FindResearchTopicsAction");
             var webSearchAction = AgentRuntime.GetAction<List<EnrichedSearchResult>, TopicSearch>("WebSearchAction");
             var mergeAction = AgentRuntime.GetAction<string, MergeSearchParams>("MergeSearchResultsAction");
 
-            if (webSearchAction == null || mergeAction == null)
+            if (webSearchAction == null || mergeAction == null || findTopicAction == null)
             {
                 LLMEngine.Logger?.LogWarning("Required actions not found in registry. ResearchTask cancelled.");
                 return;
             }
 
-            foreach (var topic in searchtopics)
+            var searchparams = new FindResearchTopicsParams { Messages = session.Messages, IncludeBios = true };
+            var lookup = await findTopicAction.Execute(searchparams, ct).ConfigureAwait(false);
+            if (lookup == null || lookup.Unfamiliar_Topics.Count == 0)
+                return;
+
+            foreach (var topic in lookup.Unfamiliar_Topics)
             {
                 // Cancellation requested?
                 if (ct.IsCancellationRequested)

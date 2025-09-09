@@ -4,6 +4,7 @@
 #pragma warning disable 8618 // Disable "CS8618 Non-nullable field is uninitialized"
 #pragma warning disable 8625 // Disable "CS8625 Cannot convert null literal to non-nullable reference type"
 
+using AIToolkit.LLM;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -200,8 +201,7 @@ namespace AIToolkit.API
                 delayMs = (int)(RetryDelayMs * Math.Pow(2, attempt - 1));
 
                 // Add some jitter (±20% randomization) to avoid thundering herd
-                var random = new Random();
-                double jitter = 0.8 + (random.NextDouble() * 0.4); // 0.8 to 1.2
+                double jitter = 0.8 + (LLMEngine.RNG.NextDouble() * 0.4); // 0.8 to 1.2
                 delayMs = (int)(delayMs * jitter);
 
                 // Cap at 30 seconds max delay

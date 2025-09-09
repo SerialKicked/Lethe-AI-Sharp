@@ -9,7 +9,7 @@ using System.Text;
 
 namespace AIToolkit.Files
 {
-    public class ChatSession : MemoryUnit, IChatSession
+    public class ChatSession : MemoryUnit
     {
         // Canonical fields proxied to MetaData for this subtype
         public override string Name
@@ -25,7 +25,6 @@ namespace AIToolkit.Files
         }
 
         public SessionMetaInfo MetaData { get; set; } = new();
-        public TopicLookup NewTopics { get; set; } = new();
 
         public string Scenario { get; set; } = string.Empty;
 
@@ -43,7 +42,7 @@ namespace AIToolkit.Files
         public bool Sticky { get; set; } = false;
 
         [OnError]
-        internal void OnError(StreamingContext ctx, Newtonsoft.Json.Serialization.ErrorContext error)
+        internal void OnError(StreamingContext ctx, ErrorContext error)
         {
             // fix loading with older versions of the chatlog.
             if (string.Equals(error.Member?.ToString(), "Duration", StringComparison.OrdinalIgnoreCase))
@@ -102,8 +101,6 @@ namespace AIToolkit.Files
                 var sum = await GenerateSummary().ConfigureAwait(false);
                 if (sum.Length > MetaData.Summary.Length)
                     MetaData.Summary = sum;
-                var topics = await GetResearchTopics().ConfigureAwait(false);
-                NewTopics = topics;
             }
             else
             {
@@ -166,61 +163,6 @@ namespace AIToolkit.Files
             }
             var finalstr = await LLMEngine.SimpleQuery(ct).ConfigureAwait(false);
             session = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
-            session?.ClampRelevance();
-            LLMEngine.NamesInPromptOverride = null;
-            LLMEngine.Instruct.PrefillThinking = prefill;
-            return session!;
-        }
-
-        /// <summary>
-        /// Method that generates a list of research topics based on the chat session's content, character information, 
-        /// and dialog context, using a specified grammar for structured output. 
-        /// Used by the ResearchTask agentic plugin to identify topics for background web research.
-        /// </summary>
-        /// <returns>A <see cref="TopicLookup"/> object containing the generated research topics.</returns>
-        protected virtual async Task<TopicLookup> GetResearchTopics()
-        {
-            var session = new TopicLookup();
-            var grammar = await session.GetGrammar().ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(grammar))
-                throw new Exception("Something went wrong when building summary grammar and json format.");
-
-            LLMEngine.NamesInPromptOverride = false;
-            var prefill = LLMEngine.Instruct.PrefillThinking;
-            LLMEngine.Instruct.PrefillThinking = false;
-            var replyln = 2048;
-            var availtokens = LLMEngine.MaxContextLength - replyln - 20;
-
-            var promptbuild = LLMEngine.Client!.GetPromptBuilder();
-
-            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMEngine.NewLine +
-                LLMEngine.NewLine +
-                "# Character Information:" + LLMEngine.NewLine +
-                "## Name: {{char}}" + LLMEngine.NewLine +
-                "{{charbio}}" + LLMEngine.NewLine +
-                "## Name: {{user}}" + LLMEngine.NewLine +
-                "{{userbio}}" + LLMEngine.NewLine + LLMEngine.NewLine +
-                "# Chat Session:" + LLMEngine.NewLine +
-                "## Starting Date: " + StringExtensions.DateToHumanString(StartTime) + LLMEngine.NewLine +
-                "## Duration: " + StringExtensions.TimeSpanToHumanString(EndTime - StartTime) + LLMEngine.NewLine + LLMEngine.NewLine;
-
-
-            var requestedTask = session.GetQuery();
-
-            availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
-            availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
-
-            var docs = GetRawDialogs(availtokens, false, true, false);
-            promptbuild.AddMessage(AuthorRole.SysPrompt, sysprompt + docs);
-            promptbuild.AddMessage(AuthorRole.User, requestedTask);
-
-            var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, replyln);
-            if (ct is GenerationInput input)
-            {
-                input.Grammar = grammar;
-            }
-            var finalstr = await LLMEngine.SimpleQuery(ct).ConfigureAwait(false);
-            session = JsonConvert.DeserializeObject<TopicLookup>(finalstr);
             session?.ClampRelevance();
             LLMEngine.NamesInPromptOverride = null;
             LLMEngine.Instruct.PrefillThinking = prefill;

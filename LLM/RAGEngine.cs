@@ -33,7 +33,6 @@ namespace AIToolkit.LLM
         private readonly ThreadLocal<Random> threadLocalRandom = new(() => new Random(Interlocked.Increment(ref seed)));
         private static int seed = Environment.TickCount;
 
-        //private readonly Random RNG = new();
         public bool IsThreadSafe => true;
         public float NextFloat() => (float)threadLocalRandom.Value!.NextDouble();
         public int Next(int minValue, int maxValue) => threadLocalRandom.Value!.Next(minValue, maxValue);
