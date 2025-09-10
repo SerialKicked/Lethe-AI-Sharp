@@ -235,7 +235,7 @@ namespace AIToolkit.Files
             var realprompt = prompt;
 
             // In group conversations, ALWAYS add names so the LLM knows which persona is speaking
-            var addname = (bot is GroupPersona) ? true : RealAddNameToPrompt;
+            var addname = (bot is GroupPersona) || RealAddNameToPrompt;
 
             if (addname)
             {

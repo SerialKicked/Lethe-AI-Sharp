@@ -1,4 +1,4 @@
-﻿using AIToolkit.Agent;
+﻿using AIToolkit;
 using AIToolkit.Files;
 using AIToolkit.GBNF;
 using AIToolkit.LLM;
@@ -22,6 +22,9 @@ namespace AIToolkit.Memory
         public TimeSpan EurekaCutOff { get; set; } = TimeSpan.FromDays(15);
         public DateTime LastInsertTime { get; set; }
         public int CurrentDelay { get; set; } = 0;
+        public HashSet<MemoryType> DecayableMemories { get; set; } = [ MemoryType.WebSearch, MemoryType.Goal ];
+
+        public int MinNoRecallDaysBeforeDeletionPerPrioLevel { get; set; } = 10;
 
         public List<MemoryUnit> Memories { get; set; } = [];
         public List<TopicSearch> RecentSearches { get; set; } = [];
@@ -65,8 +68,7 @@ namespace AIToolkit.Memory
         /// </summary>
         private void RefreshMemories()
         {
-            // Remove old natural memories
-            Memories.RemoveAll(e => (e.Insertion == MemoryInsertion.Natural || e.Insertion == MemoryInsertion.NaturalForced)  && (DateTime.Now - e.Added) > EurekaCutOff);
+            MemoryDecay();
             // Select all natural memories within the cutoff period, order by Added descending, and enqueue them
             Eurekas.Clear();
             var cutoff = DateTime.Now - EurekaCutOff;
@@ -274,21 +276,12 @@ namespace AIToolkit.Memory
                 (Owner.History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty) : newMessage;
             searchmessage = LLMEngine.ReplaceMacros(searchmessage);
 
-            // Check all sessions for sticky entries
-            //foreach (var session in Owner.History.Sessions)
-            //{
-            //    if (session.Sticky && session != Owner.History.CurrentSession)
-            //    {
-            //        var rawmem = session.GetRawMemory(true, Owner.DatesInSessionSummaries);
-            //        dataInserts.AddInsert(new PromptInsert(session.Guid, rawmem, -1, 1));
-            //    }
-            //}
-
             if (RAGEngine.Enabled)
             {
                 var search = await RAGEngine.Search(searchmessage).ConfigureAwait(false);
                 dataInserts.AddMemories(search);
             }
+
             // Check for keyword-activated world info entries
             if (LLMEngine.Settings.AllowWorldInfo)
             {
@@ -361,6 +354,27 @@ namespace AIToolkit.Memory
                 return res;
             // Check local memories
             return Memories.FirstOrDefault(m => m.Guid == iD);
+        }
+
+        /// <summary>
+        /// Move memories to to their proper slot, delete old stuff.
+        /// </summary>
+        private void MemoryDecay()
+        {
+            // Remove old natural memories that haven't been inserted yet are are passed the cutoff
+            Memories.RemoveAll(e => (e.Insertion == MemoryInsertion.Natural || e.Insertion == MemoryInsertion.NaturalForced) && (DateTime.Now - e.Added) > EurekaCutOff);
+
+            // Remove old trigger memories that are decayable and haven't been recalled in a while
+            Memories.RemoveAll(e =>
+            {
+                if (e.Insertion != MemoryInsertion.Trigger || !DecayableMemories.Contains(e.Category))
+                    return false;
+                var noRecallDays = MinNoRecallDaysBeforeDeletionPerPrioLevel * (e.Priority + 1) + e.TriggerCount;
+
+                // If never triggered, use Added date
+                var since = (e.TriggerCount == 0) ? (DateTime.Now - e.Added) : (DateTime.Now - e.LastTrigger);
+                return (since.TotalDays > noRecallDays);
+            });
         }
 
         #endregion

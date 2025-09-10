@@ -1,8 +1,9 @@
 ﻿using AIToolkit.Files;
-using AIToolkit.Memory;
+using AIToolkit.LLM;
 using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace AIToolkit.LLM
+namespace AIToolkit.Memory
 {
     public class PromptInsert
     {
@@ -44,6 +45,7 @@ namespace AIToolkit.LLM
             }
             else
             {
+                LLMEngine.Bot.Brain.GetMemoryByID(data.guid)?.Touch();
                 Add(data);
             }
         }
@@ -95,5 +97,7 @@ namespace AIToolkit.LLM
                 res.Add(item.guid);
             return res;
         }
+
+        public bool Contains(Guid guid) => FindIndex(i => i.guid == guid) != -1;
     }
 }
