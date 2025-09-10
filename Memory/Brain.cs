@@ -9,6 +9,12 @@ using System.Threading.Tasks;
 
 namespace AIToolkit.Memory
 {
+    public class UserReturnInsert(string info)
+    {
+        public Guid ID { get; set; } = new Guid();
+        public DateTime Added { get; set; } = DateTime.Now;
+        public string Info { get; set; } = info;
+    }
 
     /// <summary>
     /// Brain functionality for a persona, handles memories, mood, and message inserts
@@ -19,16 +25,18 @@ namespace AIToolkit.Memory
         [JsonIgnore] private BasePersona Owner { get; set; } = basePersona;
         public TimeSpan MinInsertDelay { get; set; } = TimeSpan.FromMinutes(15);
         public int MinMessageDelay { get; set; } = 4;
+        public float HoursBeforeAFK { get; set; } = 4;
         public TimeSpan EurekaCutOff { get; set; } = TimeSpan.FromDays(15);
         public DateTime LastInsertTime { get; set; }
         public int CurrentDelay { get; set; } = 0;
         public HashSet<MemoryType> DecayableMemories { get; set; } = [ MemoryType.WebSearch, MemoryType.Goal ];
-
         public int MinNoRecallDaysBeforeDeletionPerPrioLevel { get; set; } = 10;
 
-        public List<MemoryUnit> Memories { get; set; } = [];
+        [JsonProperty] protected List<MemoryUnit> Memories { get; set; } = [];
+        [JsonProperty] protected List<UserReturnInsert> Inserts { get; set; } = [];
+
         public List<TopicSearch> RecentSearches { get; set; } = [];
-        [JsonIgnore] public List<MemoryUnit> Eurekas { get; set; } = [];
+        [JsonIgnore] protected List<MemoryUnit> Eurekas { get; set; } = [];
 
         public virtual MoodState Mood { get; set; } = new MoodState();
 
@@ -94,29 +102,16 @@ namespace AIToolkit.Memory
             if (message.Role != AuthorRole.User)
                 return;
 
-            // First, check if there's a long time between message and last message, if so do the mood related stuff
-            if (Owner.SenseOfTime)
-            {
-                // no previous user message, nothing to do
-                var lastmsg = LLMEngine.History.GetLastMessageFrom(AuthorRole.User);
-                if (lastmsg == null)
-                    return;
-                Mood.Update();
-                Mood.Interpret(message.Message);
-                // check if we have a previous message in current session, and if it's already a system msg, gtfo
-                if (LLMEngine.History.CurrentSession.Messages.Count > 1 && LLMEngine.History.CurrentSession.Messages[^2].Role == AuthorRole.System)
-                    return;
+            Mood.Update();
+            Mood.Interpret(message.Message);
 
-                var timeSinceLast = (DateTime.Now - lastmsg.Date);
-                if (timeSinceLast >= TimeSpan.FromHours(4))
-                {
-                    var info = LLMEngine.GetAwayString() + " " + Mood.Describe();
-                    info = LLMEngine.ReplaceMacros(info.CleanupAndTrim());
-                    var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, info, Owner.UniqueName, LLMEngine.User.UniqueName, true);
-                    LLMEngine.History.LogMessage(tosend);
-                    // Stop here, don't insert a eureka right after this one.
-                    return;
-                }
+            // Prepare away message if need be.
+            var msg = BuildAwayMessage();
+            if (msg != null)
+            {
+                LLMEngine.History.LogMessage(msg);
+                // Stop here, don't insert a eureka right after this one.
+                return;
             }
 
             RefreshMemories();
@@ -135,81 +130,6 @@ namespace AIToolkit.Memory
             {
                 InsertEureka(null, !iseurekatriggerword);
             }
-        }
-
-        /// <summary>
-        /// Retrieve the most relevant Eureka from the collection based on the similarity to the specified user input.
-        /// </summary>
-        /// <remarks>If the RAG system is disabled or the brain is disabled, the method returns null</remarks>
-        /// <param name="userinput">The input string to compare against the Eurekas.</param>
-        /// <param name="maxDistance">The maximum allowable distance for a Eureka to be considered relevant. Defaults to 0.075.</param>
-        /// <returns>A <see cref="MemoryUnit"/> representing the most relevant Eureka if one is found within the specified distance; otherwise null.</returns>
-        protected virtual async Task<MemoryUnit?> GetRelevantEureka(string userinput, float maxDistance = 0.085f)
-        {
-            if (!RAGEngine.Enabled)
-                return null;
-
-            foreach (var item in Eurekas)
-            {
-                var dist = await RAGEngine.GetDistanceAsync(userinput, item).ConfigureAwait(false);
-                if (dist <= maxDistance)
-                {
-                    return item;
-                }
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Inserts a selected memory into the conversation as a system message.
-        /// </summary>
-        /// <param name="insert">memory to insert</param>
-        protected virtual void InsertEureka(MemoryUnit? insert = null, bool onlyForced = false)
-        {
-            // Work on a local variable; do not reassign the parameter for clarity.
-            MemoryUnit? selected = insert;
-
-            // If only forced, search the forced pool
-            if (onlyForced && selected is null)
-            {
-                selected = Eurekas.Find(e => e.Insertion == MemoryInsertion.NaturalForced);
-                if (selected is null)
-                    return; // nothing to insert
-            }
-
-            if (selected is null)
-            {
-                if (Eurekas.Count == 0)
-                    return;
-                selected = Eurekas[0];
-            }
-
-            // Avoid immediate re-use in the current window
-            Eurekas.Remove(selected);
-            LastInsertTime = DateTime.Now;
-            CurrentDelay = 0;
-
-            // Persist the intent so RefreshMemories will not bring it back:
-            if (selected.Priority > 1)
-            {
-                // Keep important memories but stop them from being considered "natural" next time
-                selected.Insertion = MemoryInsertion.Trigger;
-            }
-            else
-            {
-                // One-shot natural memories are consumed
-                Memories.Remove(selected);
-            }
-
-            var tosend = new SingleMessage(
-                AuthorRole.System,
-                DateTime.Now,
-                selected.ToEureka(),
-                Owner.UniqueName,
-                LLMEngine.User.UniqueName,
-                true);
-            selected.Touch();
-            LLMEngine.History.LogMessage(tosend);
         }
 
         /// <summary>
@@ -377,7 +297,204 @@ namespace AIToolkit.Memory
             });
         }
 
+        /// <summary>
+        /// Adds the specified memory unit to the collection of memories.
+        /// </summary>
+        /// <param name="mem">The memory unit to add. Cannot be <see langword="null"/>.</param>
+        public void Memorize(MemoryUnit mem)
+        {
+            Memories.Add(mem);
+        }
+
+        /// <summary>
+        /// Removes the specified memory unit from the collection of memories.
+        /// </summary>
+        /// <remarks>If the specified memory unit does not exist in the collection, no action is
+        /// taken.</remarks>
+        /// <param name="mem">The memory unit to remove. Cannot be <see langword="null"/>.</param>
+        public void Forget(MemoryUnit mem)
+        {
+            Memories.Remove(mem);
+        }
+
+        public List<MemoryUnit> GetMemoriesForRAG()
+        {
+            return Memories.FindAll(m => m.Insertion == MemoryInsertion.Trigger && m.EmbedSummary.Length > 0);
+        }
+
         #endregion
+
+        #region *** Eureka Management ***
+
+        /// <summary>
+        /// Retrieve the most relevant Eureka from the collection based on the similarity to the specified user input.
+        /// </summary>
+        /// <remarks>If the RAG system is disabled or the brain is disabled, the method returns null</remarks>
+        /// <param name="userinput">The input string to compare against the Eurekas.</param>
+        /// <param name="maxDistance">The maximum allowable distance for a Eureka to be considered relevant. Defaults to 0.075.</param>
+        /// <returns>A <see cref="MemoryUnit"/> representing the most relevant Eureka if one is found within the specified distance; otherwise null.</returns>
+        protected virtual async Task<MemoryUnit?> GetRelevantEureka(string userinput, float maxDistance = 0.085f)
+        {
+            if (!RAGEngine.Enabled)
+                return null;
+
+            foreach (var item in Eurekas)
+            {
+                var dist = await RAGEngine.GetDistanceAsync(userinput, item).ConfigureAwait(false);
+                if (dist <= maxDistance)
+                {
+                    return item;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Inserts a selected memory into the conversation as a system message.
+        /// </summary>
+        /// <param name="insert">memory to insert</param>
+        protected virtual void InsertEureka(MemoryUnit? insert = null, bool onlyForced = false)
+        {
+            // Work on a local variable; do not reassign the parameter for clarity.
+            MemoryUnit? selected = insert;
+
+            // If only forced, search the forced pool
+            if (onlyForced && selected is null)
+            {
+                selected = Eurekas.Find(e => e.Insertion == MemoryInsertion.NaturalForced);
+                if (selected is null)
+                    return; // nothing to insert
+            }
+
+            if (selected is null)
+            {
+                if (Eurekas.Count == 0)
+                    return;
+                selected = Eurekas[0];
+            }
+
+            // Avoid immediate re-use in the current window
+            Eurekas.Remove(selected);
+            LastInsertTime = DateTime.Now;
+            CurrentDelay = 0;
+
+            // Persist the intent so RefreshMemories will not bring it back:
+            if (selected.Priority > 1)
+            {
+                // Keep important memories but stop them from being considered "natural" next time
+                selected.Insertion = MemoryInsertion.Trigger;
+            }
+            else
+            {
+                // One-shot natural memories are consumed
+                Memories.Remove(selected);
+            }
+
+            var tosend = new SingleMessage(
+                AuthorRole.System,
+                DateTime.Now,
+                selected.ToEureka(),
+                Owner.UniqueName,
+                LLMEngine.User.UniqueName,
+                true);
+            selected.Touch();
+            LLMEngine.History.LogMessage(tosend);
+        }
+
+        #endregion
+
+        #region *** User Return Inserts ***
+
+        /// <summary>
+        /// Add a message to be inserted when the user returns after a long absence. This is inserted in the same block as the mood and time message.
+        /// </summary>
+        /// <param name="info"></param>
+        public UserReturnInsert AddUserReturnInsert(string info)
+        {
+            var existing = Inserts.Find(i => i.Info.Equals(info, StringComparison.InvariantCultureIgnoreCase));
+            if (existing != null)
+            {
+                existing.Added = DateTime.Now;
+                return existing;
+            }
+            else
+            {
+                var x = new UserReturnInsert(info);
+                Inserts.Add(x);
+                return x;
+            }
+        }
+
+        public bool RemoveUserReturnInsert(Guid id)
+        {
+            var existing = Inserts.Find(i => i.ID == id);
+            if (existing != null)
+            {
+                Inserts.Remove(existing);
+                return true;
+            }
+            return false;
+        }
+
+        public SingleMessage? BuildAwayMessage()
+        {
+            // no previous user message, nothing to do
+            if (!Owner.SenseOfTime && Inserts.Count == 0)
+                return null;
+
+            // no previous user message, nothing to do
+            var lastmsg = LLMEngine.History.GetLastMessageFrom(AuthorRole.User);
+            if (lastmsg == null)
+                return null;
+
+            // check if we have a previous message in current session, and if it's already a system msg, gtfo
+            if (LLMEngine.History.CurrentSession.Messages.Count > 1 && LLMEngine.History.CurrentSession.Messages[^2].Role == AuthorRole.System)
+                return null;
+
+            var timeSinceLast = (DateTime.Now - lastmsg.Date);
+            if (timeSinceLast < TimeSpan.FromHours(HoursBeforeAFK))
+                return null;
+
+            var info = Owner.SenseOfTime ? GetAwayString() + " " + Mood.Describe() : Mood.Describe();
+            foreach (var item in Inserts)
+            {
+                info += " " + item.Info;
+            };
+            Inserts.Clear();
+            info = LLMEngine.ReplaceMacros(info.CleanupAndTrim());
+            var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, info, Owner.UniqueName, LLMEngine.User.UniqueName, true);
+            return tosend;
+        }
+
+        /// <summary>
+        /// Returns an away string depending on the last chat's date.
+        /// </summary>
+        /// <returns></returns>
+        protected virtual string GetAwayString()
+        {
+            var lastusermsg = Owner.History.GetLastMessageFrom(AuthorRole.User);
+            if (lastusermsg == null || Owner.History.CurrentSession != Owner.History.Sessions.Last())
+                return string.Empty;
+
+            var timespan = DateTime.Now - lastusermsg.Date;
+            if (timespan <= new TimeSpan(2, 0, 0))
+                return string.Empty;
+
+            var msgtxt = (DateTime.Now.Date != lastusermsg.Date.Date) || (timespan > new TimeSpan(12, 0, 0)) ?
+                $"We're {DateTime.Now.DayOfWeek} {StringExtensions.DateToHumanString(DateTime.Now)}." : string.Empty;
+            if (timespan.Days > 1)
+                msgtxt += $" The last chat was {timespan.Days} days ago. " + "It is {{time}} now.";
+            else if (timespan.Days == 1)
+                msgtxt += " The last chat happened yesterday. It is {{time}} now.";
+            else
+                msgtxt += $" The last chat was about {timespan.Hours} hours ago. " + "It is {{time}} now.";
+            msgtxt = msgtxt.Trim();
+            return LLMEngine.ReplaceMacros(msgtxt);
+        }
+
+
+        #endregion
+
 
     }
 }

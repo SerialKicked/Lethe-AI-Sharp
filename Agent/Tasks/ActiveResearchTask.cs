@@ -121,7 +121,7 @@ namespace AIToolkit.Agent.Plugins
                 };
 
                 await mem.EmbedText().ConfigureAwait(false);
-                owner.Brain.Memories.Add(mem);
+                owner.Brain.Memorize(mem);
             }
             cfg.SetSetting<Guid>("LastMessageGuid", activesession.Messages[^1].Guid);
             cfg.SetSetting<DateTime>("LastSearch", DateTime.Now);

@@ -205,10 +205,9 @@ namespace AIToolkit.LLM
                 currentID++;
             }
 
-            foreach (var doc in LLMEngine.Bot.Brain.Memories)
+            var brainmemories = LLMEngine.Bot.Brain.GetMemoriesForRAG();
+            foreach (var doc in brainmemories)
             {
-                if (doc.EmbedSummary.Length == 0 || doc.Insertion != Memory.MemoryInsertion.Trigger)
-                    continue;
                 vectors.Add(doc.EmbedSummary);
                 LookupDB[currentID] = (doc.Guid, EmbedType.Brain);
                 currentID++;
@@ -270,9 +269,9 @@ namespace AIToolkit.LLM
                         if (found.MetaData.IsRoleplaySession)
                         {
                             if (requestIsAboutRoleplay)
-                                item.Distance -= 0.05f; // Boost RP sessions
+                                item.Distance -= 0.04f; // Boost RP sessions
                             else
-                                item.Distance += 0.05f; // Decay RP sessions
+                                item.Distance += 0.04f; // Decay RP sessions
                         }
                         // Mark sticky as not wanted because they are handled with different insertion method
                         if (found.Sticky)

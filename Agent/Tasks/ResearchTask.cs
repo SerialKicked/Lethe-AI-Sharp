@@ -67,7 +67,7 @@ namespace AIToolkit.Agent.Plugins
                 if (ct.IsCancellationRequested)
                     return;
                 // Compare to recent searches to avoid duplicate
-                var wassearchedbefore = await LLMEngine.Bot.Brain.WasSearchedRecently(topic.Topic).ConfigureAwait(false);
+                var wassearchedbefore = await LLMEngine.Bot.Brain.WasSearchedRecently(topic.Topic, 0.085f).ConfigureAwait(false);
                 if (wassearchedbefore)
                     continue;
                 LLMEngine.Bot.Brain.RecentSearches.Add(topic);
@@ -97,7 +97,7 @@ namespace AIToolkit.Agent.Plugins
                 };
 
                 await mem.EmbedText().ConfigureAwait(false);
-                owner.Brain.Memories.Add(mem);
+                owner.Brain.Memorize(mem);
             }
             cfg.SetSetting<Guid>("LastSessionGuid", session.Guid);
         }

@@ -5,6 +5,7 @@ using AIToolkit.Memory;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Drawing;
+using System.Globalization;
 using System.Text;
 using static AIToolkit.SearchAPI.WebSearchAPI;
 using Message = OpenAI.Chat.Message;
@@ -539,7 +540,7 @@ namespace AIToolkit.LLM
 
             // Common replacements for both group and single
             res.Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
-               .Replace("{{time}}", DateTime.Now.ToShortTimeString())
+               .Replace("{{time}}", DateTime.Now.ToString("hh:mm tt", CultureInfo.InvariantCulture))
                .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString());
 
             return res.ToString().CleanupAndTrim();
@@ -567,32 +568,6 @@ namespace AIToolkit.LLM
             }
         }
           
-        /// <summary>
-        /// Returns an away string depending on the last chat's date.
-        /// </summary>
-        /// <returns></returns>
-        public static string GetAwayString()
-        {
-            var lastusermsg = Bot.History.GetLastMessageFrom(AuthorRole.User);
-            if (lastusermsg == null || History.CurrentSession != History.Sessions.Last())
-                return string.Empty;
-
-            var timespan = DateTime.Now - lastusermsg.Date;
-            if (timespan <= new TimeSpan(2, 0, 0))
-                return string.Empty;
-
-            var msgtxt = (DateTime.Now.Date != lastusermsg.Date.Date) || (timespan > new TimeSpan(12, 0, 0)) ?
-                $"We're {DateTime.Now.DayOfWeek} {StringExtensions.DateToHumanString(DateTime.Now)}." : string.Empty;
-            if (timespan.Days > 1)
-                msgtxt += $" The last chat was {timespan.Days} days ago. " + "It is {{time}} now.";
-            else if (timespan.Days == 1)
-                msgtxt += " The last chat happened yesterday. It is {{time}} now.";
-            else
-                msgtxt += $" The last chat was about {timespan.Hours} hours ago. " + "It is {{time}} now.";
-            msgtxt = msgtxt.Trim();
-            return ReplaceMacros(msgtxt);
-        }
-
         /// <summary>
         /// Called to clear the prompt cache and force a rebuild of the prompt on next generation. Must be called when changing any setting that affects the prompt.
         /// </summary>
