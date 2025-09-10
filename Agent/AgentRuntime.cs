@@ -16,7 +16,7 @@ namespace AIToolkit.Agent
     public class AgentConfig
     {
         public Dictionary<string, AgentTaskSetting> PluginSettings { get; set; } = [];
-        public TimeSpan MinInactivityTime { get; set; } = new TimeSpan(0, 15, 0); // 30 minutes
+        public TimeSpan MinInactivityTime { get; set; } = new TimeSpan(0, 15, 0);
     }
 
     /// <summary>
@@ -294,6 +294,7 @@ namespace AIToolkit.Agent
         }
 
         #endregion
+
 
         #region *** Action Management ***
 

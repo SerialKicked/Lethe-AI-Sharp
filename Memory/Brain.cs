@@ -185,21 +185,21 @@ namespace AIToolkit.Memory
         /// Checks for RAG entries and refreshes the textual inserts.
         /// </summary>
         /// <param name="MsgSender"></param>
-        /// <param name="newMessage"></param>
+        /// <param name="searchstring"></param>
         /// <returns></returns>
-        public virtual async Task UpdateRagAndInserts(PromptInserts dataInserts, string newMessage)
+        public virtual async Task UpdateRagAndInserts(PromptInserts target, string searchstring, int ragResCount, float ragDistance)
         {
             // Check for RAG entries and refresh the textual inserts
-            dataInserts.DecreaseDuration();
+            target.DecreaseDuration();
 
-            var searchmessage = string.IsNullOrWhiteSpace(newMessage) ?
-                (Owner.History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty) : newMessage;
+            var searchmessage = string.IsNullOrWhiteSpace(searchstring) ?
+                (Owner.History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty) : searchstring;
             searchmessage = LLMEngine.ReplaceMacros(searchmessage);
 
             if (RAGEngine.Enabled)
             {
-                var search = await RAGEngine.Search(searchmessage).ConfigureAwait(false);
-                dataInserts.AddMemories(search);
+                var search = await RAGEngine.Search(searchmessage, ragResCount, ragDistance).ConfigureAwait(false);
+                target.AddMemories(search);
             }
 
             // Check for keyword-activated world info entries
@@ -234,12 +234,12 @@ namespace AIToolkit.Memory
                         }
                     }
                 }
-                var usedguid = dataInserts.GetGuids();
+                var usedguid = target.GetGuids();
                 _currentWorldEntries.RemoveAll(e => usedguid.Contains(e.Guid));
 
                 foreach (var entry in _currentWorldEntries)
                 {
-                    dataInserts.AddInsert(new PromptInsert(
+                    target.AddInsert(new PromptInsert(
                         entry.Guid, entry.Content, entry.PositionIndex, entry.Duration)
                         );
                 }
@@ -298,12 +298,54 @@ namespace AIToolkit.Memory
         }
 
         /// <summary>
-        /// Adds the specified memory unit to the collection of memories.
+        /// Adds a memory unit to the collection, optionally skipping duplicate checks.
         /// </summary>
-        /// <param name="mem">The memory unit to add. Cannot be <see langword="null"/>.</param>
-        public void Memorize(MemoryUnit mem)
+        /// <remarks>If <paramref name="skipDuplicateCheck"/> is <see langword="false"/>, the method
+        /// performs a similarity check  against existing memories in the same category. If a similar memory is found
+        /// (based on a predefined distance threshold),  the existing memory is replaced with the new one. Otherwise,
+        /// the new memory is added to the collection.</remarks>
+        /// <param name="mem">The memory unit to be added. This object represents a specific memory with associated data.</param>
+        /// <param name="skipDuplicateCheck">A boolean value indicating whether to skip the duplicate check.  If <see langword="true"/>, the memory unit
+        /// is added directly without checking for duplicates.  Defaults to <see langword="false"/>.</param>
+        /// 
+        public void Memorize(MemoryUnit mem, bool skipDuplicateCheck = false)
         {
-            Memories.Add(mem);
+            if (skipDuplicateCheck || mem.EmbedSummary.Length == 0)
+            {
+                Memories.Add(mem);
+                return;
+            }
+
+            var mindist = float.MaxValue;
+            var bestmatch = (MemoryUnit?)null;
+            var comparelist = Memories.FindAll(e => e.Category == mem.Category);
+            foreach (var item in comparelist)
+            {
+                if (item.Category != mem.Category)
+                    continue;
+                var dist = RAGEngine.GetDistance(item, mem);
+                if (dist < mindist)
+                {
+                    mindist = dist;
+                    bestmatch = item;
+                }
+            }
+
+            if (mindist < 0.07f && bestmatch != null)
+            {
+                var idx = Memories.IndexOf(bestmatch);
+                if (idx != -1)
+                {
+                    Memories[idx] = mem;
+                    mem.Touch();
+                    return;
+                }
+            }
+            else
+            {
+                // No similar memory found, add new
+                Memories.Add(mem);
+            }
         }
 
         /// <summary>
@@ -409,8 +451,10 @@ namespace AIToolkit.Memory
         /// Add a message to be inserted when the user returns after a long absence. This is inserted in the same block as the mood and time message.
         /// </summary>
         /// <param name="info"></param>
-        public UserReturnInsert AddUserReturnInsert(string info)
+        public UserReturnInsert? AddUserReturnInsert(string info)
         {
+            if (string.IsNullOrWhiteSpace(info))
+                return null;
             var existing = Inserts.Find(i => i.Info.Equals(info, StringComparison.InvariantCultureIgnoreCase));
             if (existing != null)
             {

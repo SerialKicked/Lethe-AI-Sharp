@@ -123,6 +123,7 @@ namespace AIToolkit.Agent.Plugins
                 await mem.EmbedText().ConfigureAwait(false);
                 owner.Brain.Memorize(mem);
             }
+            owner.Brain.AddUserReturnInsert("{{char}} found some new information that might be useful regarding the recently discussed topics.");
             cfg.SetSetting<Guid>("LastMessageGuid", activesession.Messages[^1].Guid);
             cfg.SetSetting<DateTime>("LastSearch", DateTime.Now);
         }

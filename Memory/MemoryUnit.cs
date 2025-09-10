@@ -111,7 +111,7 @@ namespace AIToolkit.Memory
                 return;
             var mixedcat = new HashSet<MemoryType>() 
             { 
-                MemoryType.ChatSession, MemoryType.Journal, MemoryType.WebSearch, MemoryType.Person, MemoryType.Location, MemoryType.Event 
+                MemoryType.ChatSession, MemoryType.Journal, MemoryType.WebSearch, MemoryType.Person, MemoryType.Location, MemoryType.Event, MemoryType.Goal
             };
             if (!mixedcat.Contains(Category))
             {

@@ -112,9 +112,10 @@ namespace AIToolkit.Files
         /// <param name="allowRP">A boolean value indicating whether to include roleplay sessions in the summary. If <see langword="false"/>,
         /// roleplay sessions are excluded. Defaults to <see langword="true"/>.</param>
         /// <param name="maxCount">The maximum number of previous sessions to include in the summary. Defaults to <see cref="int.MaxValue"/>, meaning all valid sessions</param>
+        /// <param name="ignoreList">An optional set of session GUIDs to ignore when compiling the summary. Sessions with GUIDs in this list will be skipped.</param>
         /// <returns>A string containing the formatted summaries of previous sessions, up to the specified token limit.  Returns
         /// an empty string if no valid sessions are found or if the token limit is too restrictive.</returns>
-        public string GetPreviousSummaries(int maxTokens, string sectionHeader = "##", bool allowRP = true, int maxCount = int.MaxValue)
+        public string GetPreviousSummaries(int maxTokens, string sectionHeader = "##", bool allowRP = true, int maxCount = int.MaxValue, HashSet<Guid>? ignoreList = null)
         {
             if (lastSessionID == -1 && Sessions.Count >= 2)
             {
@@ -127,7 +128,7 @@ namespace AIToolkit.Files
             if (entrydepth < 0)
                 return string.Empty;
 
-            var usedGuid = LLMEngine.dataInserts.GetGuids();
+            var usedGuid = ignoreList ?? [];
 
             // Add the sticky sessions first
             var SelectedSessions = new List<ChatSession>();
@@ -144,7 +145,6 @@ namespace AIToolkit.Files
                 var session = Sessions[i];
                 if (usedGuid.Contains(session.Guid) || string.IsNullOrWhiteSpace(session.Content))
                     continue;
-
                 if (!allowRP && session.MetaData.IsRoleplaySession)
                     continue;
                 sb.Clear();

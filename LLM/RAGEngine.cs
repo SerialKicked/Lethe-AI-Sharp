@@ -383,7 +383,7 @@ namespace AIToolkit.LLM
         /// Compute cosine similarity distance between two IEmbed.
         /// Returns a value in [0, 2].
         /// </summary>
-        public static float GetDistanceAsync(IEmbed a, IEmbed b)
+        public static float GetDistance(IEmbed a, IEmbed b)
         {
             if (a.EmbedSummary.Length == 0 || b.EmbedSummary.Length == 0 || a.EmbedSummary.Length != b.EmbedSummary.Length)
                 return 2f;

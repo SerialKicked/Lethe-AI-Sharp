@@ -808,7 +808,7 @@ namespace AIToolkit.LLM
 
             if (Settings.SessionMemorySystem && History.Sessions.Count > 1)
             {
-                var shistory = History.GetPreviousSummaries(Settings.SessionReservedTokens - GetTokenCount(ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator);
+                var shistory = History.GetPreviousSummaries(Settings.SessionReservedTokens - GetTokenCount(ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator, ignoreList: dataInserts.GetGuids());
                 if (!string.IsNullOrEmpty(shistory))
                 {
                     rawprompt.AppendLinuxLine(NewLine + ReplaceMacros(SystemPrompt.SessionHistoryTitle) + NewLine);
@@ -841,7 +841,7 @@ namespace AIToolkit.LLM
             }
 
             // update the RAG, world info, and summary stuff
-            await Bot.Brain.UpdateRagAndInserts(dataInserts, newMessage).ConfigureAwait(false);
+            await Bot.Brain.UpdateRagAndInserts(dataInserts, newMessage, Settings.RAGMaxEntries, Settings.RAGDistanceCutOff).ConfigureAwait(false);
 
             // Prepare the full system prompt and count the tokens used
             var rawprompt = GenerateSystemPromptContent(newMessage);

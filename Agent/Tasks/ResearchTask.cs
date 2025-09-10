@@ -99,6 +99,7 @@ namespace AIToolkit.Agent.Plugins
                 await mem.EmbedText().ConfigureAwait(false);
                 owner.Brain.Memorize(mem);
             }
+            owner.Brain.AddUserReturnInsert("{{char}} has done some research about the previous chat sessions.");
             cfg.SetSetting<Guid>("LastSessionGuid", session.Guid);
         }
 
