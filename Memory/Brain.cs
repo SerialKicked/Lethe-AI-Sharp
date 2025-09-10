@@ -2,205 +2,13 @@
 using AIToolkit.Files;
 using AIToolkit.GBNF;
 using AIToolkit.LLM;
+using CommunityToolkit.HighPerformance;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace AIToolkit.Memory
 {
-    /// <summary>
-    /// list of "what's up" and similar sentences open ended intros to trigger a memory recall
-    /// </summary>
-    internal static class MemoryTriggers
-    {
-        private static readonly List<string> EurekaTriggers =
-        [
-            "any updates",
-            "any developments",
-            "any breakthroughs",
-            "any discoveries",
-            "any news",
-            "anything interesting",
-            "anything new",
-            "anything exciting",
-            "anything noteworthy",
-            "anything remarkable",
-            "pick a topic",
-            "pick something",
-            "something new",
-            "something to share",
-            "something interesting",
-            "share something",
-            "share anything",
-            "share news",
-            "share updates",
-            "talk about?",
-            "what have you learned",
-            "what's going on",
-            "what's happening",
-            "what's the latest",
-            "what's the scoop",
-            "what's the buzz",
-            "what's the word",
-            "what's up",
-            "what's new",
-        ];
-
-        private static readonly List<string> ComplimentTriggers =
-        [
-            "you look nice",
-            "you look great",
-            "you did well",
-            "good job",
-            "well done",
-            "congrats",
-            "bravo",
-            "kudos",
-            "thank you",
-            "thanks",
-            "much appreciated",
-            "I appreciate it",
-            "you are amazing",
-            "you are awesome",
-            "you are the best",
-            "you are incredible",
-            "you are fantastic",
-            "you are wonderful",
-            "you are impressive",
-            "you are outstanding",
-            "you are remarkable",
-            "you are extraordinary",
-            "you are exceptional",
-            "you are brilliant",
-            "you are superb",
-            "you're amazing",
-            "you're awesome",
-            "you're the best",
-            "you're incredible",
-            "you're fantastic",
-            "you're wonderful",
-            "you're impressive",
-            "you're remarkable",
-            "you're extraordinary",
-            "you're exceptional",
-            "you're brilliant",
-        ];
-
-
-        public static bool IsEurekaTrigger(string input)
-        {
-            var lowered = input.ToLowerInvariant();
-            return EurekaTriggers.Any(trigger => lowered.Contains(trigger));
-        }
-
-        public static bool IsComplimentTrigger(string input)
-        {
-            var lowered = input.ToLowerInvariant();
-            return ComplimentTriggers.Any(trigger => lowered.Contains(trigger));
-        }
-    }
-
-    public class MoodState
-    {
-        private double energy = 0.5;
-        private double cheer = 0.5;
-        private double curiosity = 0.5;
-
-        public double Energy 
-        { 
-            get => energy;
-            set
-            {
-                energy = value;
-                energy = Math.Clamp(energy, 0, 1);
-            }
-        }
-
-        public double Cheer 
-        { 
-            get => cheer;
-            set
-            {
-                cheer = value;
-                cheer = Math.Clamp(cheer, 0, 1);
-            }
-        }
-
-        public double Curiosity 
-        { 
-            get => curiosity;
-            set
-            {
-                curiosity = value;
-                curiosity = Math.Clamp(curiosity, 0, 1);
-            }
-        }
-
-        public virtual void Update()
-        {
-            // Natural decay towards neutral state (0.5)
-            Energy += (0.5 - Energy) * 0.005;
-            Cheer += (0.5 - Cheer) * 0.005;
-            Curiosity += (0.5 - Curiosity) * 0.005;
-
-            // Special cases based on time since last message exchanged
-            var msg = LLMEngine.History.GetLastMessageFrom(AuthorRole.User);
-            if (msg != null)
-            {
-                var timeSinceLast = (DateTime.Now - msg.Date);
-                if (timeSinceLast >= TimeSpan.FromDays(7))
-                {
-                    // Long gap increase energy and curiosity, but decreases cheer
-                    Energy = 0.6;
-                    Curiosity = 1;
-                    Cheer -= 0.05 * timeSinceLast.TotalDays;
-                }
-                else if (timeSinceLast >= TimeSpan.FromDays(0.5))
-                {
-                    // Recent interaction increases cheer
-                    Energy += 0.2 * timeSinceLast.TotalDays;
-                    Curiosity += 0.02 * timeSinceLast.TotalDays;
-                }
-            }
-        }
-
-        public virtual void Interpret(string userMessage)
-        {
-            if (MemoryTriggers.IsComplimentTrigger(userMessage))
-            {
-                Cheer += 0.1;
-                Energy += 0.05;
-            };
-        }
-
-        public virtual string Describe()
-        {
-            var sb = new StringBuilder("{{char}} is currently feeling");
-            if (Energy < 0.35)
-                sb.Append(" tired");
-            else if (Energy > 0.65)
-                sb.Append(" energetic");
-            else
-                sb.Append(" rested");
-
-            if (Cheer < 0.15)
-                sb.Append(", sad");
-            if (Cheer < 0.35)
-                sb.Append(", moody");
-            else if (Cheer > 0.65)
-                sb.Append(", joyful");
-            else if (Cheer > 0.85)
-                sb.Append(", happy");
-
-            if (Curiosity < 0.25)
-                sb.Append(", and disinterested");
-            else if (Curiosity > 0.65)
-                sb.Append(", and curious");
-            sb.Append('.');
-            return sb.ToString();
-        }
-    }
 
     /// <summary>
     /// Brain functionality for a persona, handles memories, mood, and message inserts
@@ -220,11 +28,6 @@ namespace AIToolkit.Memory
         [JsonIgnore] public List<MemoryUnit> Eurekas { get; set; } = [];
 
         public virtual MoodState Mood { get; set; } = new MoodState();
-
-        /// <summary>
-        /// Checks if Brain functionality should be disabled (currently returns true for group conversations)
-        /// </summary>
-        private bool IsBrainDisabled => LLMEngine.IsGroupConversation;
 
         /// <summary>
         /// Called to initialize the brain with its owner persona.
@@ -252,8 +55,6 @@ namespace AIToolkit.Memory
         /// <param name="e"></param>
         protected virtual void DoOnNewSession(object? sender, ChatSession e)
         {
-            if (IsBrainDisabled)
-                return;
             CurrentDelay = 0;
             LastInsertTime = DateTime.Now;
             RefreshMemories();
@@ -269,8 +70,7 @@ namespace AIToolkit.Memory
             // Select all natural memories within the cutoff period, order by Added descending, and enqueue them
             Eurekas.Clear();
             var cutoff = DateTime.Now - EurekaCutOff;
-            var recent = Memories.Where(m => (m.Insertion == MemoryInsertion.Natural || m.Insertion == MemoryInsertion.NaturalForced) && m.Added >= cutoff)
-                                .OrderByDescending(m => m.Added).ToList();
+            var recent = Memories.Where(m => (m.Insertion == MemoryInsertion.Natural || m.Insertion == MemoryInsertion.NaturalForced) && m.Added >= cutoff).OrderByDescending(m => m.Added).ToList();
             foreach (var item in recent)
                 Eurekas.Add(item);
         }
@@ -289,7 +89,7 @@ namespace AIToolkit.Memory
         /// <returns></returns>
         public virtual async Task HandleMessages(SingleMessage message)
         {
-            if (IsBrainDisabled || message.Role != AuthorRole.User)
+            if (message.Role != AuthorRole.User)
                 return;
 
             // First, check if there's a long time between message and last message, if so do the mood related stuff
@@ -342,9 +142,9 @@ namespace AIToolkit.Memory
         /// <param name="userinput">The input string to compare against the Eurekas.</param>
         /// <param name="maxDistance">The maximum allowable distance for a Eureka to be considered relevant. Defaults to 0.075.</param>
         /// <returns>A <see cref="MemoryUnit"/> representing the most relevant Eureka if one is found within the specified distance; otherwise null.</returns>
-        protected virtual async Task<MemoryUnit?> GetRelevantEureka(string userinput, float maxDistance = 0.075f)
+        protected virtual async Task<MemoryUnit?> GetRelevantEureka(string userinput, float maxDistance = 0.085f)
         {
-            if (IsBrainDisabled ||!RAGEngine.Enabled)
+            if (!RAGEngine.Enabled)
                 return null;
 
             foreach (var item in Eurekas)
@@ -364,8 +164,6 @@ namespace AIToolkit.Memory
         /// <param name="insert">memory to insert</param>
         protected virtual void InsertEureka(MemoryUnit? insert = null, bool onlyForced = false)
         {
-            if (IsBrainDisabled)
-                return;
             // Work on a local variable; do not reassign the parameter for clarity.
             MemoryUnit? selected = insert;
 
@@ -408,7 +206,7 @@ namespace AIToolkit.Memory
                 Owner.UniqueName,
                 LLMEngine.User.UniqueName,
                 true);
-
+            selected.Touch();
             LLMEngine.History.LogMessage(tosend);
         }
 
@@ -444,19 +242,104 @@ namespace AIToolkit.Memory
         }
 
         /// <summary>
-        /// Checks if a memory of a specific type with the given session ID exists in the collection.
+        /// Regenerates the embeddings for all memories in the collection.
         /// </summary>
-        /// <param name="memType"></param>
-        /// <param name="sessionId"></param>
+        /// <remarks>This method iterates through the collection of memories and invokes the
+        /// <c>EmbedText</c> method  on each memory asynchronously. It ensures that the embeddings are updated for all
+        /// items in the collection.</remarks>
+        /// <returns>A task that represents the asynchronous operation.</returns>
+        public async Task RegenEmbeds()
+        {
+            foreach (var mem in Memories)
+            {
+                await mem.EmbedText().ConfigureAwait(false);
+            }
+        }
+
+
+        #region *** LTM - Memory Management ***
+
+        /// <summary>
+        /// Checks for RAG entries and refreshes the textual inserts.
+        /// </summary>
+        /// <param name="MsgSender"></param>
+        /// <param name="newMessage"></param>
         /// <returns></returns>
-        public bool Has(MemoryType memType, Guid sessionId) => Memories.Any(m => m.Category == memType && m.Guid == sessionId);
+        public virtual async Task UpdateRagAndInserts(PromptInserts dataInserts, string newMessage)
+        {
+            // Check for RAG entries and refresh the textual inserts
+            dataInserts.DecreaseDuration();
+
+            var searchmessage = string.IsNullOrWhiteSpace(newMessage) ?
+                (Owner.History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty) : newMessage;
+            searchmessage = LLMEngine.ReplaceMacros(searchmessage);
+
+            // Check all sessions for sticky entries
+            //foreach (var session in Owner.History.Sessions)
+            //{
+            //    if (session.Sticky && session != Owner.History.CurrentSession)
+            //    {
+            //        var rawmem = session.GetRawMemory(true, Owner.DatesInSessionSummaries);
+            //        dataInserts.AddInsert(new PromptInsert(session.Guid, rawmem, -1, 1));
+            //    }
+            //}
+
+            if (RAGEngine.Enabled)
+            {
+                var search = await RAGEngine.Search(searchmessage).ConfigureAwait(false);
+                dataInserts.AddMemories(search);
+            }
+            // Check for keyword-activated world info entries
+            if (LLMEngine.Settings.AllowWorldInfo)
+            {
+                var _currentWorldEntries = new List<MemoryUnit>();
+                // Add world entries from the group/bot itself
+                if (Owner.MyWorlds.Count > 0)
+                {
+                    foreach (var world in Owner.MyWorlds)
+                    {
+                        _currentWorldEntries.AddRange(world.FindEntries(Owner.History, searchmessage));
+                    }
+                }
+                // If in group conversation, also add world entries from the current active persona
+                if (Owner is GroupPersona group)
+                {
+                    var currentBot = group.CurrentBot;
+                    if (currentBot?.MyWorlds.Count > 0)
+                    {
+                        foreach (var world in currentBot.MyWorlds)
+                        {
+                            var entries = world.FindEntries(Owner.History, searchmessage);
+                            // Only add entries that aren't already included from the group
+                            foreach (var entry in entries)
+                            {
+                                if (!_currentWorldEntries.Any(e => e.Guid == entry.Guid))
+                                {
+                                    _currentWorldEntries.Add(entry);
+                                }
+                            }
+                        }
+                    }
+                }
+                var usedguid = dataInserts.GetGuids();
+                _currentWorldEntries.RemoveAll(e => usedguid.Contains(e.Guid));
+
+                foreach (var entry in _currentWorldEntries)
+                {
+                    dataInserts.AddInsert(new PromptInsert(
+                        entry.Guid, entry.Content, entry.PositionIndex, entry.Duration)
+                        );
+                }
+            }
+
+        }
 
         /// <summary>
         /// Retrieves a local embed object with the specified unique identifier.
         /// </summary>
         /// <param name="iD">The unique identifier of the embed to retrieve.</param>
         /// <returns>The embed object with the specified identifier, or <see langword="null"/> if no matching embed is found.</returns>
-        internal IEmbed? GetEmbedByID(Guid iD)
+        internal MemoryUnit? GetLocalMemoryByID(Guid iD)
         {
             return Memories.FirstOrDefault(m => m.Guid == iD);
         }
@@ -480,20 +363,7 @@ namespace AIToolkit.Memory
             return Memories.FirstOrDefault(m => m.Guid == iD);
         }
 
-        /// <summary>
-        /// Regenerates the embeddings for all memories in the collection.
-        /// </summary>
-        /// <remarks>This method iterates through the collection of memories and invokes the
-        /// <c>EmbedText</c> method  on each memory asynchronously. It ensures that the embeddings are updated for all
-        /// items in the collection.</remarks>
-        /// <returns>A task that represents the asynchronous operation.</returns>
-        public async Task RegenEmbeds()
-        {
-            foreach (var mem in Memories)
-            {
-                await mem.EmbedText().ConfigureAwait(false);
-            }
-        }
+        #endregion
 
     }
 }

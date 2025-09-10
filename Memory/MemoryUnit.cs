@@ -87,9 +87,11 @@ namespace AIToolkit.Memory
         /// </summary>
         public int Priority { get; set; } = 1;
 
+        /// <summary>
+        /// Insertion position index. 0 = most recent -> 100 = least recent. -1 to insert into system prompt instead.
+        /// </summary>
         public int PositionIndex { get; set; } = 0;
         public int Duration { get; set; } = 1;
-        public WEPosition Position { get; set; } = WEPosition.SystemPrompt;
         public float TriggerChance { get; set; } = 1;
 
         public bool Enabled = true;
@@ -97,6 +99,11 @@ namespace AIToolkit.Memory
         public List<string> KeyWordsSecondary = [];
         public KeyWordLink WordLink = KeyWordLink.And;
         public bool CaseSensitive = false;
+
+        public void Touch()
+        {
+            LastTrigger = DateTime.Now; TriggerCount++;
+        }
 
         public virtual async Task EmbedText()
         {

@@ -161,7 +161,6 @@ namespace AIToolkit.LLM
         private static BasePersona user = new() { IsUser = true, Name = "User", UniqueName = string.Empty };
 
         internal static List<string> vlm_pictures = [];
-        internal static HashSet<Guid> usedGuidInSession = [];
         internal static PromptInserts dataInserts = [];
         internal static readonly Random RNG = new();
 
@@ -567,7 +566,7 @@ namespace AIToolkit.LLM
                 return TokenTools.CountTokens(text);
             }
         }
-
+          
         /// <summary>
         /// Returns an away string depending on the last chat's date.
         /// </summary>
@@ -601,7 +600,6 @@ namespace AIToolkit.LLM
         {
             PromptBuilder?.Clear();
             dataInserts.Clear();
-            usedGuidInSession.Clear();
         }
 
         /// <summary>
@@ -833,9 +831,8 @@ namespace AIToolkit.LLM
                     rawprompt.AppendLinuxLine(item.Content);
             }
 
-            if (Settings.SessionMemorySystem && Settings.SessionReservedTokens > 0 && History.Sessions.Count > 1)
+            if (Settings.SessionMemorySystem && History.Sessions.Count > 1)
             {
-                usedGuidInSession = dataInserts.GetGuids();
                 var shistory = History.GetPreviousSummaries(Settings.SessionReservedTokens - GetTokenCount(ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator);
                 if (!string.IsNullOrEmpty(shistory))
                 {
@@ -845,78 +842,6 @@ namespace AIToolkit.LLM
             }
 
             return ReplaceMacros(rawprompt.ToString()).CleanupAndTrim();
-        }
-
-        /// <summary>
-        /// Checks for RAG entries and refreshes the textual inserts.
-        /// </summary>
-        /// <param name="MsgSender"></param>
-        /// <param name="newMessage"></param>
-        /// <returns></returns>
-        private static async Task UpdateRagAndInserts(string newMessage)
-        {
-            // Check for RAG entries and refresh the textual inserts
-            dataInserts.DecreaseDuration();
-            var searchmessage = string.IsNullOrWhiteSpace(newMessage) ?
-                History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty :
-                newMessage;
-            if (RAGEngine.Enabled)
-            {
-                var search = await RAGEngine.Search(ReplaceMacros(searchmessage)).ConfigureAwait(false);
-                search.RemoveAll(search => usedGuidInSession.Contains(search.session.Guid));
-                dataInserts.AddMemories(search);
-            }
-            // Check for keyword-activated world info entries
-            if (Settings.AllowWorldInfo)
-            {
-                var _currentWorldEntries = new List<MemoryUnit>();
-                
-                // Add world entries from the group/bot itself
-                if (Bot.MyWorlds.Count > 0)
-                {
-                    foreach (var world in Bot.MyWorlds)
-                    {
-                        _currentWorldEntries.AddRange(world.FindEntries(History, searchmessage));
-                    }
-                }
-                
-                // If in group conversation, also add world entries from the current active persona
-                if (IsGroupConversation)
-                {
-                    var currentBot = GetCurrentGroupBot();
-                    if (currentBot?.MyWorlds.Count > 0)
-                    {
-                        foreach (var world in currentBot.MyWorlds)
-                        {
-                            var entries = world.FindEntries(History, searchmessage);
-                            // Only add entries that aren't already included from the group
-                            foreach (var entry in entries)
-                            {
-                                if (!_currentWorldEntries.Any(e => e.Guid == entry.Guid))
-                                {
-                                    _currentWorldEntries.Add(entry);
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                foreach (var entry in _currentWorldEntries)
-                {
-                    dataInserts.AddInsert(new PromptInsert(
-                        entry.Guid, entry.Content, entry.Position == WEPosition.SystemPrompt ? -1 : entry.PositionIndex, entry.Duration)
-                        );
-                }
-            }
-            // Check all sessions for sticky entries
-            foreach (var session in History.Sessions)
-            {
-                if (session.Sticky && session != History.CurrentSession)
-                {
-                    var rawmem = session.GetRawMemory(true, Bot.DatesInSessionSummaries);
-                    dataInserts.AddInsert(new PromptInsert(session.Guid, rawmem, Settings.RAGIndex, 1));
-                }
-            }
         }
 
         /// <summary>
@@ -941,7 +866,8 @@ namespace AIToolkit.LLM
             }
 
             // update the RAG, world info, and summary stuff
-            await UpdateRagAndInserts(newMessage).ConfigureAwait(false);
+            await Bot.Brain.UpdateRagAndInserts(dataInserts, newMessage).ConfigureAwait(false);
+
             // Prepare the full system prompt and count the tokens used
             var rawprompt = GenerateSystemPromptContent(newMessage);
             availtokens -= PromptBuilder.AddMessage(AuthorRole.SysPrompt, rawprompt);

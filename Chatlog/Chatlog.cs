@@ -102,9 +102,10 @@ namespace AIToolkit.Files
         /// Retrieves a concatenated summary of previous sessions, formatted with a specified section header,  while
         /// adhering to token limits and optional filtering criteria.
         /// </summary>
-        /// <remarks>Sessions that already used for memory recall (use <seealso cref="LLMEngine.InvalidatePromptCache"/> before call to include everything), are empty, or do not meet
-        /// the filtering  criteria (e.g., roleplay sessions when <paramref name="allowRP"/> is <see langword="false"/>)
-        /// are skipped. The method stops adding content once the maxTokens or maxCount limit are reached.</remarks>
+        /// <remarks>Sessions that already used for memory recall (use <seealso cref="LLMEngine.InvalidatePromptCache"/> before 
+        /// call to include everything), are empty, or do not meet the filtering  criteria (e.g., roleplay sessions when <paramref name="allowRP"/> 
+        /// is false are skipped. Sessions marked as sticky are always inserted (unless already in recall). The method stops adding content 
+        /// once the maxTokens or maxCount limit are reached.</remarks>
         /// <param name="maxTokens">The maximum number of tokens allowed in the resulting summary. The method will truncate content to stay
         /// within this limit.</param>
         /// <param name="sectionHeader">The header string to prepend to each session's name in the summary. Defaults to "##".</param>
@@ -115,8 +116,6 @@ namespace AIToolkit.Files
         /// an empty string if no valid sessions are found or if the token limit is too restrictive.</returns>
         public string GetPreviousSummaries(int maxTokens, string sectionHeader = "##", bool allowRP = true, int maxCount = int.MaxValue)
         {
-            var res = new StringBuilder();
-            var tokensleft = maxTokens;
             if (lastSessionID == -1 && Sessions.Count >= 2)
             {
                 if (CurrentSessionID != -1 && CurrentSessionID != Sessions.Count -1)
@@ -127,30 +126,55 @@ namespace AIToolkit.Files
             var entrydepth = lastSessionID - 1;
             if (entrydepth < 0)
                 return string.Empty;
+
+            var usedGuid = LLMEngine.dataInserts.GetGuids();
+
+            // Add the sticky sessions first
+            var SelectedSessions = new List<ChatSession>();
+            SelectedSessions.AddRange(Sessions.FindAll(e => e.Sticky));
+            foreach (var item in SelectedSessions)
+                usedGuid.Add(item.Guid);
+
+            // Now check all previous entries
+            var tokensleft = maxTokens;
             var count = 0;
+            var sb = new StringBuilder();
             for (int i = entrydepth; i >= 0; i--)
             {
                 var session = Sessions[i];
-                if (LLMEngine.usedGuidInSession.Contains(session.Guid) || string.IsNullOrWhiteSpace(session.Content))
+                if (usedGuid.Contains(session.Guid) || string.IsNullOrWhiteSpace(session.Content))
                     continue;
+
                 if (!allowRP && session.MetaData.IsRoleplaySession)
                     continue;
-                var sb = new StringBuilder();
+                sb.Clear();
                 sb.AppendLinuxLine($"{sectionHeader} {session.Name}");
                 sb.AppendLinuxLine(session.GetRawMemory(false, LLMEngine.Bot.DatesInSessionSummaries));
-                var tks = LLMEngine.GetTokenCount(sb.ToString());
+                var tks = LLMEngine.GetTokenCount(sb.ToString()) + 1;
                 if (tks <= tokensleft)
                 {
-                    res.Insert(0, sb.ToString());
+                    SelectedSessions.Add(session);
+                    count++;
+                    tokensleft -= tks;
                 }
-                else
+                if (tokensleft <= 0)
                     break;
-                tokensleft = maxTokens - LLMEngine.GetTokenCount(res.ToString());
-                count++;
                 if (count >= maxCount)
                     break;
             }
-            return res.ToString();
+            if (SelectedSessions.Count == 0)
+                return string.Empty;
+
+            // Now we should have a proper list (with roughly correct size) sort from oldest to youngest
+            SelectedSessions.Sort((x, y) => x.StartTime.CompareTo(y.StartTime));
+            sb.Clear();
+            foreach (var session in SelectedSessions)
+            {
+                sb.AppendLinuxLine($"{sectionHeader} {session.Name}");
+                sb.AppendLinuxLine(session.GetRawMemory(false, LLMEngine.Bot.DatesInSessionSummaries));
+            }
+
+            return sb.ToString();
         }
 
         internal void AddHistoryToPrompt(SessionHandling sessionHandling, int maxTokens, PromptInserts? memories)

@@ -6,6 +6,7 @@ using MessagePack;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
 using AIToolkit.Files;
+using AIToolkit.Memory;
 
 namespace AIToolkit.LLM
 {
@@ -247,13 +248,16 @@ namespace AIToolkit.LLM
                 VectorizeChatBot(LLMEngine.Bot);
             }
             // Check if message contains the words RP or roleplay
-            var RPCheck = message.Contains(" RP", StringComparison.OrdinalIgnoreCase) || message.Contains(" roleplay", StringComparison.OrdinalIgnoreCase);
+            var requestIsAboutRoleplay = message.Contains(" RP", StringComparison.OrdinalIgnoreCase) || message.Contains(" roleplay", StringComparison.OrdinalIgnoreCase);
 
             var emb = await EmbeddingText(message.ConvertToThirdPerson()).ConfigureAwait(false);
             var subcount = maxRes + 1;
             // If we have both titles and summaries double result count to get a better picture
             if (LLMEngine.Settings.AllowWorldInfo)
                 subcount += 2;
+            if (subcount < 30)
+                subcount = 30;
+
             var res = Search(emb, subcount);
 
             foreach (var item in res)
@@ -261,43 +265,36 @@ namespace AIToolkit.LLM
                 if (item.Category == EmbedType.Session)
                 {
                     var found = LLMEngine.History.GetSessionByID(item.ID);
-                    if (found != null && found.MetaData.IsRoleplaySession)
+                    if (found != null)
                     {
-                        if (RPCheck)
-                            item.Distance -= 0.1f; // Boost RP sessions
-                        else
-                            item.Distance += 0.1f; // Decay RP sessions
+                        if (found.MetaData.IsRoleplaySession)
+                        {
+                            if (requestIsAboutRoleplay)
+                                item.Distance -= 0.05f; // Boost RP sessions
+                            else
+                                item.Distance += 0.05f; // Decay RP sessions
+                        }
+                        // Mark sticky as not wanted because they are handled with different insertion method
+                        if (found.Sticky)
+                            item.Distance += 2f;
                     }
                 }
             }
+            // Remove entries with distance above limit
+            res.RemoveAll(e => e.Distance > maxDist);
             res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
-            // Make sure we got the correct amount of results
+            // If we have too many results, trim the list to maxRes
             if (res.Count > maxRes)
                 res = res.GetRange(0, maxRes);
-            res.RemoveAll(e => e.Distance > maxDist);
+
             var list = new List<(IEmbed session, EmbedType category, float distance)>();
             foreach (var item in res)
             {
                 if (item == null)
                     continue;
-                if (item.Category == EmbedType.WorldInfo)
-                {
-                    var found = LLMEngine.Bot.GetWIEntryByGUID(item.ID);
-                    if (found != null)
-                        list.Add((found, item.Category, item.Distance));
-                }
-                else if (item.Category == EmbedType.Brain)
-                {
-                    var found = LLMEngine.Bot.Brain.GetEmbedByID(item.ID);
-                    if (found != null)
-                        list.Add((found, item.Category, item.Distance));
-                }
-                else
-                {
-                    var found = LLMEngine.History.GetSessionByID(item.ID);
-                    if (found != null)
-                        list.Add((found, item.Category, item.Distance));
-                }
+                var found = LLMEngine.Bot.Brain.GetMemoryByID(item.ID);
+                if (found != null)
+                    list.Add((found, item.Category, item.Distance));
             }
             return list;
         }
@@ -349,23 +346,27 @@ namespace AIToolkit.LLM
         #region Self contained string similarity check
 
         /// <summary>
-        /// Compute cosine similarity between two strings using the current embedding model.
+        /// Compute cosine similarity distance between two strings using the embedding model.
         /// Returns a value in [0, 2]. Requires RAG to be Enabled.
         /// </summary>
         public static async Task<float> GetDistanceAsync(string a, string b)
         {
             if (!Enabled)
-                return 0f;
+                return 2f;
 
             var ea = await EmbeddingText(a).ConfigureAwait(false);
             var eb = await EmbeddingText(b).ConfigureAwait(false);
 
             if (ea.Length == 0 || eb.Length == 0 || ea.Length != eb.Length)
-                return 0f;
+                return 2f;
 
             return ToCosineDistance(CosineSimilarityUnit(ea, eb));
         }
 
+        /// <summary>
+        /// Compute cosine similarity distance between a string and a IEmbed.
+        /// Returns a value in [0, 2]. Requires RAG to be Enabled.
+        /// </summary>
         public static async Task<float> GetDistanceAsync(string a, IEmbed b)
         {
             if (!Enabled)
@@ -380,11 +381,39 @@ namespace AIToolkit.LLM
         }
 
         /// <summary>
+        /// Compute cosine similarity distance between two IEmbed.
+        /// Returns a value in [0, 2].
+        /// </summary>
+        public static float GetDistanceAsync(IEmbed a, IEmbed b)
+        {
+            if (a.EmbedSummary.Length == 0 || b.EmbedSummary.Length == 0 || a.EmbedSummary.Length != b.EmbedSummary.Length)
+                return 2f;
+
+            return ToCosineDistance(CosineSimilarityUnit(a.EmbedSummary, b.EmbedSummary));
+        }
+
+        /// <summary>
         /// Synchronous wrapper for GetSimilarityAsync. May block the calling thread.
         /// Prefer the async version when possible.
         /// </summary>
-        public static float GetDistance(string a, string b)
-            => GetDistanceAsync(a, b).GetAwaiter().GetResult();
+        public static float GetDistance(string a, string b) => GetDistanceAsync(a, b).GetAwaiter().GetResult();
+
+        /// <summary>
+        /// Merge 2 embeddings with weights and re-normalize.
+        /// </summary>
+        public static float[] MergeEmbeddings(float[] firstembed, float[] secondembed, float firstweight = 0.2f, float secondweight = 0.8f)
+        {
+            if (firstembed.Length != secondembed.Length)
+                throw new ArgumentException("Title and summary embeddings must have the same length.");
+            int dim = firstembed.Length;
+            float[] merged = new float[dim];
+            // weighted merge
+            for (int i = 0; i < dim; i++)
+            {
+                merged[i] = (firstweight * firstembed[i]) + (secondweight * secondembed[i]);
+            }
+            return merged.EuclideanNormalization();
+        }
 
         /// <summary>
         /// Cosine similarity for unit-normalized vectors (EmbeddingText already normalizes).
@@ -397,9 +426,12 @@ namespace AIToolkit.LLM
                 dot += a[i] * b[i];
 
             // Clamp for numerical stability
-            if (dot > 1f) dot = 1f;
-            else if (dot < -1f) dot = -1f;
-            return dot;
+            if (dot > 1f)
+                dot = 1f;
+            else if (dot < -1f)
+                dot = -1f;
+            return
+                dot;
         }
 
         /// <summary>
@@ -411,23 +443,6 @@ namespace AIToolkit.LLM
             if (d < 0f) return 0f;
             if (d > 2f) return 2f;
             return d;
-        }
-
-        public static float[] MergeEmbeddings(float[] titleembed, float[] sumembed, float titleweight = 0.2f, float summaryweight = 0.8f)
-        {
-
-            if (titleembed.Length != sumembed.Length)
-                throw new ArgumentException("Title and summary embeddings must have the same length.");
-
-            int dim = titleembed.Length;
-            float[] merged = new float[dim];
-
-            // weighted merge
-            for (int i = 0; i < dim; i++)
-            {
-                merged[i] = (titleweight * titleembed[i]) + (summaryweight * sumembed[i]);
-            }
-            return merged.EuclideanNormalization();
         }
 
         #endregion

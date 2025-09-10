@@ -11,6 +11,8 @@ namespace AIToolkit.LLM
         public int Location = 0;
         public int Duration = 0;
 
+        public MemoryUnit? Memory => LLMEngine.Bot.Brain.GetMemoryByID(guid);
+
         public PromptInsert(Guid? newguid, string content, int location, int duration)
         {
             if (newguid != null)
@@ -19,7 +21,10 @@ namespace AIToolkit.LLM
             Location = location;
             Duration = duration;
         }
+
     }
+
+
     public class PromptInserts : List<PromptInsert> 
     { 
         public void DecreaseDuration()
@@ -52,8 +57,8 @@ namespace AIToolkit.LLM
         {
             var res = new StringBuilder();
             foreach (var item in GetEntriesByPosition(position))
-                res.AppendLinuxLine(LLMEngine.ReplaceMacros(item.Content));
-            return res.ToString();
+                res.AppendLinuxLine(item.Content);
+            return LLMEngine.ReplaceMacros(res.ToString());
         }
 
         public void AddMemories(List<(IEmbed session, EmbedType category, float distance)> memories)
@@ -64,24 +69,23 @@ namespace AIToolkit.LLM
             {
                 if (session is ChatSession info)
                 {
-                    AddInsert(new PromptInsert(session.Guid, info.GetRawMemory(true, LLMEngine.Bot.DatesInSessionSummaries), LLMEngine.Settings.RAGIndex, 1));
+                    AddInsert(
+                        new PromptInsert(
+                            session.Guid, 
+                            info.GetRawMemory(true, LLMEngine.Bot.DatesInSessionSummaries), 
+                            LLMEngine.Settings.RAGIndex, 
+                            1)
+                        );
                 }
                 else if (session is MemoryUnit entry)
                 {
                     if (entry.Category == MemoryType.WorldInfo)
-                        AddInsert(new PromptInsert(entry.Guid, entry.Content, entry.Position == WEPosition.SystemPrompt ? -1 : entry.PositionIndex, entry.Duration));
+                        AddInsert(new PromptInsert(entry.Guid, entry.Content, entry.PositionIndex, entry.Duration));
                     else
                         AddInsert(new PromptInsert(session.Guid, entry.Content, LLMEngine.Settings.RAGIndex, 1));
-
-                }
-                else if (session is MemoryUnit unit)
-                {
-                    AddInsert(new PromptInsert(session.Guid, unit.Content, LLMEngine.Settings.RAGIndex, 1));
                 }
             }
         }
-
-
 
         public HashSet<Guid> GetGuids()
         {

@@ -297,9 +297,13 @@ namespace AIToolkit
 
                 if (paragraphs.Count >= 3)
                 {
+                    var list = paragraphs.Take(paragraphs.Count - 1)
+                                                         .Any(p => p.TrimStart().StartsWith('-') || p.TrimStart().StartsWith("1)") || p.TrimStart().StartsWith("a)"));
+
                     bool earlierHasQuestion = paragraphs.Take(paragraphs.Count - 1)
                                                          .Any(p => p.Contains('?'));
-                    bool deleteLast = earlierHasQuestion || LLMEngine.RNG.NextDouble() < 0.66;
+                   
+                    bool deleteLast = !list && (earlierHasQuestion || LLMEngine.RNG.NextDouble() < (0.1f * (float)paragraphs.Count) );
 
                     if (deleteLast)
                     {
