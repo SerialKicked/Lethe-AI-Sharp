@@ -75,6 +75,7 @@ namespace AIToolkit.Files
 
         /// <summary> Toggle RAG functionalities on/off </summary>
         public bool RAGEnabled { get; set; } = true;
+        public bool SentimentAnalysis { get; set; } = true;
 
         /// <summary> 
         /// Path to embeddding model. RAG functionalities won't be available if this file is not present. 
