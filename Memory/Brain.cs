@@ -412,7 +412,7 @@ namespace AIToolkit.Memory
             {
                 if (Eurekas.Count == 0)
                     return;
-                selected = Eurekas[0];
+                selected = Eurekas[LLMEngine.RNG.Next(Eurekas.Count)];
             }
 
             // Avoid immediate re-use in the current window

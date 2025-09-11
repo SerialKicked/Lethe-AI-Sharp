@@ -133,16 +133,16 @@ namespace AIToolkit.Memory
             switch (Category)
             {
                 case MemoryType.Person:
-                    text.Append($"Here's the information you remember about {Name}.");
+                    text.Append($"Here's relevant information about {Name}.");
                     break;
                 case MemoryType.Location:
                     text.Append($"You remember something about this location: {Name}.");
                     break;
                 case MemoryType.Goal:
-                    text.Append($"You remember you've set this goal for yourself: {Name}.");
+                    text.Append($"{LLMEngine.Bot.Name} remembers they set this goal for themselves: {Name}.");
                     break;
                 case MemoryType.WebSearch:
-                    text.Append($"You remember something you've found on the web recently about '{Name}'.");
+                    text.Append($"{LLMEngine.Bot.Name} remembers something they found on the web about '{Name}'.");
                     break;
                 default:
                     text.Append($"This is some information regarding '{Name}'.");
@@ -151,9 +151,9 @@ namespace AIToolkit.Memory
 
             if (!string.IsNullOrEmpty(Reason))
             {
-                text.AppendLinuxLine($" Your reason for it was: {Reason}.");
+                text.AppendLinuxLine($" The reason for it was: {Reason}.");
             }
-            text.AppendLinuxLine().AppendLinuxLine($"{Content}").AppendLinuxLine().Append("Mention this information when there's a lull in the discussion, if the user makes a mention of it, or if you feel like it's a good idea to talk about it.");
+            text.AppendLinuxLine().AppendLinuxLine($"{Content}").AppendLinuxLine().Append("Mention this information when there's a lull in the discussion, if {{user}} makes a mention of it, or if you feel like it's a good idea to talk about it.");
             return text.ToString();
         }
 
