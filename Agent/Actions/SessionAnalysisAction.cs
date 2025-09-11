@@ -1,0 +1,67 @@
+﻿using AIToolkit.API;
+using AIToolkit.Files;
+using AIToolkit.GBNF;
+using AIToolkit.LLM;
+using Newtonsoft.Json;
+using System.Text;
+
+namespace AIToolkit.Agent.Actions
+{
+    public class SessionAnalysisParams(ChatSession session, string request)
+    {
+        public ChatSession Session = session;
+        public string Request = request;
+    }
+
+    public class SessionAnalysisAction : IAgentAction<string, SessionAnalysisParams>
+    {
+        public string Id => "SessionAnalysisAction";
+        public HashSet<AgentActionRequirements> Requirements => [ AgentActionRequirements.LLM, AgentActionRequirements.Grammar ];
+        public async Task<string> Execute(SessionAnalysisParams param, CancellationToken ct)
+        {
+            if (ct.IsCancellationRequested)
+                return string.Empty;
+
+            var prompt = GetSystemPromt(param.Session, param.Request);
+            var fullprompt = prompt.PromptToQuery(AuthorRole.Assistant, LLMEngine.Sampler.Temperature, 1024);
+            var response = await LLMEngine.SimpleQuery(fullprompt).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
+            {
+                response = response.RemoveThinkingBlocks(LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd);
+            }
+            response = response.RemoveUnfinishedSentence().CleanupAndTrim();
+            return response;
+        }
+
+        private IPromptBuilder GetSystemPromt(ChatSession param, string request)
+        {
+            var promptbuild = LLMEngine.Client!.GetPromptBuilder();
+
+            var str = new StringBuilder();
+            var tokenleft = LLMEngine.MaxContextLength - 1024; // leave some space for response + mix
+            str.AppendLinuxLine("You are {{char}} and you are meant to reflect on this session with {{user}}.").AppendLinuxLine();
+
+            str.AppendLinuxLine("## {{char}} (this is you)").AppendLinuxLine();
+            str.AppendLine("{{charbio}}").AppendLinuxLine();
+            str.AppendLinuxLine("## {{user}} (this is the user)").AppendLinuxLine();
+            str.AppendLine("{{userbio}}").AppendLinuxLine();
+            if (!string.IsNullOrEmpty(param.Content))
+            {
+                str.AppendLinuxLine($"## Session Summary: {param.Name}").AppendLinuxLine();
+                str.AppendLine($"{param.Content}").AppendLinuxLine();
+            }
+            str.AppendLinuxLine("## Transcript").AppendLinuxLine();
+
+            tokenleft -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, str.ToString());
+            tokenleft -= promptbuild.GetTokenCount(AuthorRole.User, request);
+
+            var transcript = param.GetRawDialogs(tokenleft, true, false, false, true);
+            str.Append(transcript);
+
+            promptbuild.AddMessage(AuthorRole.SysPrompt, str.ToString());
+            promptbuild.AddMessage(AuthorRole.User, request);
+
+            return promptbuild;
+        }
+    }
+}

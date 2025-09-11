@@ -119,7 +119,7 @@ namespace AIToolkit.LLM
             {
                 EmbedSettings = null;
                 Enabled = false;
-                throw new FileNotFoundException("Embedding model not found: " + LLMEngine.Settings.RAGModelPath);
+                LLMEngine.Logger?.LogError("Embedding model not found: {path}", LLMEngine.Settings.RAGModelPath);
             }
             EmbedSettings = new ModelParams(LLMEngine.Settings.RAGModelPath)
             { 
@@ -161,6 +161,8 @@ namespace AIToolkit.LLM
             foreach (var session in log.Sessions)
             {
                 await session.EmbedText().ConfigureAwait(false);
+                if (SentimentAnalysis.Enabled)
+                    await session.UpdateSentiment().ConfigureAwait(false);
                 RaidOnEmbedSession(session);
             }
         }

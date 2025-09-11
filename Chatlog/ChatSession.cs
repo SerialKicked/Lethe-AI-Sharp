@@ -152,7 +152,7 @@ namespace AIToolkit.Files
             availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
             availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
 
-            var docs = GetRawDialogs(availtokens, false, true, false);
+            var docs = GetRawDialogs(availtokens, false, true, false, LLMEngine.Settings.CutInTheMiddleSummaryStrategy);
             promptbuild.AddMessage(AuthorRole.SysPrompt, sysprompt + docs);
             promptbuild.AddMessage(AuthorRole.User, requestedTask);
 
@@ -301,7 +301,7 @@ namespace AIToolkit.Files
             availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
             availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
 
-            var docs = GetRawDialogs(availtokens, false, lightDialogs, showHidden);
+            var docs = GetRawDialogs(availtokens, false, lightDialogs, showHidden, LLMEngine.Settings.CutInTheMiddleSummaryStrategy);
             promptbuild.AddMessage(AuthorRole.SysPrompt, sysprompt + docs);
             promptbuild.AddMessage(AuthorRole.User, requestedTask);
 
@@ -332,36 +332,15 @@ namespace AIToolkit.Files
         /// langword="true"/> for a lighter format; otherwise, <see langword="false"/>.</param>
         /// <param name="showHidden">A value indicating whether hidden messages should be included in the output. Set to <see langword="true"/>
         /// to include hidden messages; otherwise, <see langword="false"/>.</param>
+        /// <param name="middleCut">A value indicating whether to perform a middle cut when truncating messages to fit within the token limit, or cut the end
+        /// </param>
         /// <returns>A string containing the formatted dialog messages, adhering to the specified parameters. The string may be
         /// truncated if the token limit is reached.</returns>
-        public string GetRawDialogs(int maxTokens, bool ignoresystem, bool lightDialogs = true, bool showHidden = false)
+        public string GetRawDialogs(int maxTokens, bool ignoresystem, bool lightDialogs = true, bool showHidden = false, bool middleCut = false)
         {
-            return GetRawDialogs(Messages, maxTokens, ignoresystem, lightDialogs, showHidden);
-        }
-
-        /// <summary>
-        /// Retrieves and formats a subset of dialog messages based on their position, applying specified formatting options and token limits.
-        /// </summary>
-        /// <param name="FirstID">start location in list (included)</param>
-        /// <param name="LastID">end location in list (included)</param>
-        /// <param name="maxTokens">Max tokens (will stop if we reach that)</param>
-        /// <param name="ignoresystem">skip all system messages</param>
-        /// <param name="lightDialogs">token light version</param>
-        /// <param name="showHidden">include hidden messages or not (only relevant if ignoresystem is false)</param>
-        /// <returns></returns>
-        public string GetRawDialogs(int FirstID, int LastID, int maxTokens, bool ignoresystem, bool lightDialogs = true, bool showHidden = false)
-        {
-            // get the messages in the range with ID being their position in the list (0 based)
-            if (FirstID < 0)
-                FirstID = 0;
-            if (LastID >= Messages.Count)
-                LastID = Messages.Count - 1;
-            if (FirstID > LastID)
-                return string.Empty;
-            var selected = this.Messages.GetRange(FirstID, LastID - FirstID + 1);
-            if (selected.Count == 0)
-                return string.Empty;
-            return GetRawDialogs(selected, maxTokens, ignoresystem, lightDialogs, showHidden);
+            return middleCut ? 
+                GetRawDialogsMiddleCut(Messages, maxTokens, ignoresystem, lightDialogs, showHidden) : 
+                GetRawDialogs(Messages, maxTokens, ignoresystem, lightDialogs, showHidden);
         }
 
         static internal string GetRawDialogs(List<SingleMessage> messages, int maxTokens, bool ignoresystem, bool lightDialogs = true, bool showHidden = false)
@@ -399,6 +378,169 @@ namespace AIToolkit.Files
                     return sb.ToString();
                 sb.Insert(0, text);
             }
+            return sb.ToString();
+        }
+
+        static internal string GetRawDialogsMiddleCut(List<SingleMessage> messages, int maxTokens, bool ignoresystem, bool lightDialogs = true, bool showHidden = false)
+        {
+            if (messages == null || messages.Count == 0)
+                return string.Empty;
+
+            // Build formatted entries (respecting filters) with their token counts
+            var entries = new List<(int Index, string Text, int Tokens)>(messages.Count);
+
+            for (int i = 0; i < messages.Count; i++)
+            {
+                var msg = messages[i];
+                if (msg.Hidden && !showHidden)
+                    continue;
+
+                var text = string.Empty;
+                switch (msg.Role)
+                {
+                    case AuthorRole.System:
+                    case AuthorRole.SysPrompt:
+                        if (ignoresystem)
+                            continue;
+                        text = msg.Message.StartsWith('*')
+                            ? LLMEngine.NewLine + msg.Message.Trim() + LLMEngine.NewLine
+                            : LLMEngine.NewLine + "*" + msg.Message.Trim() + "*" + LLMEngine.NewLine;
+                        break;
+
+                    case AuthorRole.User:
+                    case AuthorRole.Assistant:
+                        if (lightDialogs)
+                            text = LLMEngine.NewLine + msg.Sender?.Name + ": " + msg.Message.Trim().Replace(LLMEngine.NewLine, " ") + LLMEngine.NewLine;
+                        else
+                            text = "**" + msg.Sender?.Name + ":** " + msg.Message.Trim().Replace(LLMEngine.NewLine, " ") + LLMEngine.NewLine;
+                        break;
+                }
+
+                if (text == string.Empty)
+                    continue;
+
+                var tks = maxTokens == int.MaxValue ? 0 : LLMEngine.GetTokenCount(text);
+                entries.Add((i, text, tks));
+            }
+
+            if (entries.Count == 0)
+                return string.Empty;
+
+            // If "unlimited", just return everything
+            if (maxTokens == int.MaxValue)
+            {
+                var sbAll = new StringBuilder();
+                foreach (var e in entries)
+                    sbAll.Append(e.Text);
+                return sbAll.ToString();
+            }
+
+            // Compute total token usage
+            var totalTokens = 0;
+            foreach (var e in entries)
+                totalTokens += e.Tokens;
+
+            // If everything fits, return as-is (chronological order)
+            if (totalTokens <= maxTokens)
+            {
+                var sbAll = new StringBuilder();
+                foreach (var e in entries)
+                    sbAll.Append(e.Text);
+                return sbAll.ToString();
+            }
+
+            // Need to remove a contiguous window centered in the middle
+            var overflow = totalTokens - maxTokens;
+            var n = entries.Count;
+
+            // Initialize a central window [left..right] to remove
+            int left, right;
+            if (n % 2 == 0)
+            {
+                left = (n / 2) - 1;
+                right = (n / 2);
+            }
+            else
+            {
+                left = right = n / 2;
+            }
+
+            int removed = (left == right) ? entries[left].Tokens : entries[left].Tokens + entries[right].Tokens;
+
+            // Expand the removal window outward until we've removed enough tokens.
+            // Prefer expanding toward the side with fewer tokens to minimize loss while keeping the cut central.
+            int l = left, r = right;
+            while (removed < overflow && (l > 0 || r < n - 1))
+            {
+                var nextL = (l > 0) ? entries[l - 1].Tokens : int.MaxValue;
+                var nextR = (r < n - 1) ? entries[r + 1].Tokens : int.MaxValue;
+
+                if (nextL <= nextR)
+                {
+                    if (l > 0)
+                    {
+                        l--;
+                        removed += entries[l].Tokens;
+                    }
+                    else if (r < n - 1)
+                    {
+                        r++;
+                        removed += entries[r].Tokens;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                else
+                {
+                    if (r < n - 1)
+                    {
+                        r++;
+                        removed += entries[r].Tokens;
+                    }
+                    else if (l > 0)
+                    {
+                        l--;
+                        removed += entries[l].Tokens;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+
+            left = l;
+            right = r;
+
+            // Assemble head and tail (chronological)
+            var sb = new StringBuilder();
+
+            for (int i = 0; i < left; i++)
+                sb.Append(entries[i].Text);
+
+            sb.Append(LLMEngine.NewLine).Append("...").Append(LLMEngine.NewLine);
+
+            for (int i = right + 1; i < n; i++)
+                sb.Append(entries[i].Text);
+
+            // Edge case: if we removed everything (extreme small maxTokens),
+            // fallback to keeping as much as possible from the tail (latest context).
+            if (sb.Length == 0 && maxTokens > 0)
+            {
+                var rem = maxTokens;
+                for (int i = n - 1; i >= 0; i--)
+                {
+                    if (entries[i].Tokens <= rem)
+                    {
+                        sb.Insert(0, entries[i].Text);
+                        rem -= entries[i].Tokens;
+                        if (rem <= 0) break;
+                    }
+                }
+            }
+
             return sb.ToString();
         }
 
@@ -441,6 +583,52 @@ namespace AIToolkit.Files
             }
 
             return sb.ToString();
+        }
+
+        public async Task<List<(string Label, float Probability)>> GetSentimentTotalFor(string charID)
+        {
+            if (!SentimentAnalysis.Enabled)
+                return [];
+            var res = new List<(string Label, float Probability)>();
+            var count = 0;
+            var neutral = 0;
+            foreach (var msg in Messages)
+            {
+                if (msg.Role == AuthorRole.System || msg.Role == AuthorRole.SysPrompt || msg.Role == AuthorRole.Unknown)
+                    continue;
+
+                var talker = msg.Sender?.UniqueName;
+                if (talker != charID)
+                    continue;
+                var localsentiment = await SentimentAnalysis.Analyze(msg.Message);
+                neutral += localsentiment.RemoveAll(e => e.Label == "neutral");
+                if (localsentiment.Count == 0)
+                    continue;
+                count++;
+                foreach (var sent in localsentiment)
+                {
+                    var existing = res.FirstOrDefault(x => x.Label == sent.Label);
+                    if (existing == default)
+                    {
+                        res.Add((sent.Label, 1));
+                    }
+                    else
+                    {
+                        res.Remove(existing);
+                        res.Add((existing.Label, existing.Probability + 1));
+                    }
+                }
+            }
+            neutral /= 3;
+            // Normalize by count
+            for (int i = 0; i < res.Count; i++)
+            {
+                var item = res[i];
+                res[i] = (item.Label, item.Probability / (float)(count + neutral));
+            }
+
+            res = res.OrderByDescending(x => x.Probability).ToList();
+            return res;
         }
     }
 }

@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 
 namespace AIToolkit.LLM
 {
+
     internal sealed class ThresholdConfig
     {
         public List<string> emotion_labels { get; set; } = new();
@@ -138,19 +139,26 @@ namespace AIToolkit.LLM
             "remorse","sadness","surprise","neutral"
         ];
 
+        public enum AggregationStrategy
+        {
+            Max,
+            Mean,
+            NoisyOr,
+            NoisyOrDamp,
+            LogOddsMean
+        }
+
         private static ModelParams? modelSettings;
         private static LLamaWeights? modelWeights;
         private static LLamaEmbedder? embedder;
         private static bool headLoaded;
+        private static float[]? PerLabelThresholds;
+        private static float TargetNorm = 18.0f; // rough BERT pooled magnitude
+        private static bool ScaleLlamaEmbedding = true; // diagnostic toggle
 
         internal static string ModelPath =>LLMEngine.Settings.SentimentModelPath;
         internal static string HeadPath => LLMEngine.Settings.SentimentGoEmotionHeadPath;
         internal static string ThresholdsPath => LLMEngine.Settings.SentimentThresholdsPath;
-
-        private static float[]? PerLabelThresholds;
-
-        private static float TargetNorm = 18.0f; // rough BERT pooled magnitude
-        private static bool ScaleLlamaEmbedding = true; // diagnostic toggle
 
         private static float[] AdjustEmbedding(float[] v)
         {
@@ -225,7 +233,6 @@ namespace AIToolkit.LLM
             embedder = null;
         }
 
-        // Call once in Ensure() after GoEmotionRuntime.Load(...)
         private static void LoadPerLabelThresholds()
         {
             try
@@ -268,50 +275,277 @@ namespace AIToolkit.LLM
             }
         }
 
+        // Normalize a raw probability p relative to its threshold thr so that:
+        // p==thr -> 0.5, p==0 -> 0, p==1 -> 1, piecewise-linear on each side.
+        private static float NormalizeByThreshold(float prob, float thr)
+        {
+            const float eps = 1e-6f;
+            thr = Math.Clamp(thr, eps, 1 - eps);
+            prob = Math.Clamp(prob, 0f, 1f);
+
+            if (prob >= thr)
+            {
+                float denom = 1f - thr;
+                if (denom <= eps) return 1f; // thr ~ 1
+                return 0.5f + 0.5f * (prob - thr) / denom;
+            }
+            else
+            {
+                float denom = thr;
+                if (denom <= eps) return 0f; // thr ~ 0
+                return 0.5f - 0.5f * (thr - prob) / denom;
+            }
+        }
+
         public static async Task<List<(string Label, float Probability)>> Analyze(string text, float threshold = 0.5f, int topK = 3)
         {
+            if (!Enabled) return [];
             Ensure();
 
             // TODO: Replace this with real BERT CLS. Current llama embedding is sub-optimal for this head.
-            var emb = await embedder!.GetEmbeddings(text).ConfigureAwait(false);
+            var process = text;
+            if (process.Length > 512)
+                process = process.Substring(0, 512);
+            var emb = await embedder!.GetEmbeddings(process).ConfigureAwait(false);
             var fakeCls = AdjustEmbedding(emb[0]);
             if (fakeCls.Length != GoEmotionRuntime.HiddenIn)
                 throw new InvalidDataException($"Embedding size {fakeCls.Length} != expected {GoEmotionRuntime.HiddenIn}");
+
             var logits = GoEmotionRuntime.Forward(fakeCls);
             var probs = Sigmoid(logits);
 
             var perLabelThr = PerLabelThresholds;
             List<(string Label, float Probability)> selected;
-
             if (perLabelThr is not null && perLabelThr.Length == probs.Length)
             {
-                selected = GoEmotionRuntime.Labels
-                    .Select((lbl, i) => (lbl, probs: probs[i], thr: perLabelThr[i]))
-                    .Where(x => x.probs >= x.thr)
-                    .Select(x => (x.lbl, x.probs))
-                    .OrderByDescending(t => t.probs)
-                    .ToList();
+                // Normalize per-label so threshold maps to 0.5
+                var normalized = new float[probs.Length];
+                for (int i = 0; i < probs.Length; i++)
+                    normalized[i] = NormalizeByThreshold(probs[i], perLabelThr[i]);
 
-                if (selected.Count == 0)
-                    selected = [.. GoEmotionRuntime.Labels.Select((lbl, i) => (lbl, probs[i]))
-                                                      .OrderByDescending(t => t.Item2)
-                                                      .Take(topK)];
+                // Use normalized >= 0.5 (equivalent to raw >= threshold), and return normalized values
+                selected = [.. GoEmotionRuntime.Labels
+                    .Select((lbl, i) => (lbl, nprob: normalized[i]))
+                    .Where(t => t.nprob >= 0.5f)
+                    .OrderByDescending(t => t.nprob)
+                    .Select(t => (t.lbl, t.nprob))];
             }
             else
             {
-                // fallback to global threshold
-                selected = GoEmotionRuntime.Labels
+                // fallback to global threshold when no file (no normalization)
+                selected = [.. GoEmotionRuntime.Labels
                     .Select((lbl, i) => (lbl, probs[i]))
                     .Where(t => t.Item2 >= threshold)
-                    .OrderByDescending(t => t.Item2)
-                    .ToList();
-
-                if (selected.Count == 0)
-                    selected = [.. GoEmotionRuntime.Labels.Select((lbl, i) => (lbl, probs[i]))
-                                                      .OrderByDescending(t => t.Item2)
-                                                      .Take(topK)];
+                    .OrderByDescending(t => t.Item2)];
             }
+
+            if (selected.Count == 0)
+            {
+                if (perLabelThr is not null && perLabelThr.Length == probs.Length)
+                {
+                    // TopK by normalized values
+                    selected = [.. GoEmotionRuntime.Labels
+                        .Select((lbl, i) => (lbl, NormalizeByThreshold(probs[i], perLabelThr[i])))
+                        .OrderByDescending(t => t.Item2)
+                        .Take(topK)];
+                }
+                else
+                {
+                    selected = [.. GoEmotionRuntime.Labels
+                        .Select((lbl, i) => (lbl, probs[i]))
+                        .OrderByDescending(t => t.Item2)
+                        .Take(topK)];
+                }
+            }
+
             return selected;
+        }
+
+        // Returns the normalized per-label probability vector for a single text
+        private static async Task<float[]> AnalyzeNormalizedVector(string text)
+        {
+            Ensure();
+
+            var process = text;
+            if (process.Length > 512)
+                process = process[..512];
+
+            var emb = await embedder!.GetEmbeddings(process).ConfigureAwait(false);
+            var fakeCls = AdjustEmbedding(emb[0]);
+            if (fakeCls.Length != GoEmotionRuntime.HiddenIn)
+                throw new InvalidDataException($"Embedding size {fakeCls.Length} != expected {GoEmotionRuntime.HiddenIn}");
+
+            var logits = GoEmotionRuntime.Forward(fakeCls);
+            var probs = Sigmoid(logits);
+
+            var perLabelThr = PerLabelThresholds;
+            if (perLabelThr is not null && perLabelThr.Length == probs.Length)
+            {
+                // Normalize so threshold maps to 0.5
+                var normalized = new float[probs.Length];
+                for (int i = 0; i < probs.Length; i++)
+                    normalized[i] = NormalizeByThreshold(probs[i], perLabelThr[i]);
+                return normalized;
+            }
+
+            // No thresholds file: return raw probabilities
+            return probs;
+        }
+
+        public static async Task<List<(string Label, float Probability)>> MultiParagraphAnalysis(
+            string text,
+            AggregationStrategy strategy = AggregationStrategy.LogOddsMean,
+            int topK = 3,
+            bool lengthWeighted = true)
+        {
+            if (!Enabled) return [];
+            Ensure();
+
+            // Prefer splitting on blank lines for actual paragraphs
+            var paragraphs = text.Split(new[] { "\r\n\r\n", "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+            int labelCount = GoEmotionRuntime.Labels.Length;
+            var agg = new double[labelCount];
+            var weightSum = 0.0;
+
+            // Initialize for strategies
+            // Max: start at 0
+            // Mean / LogOddsMean: sum accumulators; LogOddsMean is in logit domain
+            // NoisyOr: we accumulate product of (1 - p), start at 1
+            var noisyOrProd = Enumerable.Repeat(1.0, labelCount).ToArray();
+
+            foreach (var rawPara in paragraphs)
+            {
+                var para = rawPara.RemoveNewLines();
+                if (string.IsNullOrWhiteSpace(para))
+                    continue;
+
+                var p = await AnalyzeNormalizedVector(para).ConfigureAwait(false);
+                double w = lengthWeighted ? Math.Max(1, para.Length) : 1.0;
+                weightSum += w;
+
+                for (int i = 0; i < labelCount; i++)
+                {
+                    double val = p[i];
+
+                    switch (strategy)
+                    {
+                        case AggregationStrategy.Max:
+                            agg[i] = Math.Max(agg[i], val);
+                            break;
+
+                        case AggregationStrategy.Mean:
+                            agg[i] += w * val;
+                            break;
+                        case AggregationStrategy.NoisyOrDamp:
+                            {
+                                // val is normalized: 0.5 = threshold. Keep only positive evidence.
+                                double pos = Math.Clamp((val - 0.5) * 2.0, 0.0, 1.0); // FIX: use val, not i
+
+                                // Expand midrange so 0.6→~0.53, 0.7→~0.66, 0.8→~0.80
+                                const double gamma = 0.7; // try 0.5–0.8
+                                pos = Math.Pow(pos, gamma);
+
+                                // Sharpen union so multiple positives accumulate faster
+                                const double lambda = 1.3; // try 1.2–2.0
+                                double q = Math.Pow(1.0 - pos, lambda);
+
+                                noisyOrProd[i] *= q;
+                                break;
+                            }
+                        case AggregationStrategy.NoisyOr:
+                            {
+                                //normal version : 1 - Π(1 - p_i); accumulate product here
+                                noisyOrProd[i] *= (1.0 - val);
+                                break;
+                            }
+                        case AggregationStrategy.LogOddsMean:
+                            // mean of log-odds, then sigmoid at the end
+                            const double eps = 1e-6;
+                            val = Math.Clamp(val, eps, 1 - eps);
+                            double logit = Math.Log(val / (1 - val));
+                            agg[i] += w * logit;
+                            break;
+                    }
+                }
+            }
+
+            var result = new List<(string Label, float Probability)>(labelCount);
+
+            for (int i = 0; i < labelCount; i++)
+            {
+                double score = 0.0;
+                switch (strategy)
+                {
+                    case AggregationStrategy.Max:
+                        score = agg[i]; // already [0,1]
+                        break;
+
+                    case AggregationStrategy.Mean:
+                        score = weightSum > 0 ? agg[i] / weightSum : 0.0;
+                        break;
+
+                    case AggregationStrategy.NoisyOrDamp:
+                    case AggregationStrategy.NoisyOr:
+                        score = 1.0 - noisyOrProd[i];
+                        if (strategy == AggregationStrategy.NoisyOrDamp) score = 1.0 - Math.Pow(1.0 - score, 0.85);
+                        break;
+
+                    case AggregationStrategy.LogOddsMean:
+                        if (weightSum > 0)
+                        {
+                            double avgLogit = agg[i] / weightSum;
+                            score = 1.0 / (1.0 + Math.Exp(-avgLogit));
+                        }
+                        else
+                        {
+                            score = 0.0;
+                        }
+                        break;
+                }
+
+                result.Add((GoEmotionRuntime.Labels[i], (float)score));
+            }
+
+            return result
+                .OrderByDescending(t => t.Probability)
+                .Take(topK)
+                .ToList();
+        }
+
+        public static async Task<List<(string Label, float Probability)>> MergedAnalyze(string text, float threshold = 0.5f, int topK = 3)
+        {
+            static float Calibrate(float p, float T = 0.85f, float b = 0f)
+            {
+                const float eps = 1e-6f;
+                p = Math.Clamp(p, eps, 1 - eps);
+                var logit = MathF.Log(p / (1 - p));
+                var z = (logit - b) / T;
+                return 1f / (1f + MathF.Exp(-z));
+            }
+
+            var maxres = await MultiParagraphAnalysis(text, AggregationStrategy.Max, 10).ConfigureAwait(false);
+            var lomres = await MultiParagraphAnalysis(text, AggregationStrategy.LogOddsMean, 10).ConfigureAwait(false);
+            var maxByLabel = maxres.ToDictionary(x => x.Label, x => x.Probability, StringComparer.OrdinalIgnoreCase);
+            var lomByLabel = lomres.ToDictionary(x => x.Label, x => x.Probability, StringComparer.OrdinalIgnoreCase);
+
+            var merged = GoEmotionRuntime.Labels
+                .Select(lbl =>
+                {
+                    var max = maxByLabel.TryGetValue(lbl, out var m) ? m : 0f;
+                    var lom = lomByLabel.TryGetValue(lbl, out var l) ? l : 0f;
+                    var lomCal = Calibrate(lom, 0.85f, 0f);
+                    var score = 0.65f * max + 0.35f * lomCal;
+                    return (Label: lbl, Score: score, Max: max, LogOddsMean: lom);
+                })
+                .Where(t => !string.Equals(t.Label, "neutral", StringComparison.OrdinalIgnoreCase))
+                .Where(t => t.Max >= 0.5f || t.LogOddsMean >= 0.35f) // gate by either
+                .OrderByDescending(t => t.Score)
+                .Take(topK)
+                .Select(t => (t.Label, t.Score))
+                .ToList();
+            return merged;
         }
     }
 }
+ 

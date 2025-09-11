@@ -58,6 +58,8 @@ namespace AIToolkit.Memory
         /// </summary>
         public string Reason { get; set; } = string.Empty;
 
+        public List<(string Label, float Probability)> Sentiments { get; set; } = [];
+
         /// <summary>
         /// Should be used files
         /// </summary>
@@ -103,6 +105,14 @@ namespace AIToolkit.Memory
         public void Touch()
         {
             LastTrigger = DateTime.Now; TriggerCount++;
+        }
+
+        public virtual async Task UpdateSentiment()
+        {
+            if (LLMEngine.Settings.SentimentEnabled)
+            {
+                Sentiments = await SentimentAnalysis.Analyze(Content).ConfigureAwait(false);
+            }
         }
 
         public virtual async Task EmbedText()

@@ -45,7 +45,7 @@ namespace AIToolkit.Files
         /// <summary> Thinking models only, attempt to disable the thinking block </summary>
         public bool DisableThinking { get; set; } = false;
 
-        /// <summary> Allow keyword-activated snippets to be inserted in the prompt (see WorldInfo and BasePersona) </summary>
+                /// <summary> Allow keyword-activated snippets to be inserted in the prompt (see WorldInfo and BasePersona) </summary>
         public bool AllowWorldInfo { get; set; } = true;
 
         /// <summary> 
@@ -69,6 +69,17 @@ namespace AIToolkit.Files
         /// <summary> Reserved token space for summaries of previous sessions </summary>
         public int SessionReservedTokens { get; set; } = 2048;
 
+        public bool CutInTheMiddleSummaryStrategy = false;
+
+        #endregion
+
+        #region *** Sentiment Analysis Module ***
+
+        public bool SentimentEnabled { get; set; } = true;
+        public string SentimentModelPath { get; set; } = "data/classifiers/emotion-bert-classifier.gguf";
+        public string SentimentGoEmotionHeadPath { get; set; } = "data/classifiers/goemotions_head.json";
+        public string SentimentThresholdsPath { get; set; } = "data/classifiers/optimized_thresholds.json";
+
         #endregion
 
         #region *** RAG Settings (retrieval of past information based on text embedding similarity) ***
@@ -82,12 +93,6 @@ namespace AIToolkit.Files
         /// https://huggingface.co/ChristianAzinn/gte-large-gguf
         /// </summary>
         public string RAGModelPath { get; set; } = "data/classifiers/gte-large.Q6_K.gguf";
-
-        public bool SentimentEnabled { get; set; } = true;
-        public string SentimentModelPath { get; set; } = "data/classifiers/emotion-bert-classifier.gguf";
-        public string SentimentGoEmotionHeadPath { get; set; } = "data/classifiers/goemotions_head.json";
-        public string SentimentThresholdsPath { get; set; } = "data/classifiers/optimized_thresholds.json";
-
 
         /// <summary> 
         /// Thinking models only, will move all RAG and WI to the thinking block. This is highly experimental. 

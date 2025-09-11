@@ -303,6 +303,7 @@ namespace AIToolkit.Agent
             RegisterAction(new WebSearchAction());
             RegisterAction(new MergeSearchResultsAction());
             RegisterAction(new FindResearchTopicsAction());
+            RegisterAction(new SessionAnalysisAction());
         }
 
         public static void RegisterAction<TResult, TParam>(IAgentAction<TResult, TParam> action)

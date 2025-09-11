@@ -3,7 +3,6 @@ using AIToolkit.Files;
 using AIToolkit.GBNF;
 using AIToolkit.LLM;
 using Newtonsoft.Json;
-using static AIToolkit.SearchAPI.WebSearchAPI;
 
 namespace AIToolkit.Agent.Actions
 {
@@ -51,7 +50,7 @@ namespace AIToolkit.Agent.Actions
             availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
             availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
 
-            var docs = ChatSession.GetRawDialogs(param.Messages, availtokens, false, true, false);
+            var docs = ChatSession.GetRawDialogsMiddleCut(param.Messages, availtokens, false, true, false);
             promptbuild.AddMessage(AuthorRole.SysPrompt, sysprompt + docs);
             promptbuild.AddMessage(AuthorRole.User, requestedTask);
 
