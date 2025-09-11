@@ -23,4 +23,18 @@
   <ItemGroup>
     <Folder Include="Docs\" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="data\classifiers\emotion-bert-classifier.gguf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="data\classifiers\goemotions_head.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="data\classifiers\gte-large.Q6_K.gguf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="data\classifiers\optimized_thresholds.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

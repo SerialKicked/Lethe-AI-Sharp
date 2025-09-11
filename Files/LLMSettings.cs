@@ -75,14 +75,19 @@ namespace AIToolkit.Files
 
         /// <summary> Toggle RAG functionalities on/off </summary>
         public bool RAGEnabled { get; set; } = true;
-        public bool SentimentAnalysis { get; set; } = true;
 
         /// <summary> 
         /// Path to embeddding model. RAG functionalities won't be available if this file is not present. 
         /// The model must be in the GGUF format. Default can be downloaded here:
         /// https://huggingface.co/ChristianAzinn/gte-large-gguf
         /// </summary>
-        public string RAGModelPath { get; set; } = "data/models/gte-large.Q6_K.gguf";
+        public string RAGModelPath { get; set; } = "data/classifiers/gte-large.Q6_K.gguf";
+
+        public bool SentimentEnabled { get; set; } = true;
+        public string SentimentModelPath { get; set; } = "data/classifiers/emotion-bert-classifier.gguf";
+        public string SentimentGoEmotionHeadPath { get; set; } = "data/classifiers/goemotions_head.json";
+        public string SentimentThresholdsPath { get; set; } = "data/classifiers/optimized_thresholds.json";
+
 
         /// <summary> 
         /// Thinking models only, will move all RAG and WI to the thinking block. This is highly experimental. 
