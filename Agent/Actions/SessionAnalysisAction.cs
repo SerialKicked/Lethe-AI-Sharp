@@ -33,7 +33,7 @@ namespace AIToolkit.Agent.Actions
             return response;
         }
 
-        private IPromptBuilder GetSystemPromt(ChatSession param, string request)
+        private static IPromptBuilder GetSystemPromt(ChatSession param, string request)
         {
             var promptbuild = LLMEngine.Client!.GetPromptBuilder();
 

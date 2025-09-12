@@ -1,4 +1,5 @@
-﻿using AIToolkit.API;
+﻿using AIToolkit.Agent.Actions;
+using AIToolkit.API;
 using AIToolkit.GBNF;
 using AIToolkit.LLM;
 using AIToolkit.Memory;
@@ -605,12 +606,12 @@ namespace AIToolkit.Files
                 if (localsentiment.Count == 0)
                     continue;
                 count++;
-                foreach (var sent in localsentiment)
+                foreach (var (Label, Probability) in localsentiment)
                 {
-                    var existing = res.FirstOrDefault(x => x.Label == sent.Label);
+                    var existing = res.FirstOrDefault(x => x.Label == Label);
                     if (existing == default)
                     {
-                        res.Add((sent.Label, 1));
+                        res.Add((Label, 1));
                     }
                     else
                     {
@@ -623,12 +624,54 @@ namespace AIToolkit.Files
             // Normalize by count
             for (int i = 0; i < res.Count; i++)
             {
-                var item = res[i];
-                res[i] = (item.Label, item.Probability / (float)(count + neutral));
+                var (Label, Probability) = res[i];
+                res[i] = (Label, Probability / (float)(count + neutral));
             }
 
-            res = res.OrderByDescending(x => x.Probability).ToList();
+            res = [.. res.OrderByDescending(x => x.Probability)];
             return res;
+        }
+
+        public override async Task UpdateSentiment()
+        {
+            if (!SentimentAnalysis.Enabled)
+                return;
+
+            var action = new SessionAnalysisAction();
+
+            var q = MetaData.IsRoleplaySession ?
+                "Describe your sentiments and feelings about this roleplay, both in the moment and now." :
+                "Describe your sentiments and feelings about this discussion, express yourself freely and honestly.";
+
+            var opinion = await action.Execute(new SessionAnalysisParams(this, q), CancellationToken.None);
+
+            var res = await SentimentAnalysis.MergedAnalyze(opinion, topK: 10);
+            var res2 = await GetSentimentTotalFor(LLMEngine.Bot.UniqueName);
+            res2.RemoveAll(e => e.Probability < 0.05);
+
+            // Merge the 2 lists and weight res1 more
+            foreach (var (Label, Probability) in res2)
+            {
+                var existing = res.Find(r => r.Label == Label);
+                if (existing != default)
+                {
+                    existing.Probability = (existing.Probability * 0.7f) + (Probability * 0.3f);
+                }
+                else
+                {
+                    if (Label == "desire")
+                        res.Add((Label, Probability));
+                    else
+                        res.Add((Label, Probability * 0.3f));
+                }
+            }
+
+            // Sort by probability (highest to lowest)
+            res.Sort((a, b) => b.Probability.CompareTo(a.Probability));
+            res.RemoveAll(e => e.Probability < 0.3f || e.Label == "neutral");
+            res = [.. res.Take(5)];
+            Sentiments = res;
+
         }
     }
 }

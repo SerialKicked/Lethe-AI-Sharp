@@ -10,19 +10,22 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
+// Ignore IDE1006 for this file to allow deserialization of JSON with lowercase property names
+#pragma warning disable IDE1006
+
 namespace AIToolkit.LLM
 {
 
     internal sealed class ThresholdConfig
     {
-        public List<string> emotion_labels { get; set; } = new();
-        public List<double> thresholds { get; set; } = new();
+        public List<string> emotion_labels { get; set; } = [];
+        public List<double> thresholds { get; set; } = [];
     }
 
     internal sealed class LinearLayer
     {
-        public List<List<float>> weight { get; set; } = new();
-        public List<float> bias { get; set; } = new();
+        public List<List<float>> weight { get; set; } = [];
+        public List<float> bias { get; set; } = [];
         private float[,] W = null!;
         private float[] B = null!;
         public int Out => W.GetLength(0);
@@ -37,7 +40,7 @@ namespace AIToolkit.LLM
             for (int r = 0; r < rows; r++)
                 for (int c = 0; c < cols; c++)
                     W[r, c] = weight[r][c];
-            B = bias.ToArray();
+            B = [.. bias];
         }
 
         public void Apply(ReadOnlySpan<float> input, Span<float> output)
@@ -65,7 +68,7 @@ namespace AIToolkit.LLM
     internal static class GoEmotionRuntime
     {
         private static GoEmotionHead? _head;
-        private static string[] _labelOrder = Array.Empty<string>();
+        private static string[] _labelOrder = [];
         public static int HiddenIn { get; private set; }
         public static int LabelCount { get; private set; }
 
@@ -91,10 +94,7 @@ namespace AIToolkit.LLM
 
             if (_head.id2label != null && _head.id2label.Count == LabelCount)
             {
-                _labelOrder = _head.id2label
-                    .OrderBy(kv => int.Parse(kv.Key, CultureInfo.InvariantCulture))
-                    .Select(kv => kv.Value)
-                    .ToArray();
+                _labelOrder = [.. _head.id2label.OrderBy(kv => int.Parse(kv.Key, CultureInfo.InvariantCulture)).Select(kv => kv.Value)];
             }
             else
             {
@@ -255,14 +255,12 @@ namespace AIToolkit.LLM
 
                 var labels = GoEmotionRuntime.Labels;
                 var mapped = new float[labels.Length];
-                bool ok = true;
                 for (int i = 0; i < labels.Length; i++)
                 {
                     if (byName.TryGetValue(labels[i], out var thr))
                         mapped[i] = thr;
                     else
                     {
-                        ok = false;
                         mapped[i] = 0.5f; // fallback default for any missing label
                     }
                 }
@@ -305,7 +303,7 @@ namespace AIToolkit.LLM
             // TODO: Replace this with real BERT CLS. Current llama embedding is sub-optimal for this head.
             var process = text;
             if (process.Length > 512)
-                process = process.Substring(0, 512);
+                process = process[..512];
             var emb = await embedder!.GetEmbeddings(process).ConfigureAwait(false);
             var fakeCls = AdjustEmbedding(emb[0]);
             if (fakeCls.Length != GoEmotionRuntime.HiddenIn)
@@ -402,7 +400,7 @@ namespace AIToolkit.LLM
             Ensure();
 
             // Prefer splitting on blank lines for actual paragraphs
-            var paragraphs = text.Split(new[] { "\r\n\r\n", "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
+            var paragraphs = text.Split(["\r\n\r\n", "\n\n"], StringSplitOptions.RemoveEmptyEntries);
 
             int labelCount = GoEmotionRuntime.Labels.Length;
             var agg = new double[labelCount];
@@ -507,13 +505,10 @@ namespace AIToolkit.LLM
                 result.Add((GoEmotionRuntime.Labels[i], (float)score));
             }
 
-            return result
-                .OrderByDescending(t => t.Probability)
-                .Take(topK)
-                .ToList();
+            return [.. result.OrderByDescending(t => t.Probability).Take(topK)];
         }
 
-        public static async Task<List<(string Label, float Probability)>> MergedAnalyze(string text, float threshold = 0.5f, int topK = 3)
+        public static async Task<List<(string Label, float Probability)>> MergedAnalyze(string text, int topK = 3)
         {
             static float Calibrate(float p, float T = 0.85f, float b = 0f)
             {
@@ -548,4 +543,5 @@ namespace AIToolkit.LLM
         }
     }
 }
- 
+
+#pragma warning restore IDE1006
