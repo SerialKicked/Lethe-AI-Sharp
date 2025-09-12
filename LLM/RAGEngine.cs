@@ -61,9 +61,9 @@ namespace AIToolkit.LLM
     public static class RAGEngine
     {
         /// <summary> Called when the system embedded a session </summary>
-        public static event EventHandler<Files.ChatSession>? OnEmbedSession;
+        public static event EventHandler<string>? OnEmbedText;
 
-        private static void RaidOnEmbedSession(Files.ChatSession session) => OnEmbedSession?.Invoke(null, session);
+        private static void RaiseOnEmbedText(string toembed) => OnEmbedText?.Invoke(null, toembed);
 
         /// <summary> Toggle RAG functionalities on/off </summary>
         public static bool Enabled
@@ -148,26 +148,6 @@ namespace AIToolkit.LLM
         }
 
         /// <summary>
-        /// Embedding of all the messages in the chatlog
-        /// </summary>
-        /// <param name="log"></param>
-        /// <returns></returns>
-        public static async Task EmbedChatSessions(Chatlog log)
-        {
-            if (!Enabled)
-                return;
-            _ = Embedder ?? LoadEmbedder();
-            // Embed all the messages in the chatlog
-            foreach (var session in log.Sessions)
-            {
-                await session.EmbedText().ConfigureAwait(false);
-                if (SentimentAnalysis.Enabled)
-                    await session.UpdateSentiment().ConfigureAwait(false);
-                RaidOnEmbedSession(session);
-            }
-        }
-
-        /// <summary>
         /// Embdding of a single message (async)
         /// </summary>
         /// <param name="textToEmbed"></param>
@@ -181,6 +161,7 @@ namespace AIToolkit.LLM
             if (emb.Length > LLMEngine.Settings.RAGEmbeddingSize)
                 emb = emb[..LLMEngine.Settings.RAGEmbeddingSize];
             var tsk = await embed.GetEmbeddings(emb).ConfigureAwait(false);
+            RaiseOnEmbedText(textToEmbed);
             return tsk[0].EuclideanNormalization();
         }
 
@@ -341,7 +322,7 @@ namespace AIToolkit.LLM
 
         public static void RemoveEmbedEventHandler()
         {
-            OnEmbedSession = null;
+            OnEmbedText = null;
         }
 
         #region Self contained string similarity check

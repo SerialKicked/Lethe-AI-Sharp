@@ -528,7 +528,23 @@ namespace AIToolkit.Files
             return res;
         }
 
-
+        /// <summary>
+        /// Embedding of all the messages in the chatlog
+        /// </summary>
+        /// <param name="log"></param>
+        /// <returns></returns>
+        public async Task EmbedChatSessions()
+        {
+            if (!RAGEngine.Enabled)
+                return;
+            // Embed all the messages in the chatlog
+            foreach (var session in Sessions)
+            {
+                await session.EmbedText().ConfigureAwait(false);
+                if (SentimentAnalysis.Enabled)
+                    await session.UpdateSentiment().ConfigureAwait(false);
+            }
+        }
         public virtual void SaveToFile(string pPath) 
         {
             var content = JsonConvert.SerializeObject(this, new JsonSerializerSettings { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
