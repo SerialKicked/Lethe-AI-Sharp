@@ -177,21 +177,15 @@ namespace AIToolkit.Files
             return res;
         }
 
-        public string GetResponseStart(BasePersona bot)
+        public string GetResponseStart(BasePersona talker, bool? overridePrefill = null)
         {
-            var res = bot.ReplaceMacros(BotStart);
+            var res = talker.IsUser ? LLMEngine.Bot.ReplaceMacros(BotStart, talker) : talker.ReplaceMacros(BotStart);
             if (RealAddNameToPrompt)
-                res += bot.Name + ":";
-            if (PrefillThinking)
-                res += GetThinkPrefill();
-            return res;
-        }
+                res += talker.Name + ":";
 
-        public string GetUserStart(BasePersona user)
-        {
-            var res = LLMEngine.Bot.ReplaceMacros(UserStart, user);
-            if (RealAddNameToPrompt)
-                res += user.Name + ":";
+            var doprefill = overridePrefill ?? PrefillThinking;
+            if (doprefill)
+                res += GetThinkPrefill();
             return res;
         }
 

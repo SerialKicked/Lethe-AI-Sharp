@@ -269,9 +269,15 @@ namespace AIToolkit.Memory
             if (res != null)
                 return res;
             // Check WorldInfo
-            res = Owner.GetWIEntryByGUID(iD);
-            if (res != null)
-                return res;
+            if (Owner.MyWorlds.Count > 0)
+            {
+                foreach (var world in Owner.MyWorlds)
+                {
+                    res = world.Entries.Find(e => e.Guid == iD);
+                    if (res != null)
+                        return res;
+                }
+            }
             // Check local memories
             return Memories.FirstOrDefault(m => m.Guid == iD);
         }

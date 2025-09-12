@@ -1,4 +1,5 @@
 ﻿using AIToolkit.API;
+using AIToolkit.Files;
 using AIToolkit.LLM;
 using CommunityToolkit.HighPerformance;
 using System;
@@ -32,17 +33,17 @@ namespace AIToolkit
             return fullprompt.ToString();
         }
 
-        public object PromptToQuery(AuthorRole responserole, double tempoverride = -1, int responseoverride = -1)
+        public object PromptToQuery(AuthorRole responserole, double tempoverride = -1, int responseoverride = -1, bool? overridePrefill = null)
         {
             var fullquery = (string)GetFullPrompt();
 
             if (responserole == AuthorRole.User)
             {
-                fullquery += LLMEngine.Instruct.GetUserStart(LLMEngine.User);
+                fullquery += LLMEngine.Instruct.GetResponseStart(LLMEngine.User, overridePrefill);
             }
             else
             {
-                fullquery += LLMEngine.Instruct.GetResponseStart(LLMEngine.Bot);
+                fullquery += LLMEngine.Instruct.GetResponseStart(LLMEngine.Bot, overridePrefill);
             }
             fullquery = fullquery.TrimEnd();
 

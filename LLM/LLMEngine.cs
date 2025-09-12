@@ -747,9 +747,9 @@ namespace AIToolkit.LLM
 
             // Prepare the bot's response tokens and count them
             if (string.IsNullOrEmpty(newMessage) && MsgSender == AuthorRole.User)
-                availtokens -= GetTokenCount(Instruct.GetResponseStart(User));
+                availtokens -= PromptBuilder.GetResponseTokenCount(User);
             else
-                availtokens -= GetTokenCount(Instruct.GetResponseStart(Bot));
+                availtokens -= PromptBuilder.GetResponseTokenCount(Bot);
 
             // get the full, formated chat history complemented by the data inserts
             var addinserts = string.IsNullOrEmpty(Instruct.ThinkingStart) || !Settings.RAGMoveToThinkBlock;

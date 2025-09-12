@@ -407,19 +407,6 @@ namespace AIToolkit.Files
             Brain.Init(this);
         }
 
-        internal MemoryUnit? GetWIEntryByGUID(Guid id)
-        {
-            if (MyWorlds.Count == 0)
-                return null;
-            foreach (var world in MyWorlds)
-            {
-                var res = world.Entries.Find(e => e.Guid == id);
-                if (res != null)
-                    return res; 
-            }
-            return null;
-        }
-
         /// <summary>
         /// Replaces the macros in a string with the actual values. Assumes the current user and bot.
         /// </summary>

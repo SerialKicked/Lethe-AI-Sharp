@@ -49,7 +49,7 @@ namespace AIToolkit
             return LLMEngine.GetTokenCount(msg.Content.ToString()) + 4;
         }
 
-        public object PromptToQuery(AuthorRole responserole, double tempoverride = -1, int responseoverride = -1)
+        public object PromptToQuery(AuthorRole responserole, double tempoverride = -1, int responseoverride = -1, bool? overridePrefill = null)
         {
             var chatrq = new ChatRequest(_prompt,
                 topP: LLMEngine.Sampler.Top_p,
