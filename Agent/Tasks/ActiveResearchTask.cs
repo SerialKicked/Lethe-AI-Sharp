@@ -117,7 +117,7 @@ namespace AIToolkit.Agent.Plugins
                     Reason = topic.Reason,
                     Added = DateTime.Now,
                     EndTime = DateTime.Now.AddDays(7),
-                    Priority = topic.Urgency
+                    Priority = topic.Urgency + 1
                 };
 
                 await mem.EmbedText().ConfigureAwait(false);

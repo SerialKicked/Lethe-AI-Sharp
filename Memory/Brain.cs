@@ -397,6 +397,22 @@ namespace AIToolkit.Memory
             return null;
         }
 
+        protected virtual MemoryUnit? GetImportantEureka(bool onlyForced)
+        {
+            if (Eurekas.Count == 0)
+                return null;
+            var mylist = new List<MemoryUnit>(Eurekas);
+            // sort by descending priority
+            mylist.Sort((a, b) => b.Priority.CompareTo(a.Priority));
+            // make a list with only the NaturalForced
+            if (onlyForced)
+            {
+                mylist = mylist.FindAll(e => e.Insertion == MemoryInsertion.NaturalForced);
+                return mylist.Count > 0 ? mylist[0] : null;
+            }
+            return mylist[0];
+        }
+
         /// <summary>
         /// Inserts a selected memory into the conversation as a system message.
         /// </summary>
@@ -406,22 +422,10 @@ namespace AIToolkit.Memory
             // Work on a local variable; do not reassign the parameter for clarity.
             MemoryUnit? selected = insert;
 
-            // If only forced, search the forced pool
-            if (onlyForced && selected is null)
-            {
-                selected = Eurekas.Find(e => e.Insertion == MemoryInsertion.NaturalForced);
-                if (selected is null)
-                    return; // nothing to insert
-            }
+            selected ??= GetImportantEureka(onlyForced);
+            if (selected == null)
+                return;
 
-            if (selected is null)
-            {
-                if (Eurekas.Count == 0)
-                    return;
-                selected = Eurekas[LLMEngine.RNG.Next(Eurekas.Count)];
-            }
-
-            // Avoid immediate re-use in the current window
             Eurekas.Remove(selected);
             LastInsertTime = DateTime.Now;
             CurrentDelay = 0;
