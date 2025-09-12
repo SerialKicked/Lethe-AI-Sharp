@@ -194,7 +194,7 @@ namespace AIToolkit.Memory
 
             var searchmessage = string.IsNullOrWhiteSpace(searchstring) ?
                 (Owner.History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty) : searchstring;
-            searchmessage = LLMEngine.ReplaceMacros(searchmessage);
+            searchmessage = Owner.ReplaceMacros(searchmessage);
 
             if (RAGEngine.Enabled)
             {
@@ -505,7 +505,7 @@ namespace AIToolkit.Memory
                 info += " " + item.Info;
             };
             Inserts.Clear();
-            info = LLMEngine.ReplaceMacros(info.CleanupAndTrim());
+            info = Owner.ReplaceMacros(info.CleanupAndTrim());
             var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, info, Owner.UniqueName, LLMEngine.User.UniqueName, true);
             return tosend;
         }
@@ -533,7 +533,7 @@ namespace AIToolkit.Memory
             else
                 msgtxt += $" The last chat was about {timespan.Hours} hours ago. " + "It is {{time}} now.";
             msgtxt = msgtxt.Trim();
-            return LLMEngine.ReplaceMacros(msgtxt);
+            return Owner.ReplaceMacros(msgtxt);
         }
 
 

@@ -125,11 +125,11 @@ namespace AIToolkit.Memory
             };
             if (!mixedcat.Contains(Category))
             {
-                EmbedSummary = await RAGEngine.EmbeddingText(LLMEngine.ReplaceMacros(Content)).ConfigureAwait(false);
+                EmbedSummary = await RAGEngine.EmbeddingText(LLMEngine.Bot.ReplaceMacros(Content)).ConfigureAwait(false);
                 return;
             }
             var titleembed = await RAGEngine.EmbeddingText(Name).ConfigureAwait(false);
-            var sumembed = await RAGEngine.EmbeddingText(LLMEngine.ReplaceMacros(Content)).ConfigureAwait(false);
+            var sumembed = await RAGEngine.EmbeddingText(LLMEngine.Bot.ReplaceMacros(Content)).ConfigureAwait(false);
             EmbedSummary = RAGEngine.MergeEmbeddings(titleembed, sumembed);
         }
 

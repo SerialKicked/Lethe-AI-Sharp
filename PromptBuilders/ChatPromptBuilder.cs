@@ -116,7 +116,7 @@ namespace AIToolkit
                     selname = user.Name;
                 }
             }
-            return new Message(TokenTools.InternalRoleToChatRole(role), LLMEngine.ReplaceMacros(realprompt, user, bot), selname);
+            return new Message(TokenTools.InternalRoleToChatRole(role), bot.ReplaceMacros(realprompt, user), selname);
         }
     }
 }

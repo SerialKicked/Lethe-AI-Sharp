@@ -60,7 +60,7 @@ namespace AIToolkit.Memory
             var res = new StringBuilder();
             foreach (var item in GetEntriesByPosition(position))
                 res.AppendLinuxLine(item.Content);
-            return LLMEngine.ReplaceMacros(res.ToString());
+            return LLMEngine.Bot.ReplaceMacros(res.ToString());
         }
 
         public void AddMemories(List<(IEmbed session, EmbedType category, float distance)> memories)

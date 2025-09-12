@@ -210,7 +210,7 @@ namespace AIToolkit.Files.Tests
 
             // Test macro replacement with group context
             var testString = "Current character: {{char}}, Group: {{group}}, Current bio: {{charbio}}";
-            var result = LLMEngine.ReplaceMacros(testString, user, groupPersona);
+            var result = groupPersona.ReplaceMacros(testString, user);
 
             // Should use Alice as current character
             if (!result.Contains("Current character: Alice"))
@@ -221,7 +221,7 @@ namespace AIToolkit.Files.Tests
 
             // Test switching current bot affects macros
             groupPersona.SetCurrentBot("bob_bot");
-            var result2 = LLMEngine.ReplaceMacros(testString, user, groupPersona);
+            var result2 = groupPersona.ReplaceMacros(testString, user);
 
             if (!result2.Contains("Current character: Bob"))
                 throw new Exception("{{char}} should resolve to current bot (Bob) after switching");

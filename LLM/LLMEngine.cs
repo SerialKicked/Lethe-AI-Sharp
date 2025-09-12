@@ -286,7 +286,7 @@ namespace AIToolkit.LLM
 
         #endregion
 
-        #region *** Communications with LLM ***
+        #region *** Full Communications (Send/reroll messages using History, RAG, and all features) ***
 
         /// <summary>
         /// Asks the model to generate a message based on the the chat history. 
@@ -394,24 +394,6 @@ namespace AIToolkit.LLM
         }
 
         /// <summary>
-        /// Submit a chatlog, get a response from the LLM. No text streaming.
-        /// </summary>
-        /// <param name="chatlog">Full chatlog to sent to the LLM. GenerationInput for Text Completion API or ChatRequest for Chat Completion API. Use PromptBuilder to generate proper format for the currently loaded API automatically.</param>
-        /// <returns>LLM's Response</returns>
-        public static async Task<string> SimpleQuery(object chatlog)
-        {
-            if (Client == null)
-                return string.Empty;
-            using var _ = await AcquireModelSlotAsync(CancellationToken.None).ConfigureAwait(false);
-            var oldst = status;
-            Status = SystemStatus.Busy;
-            var result = await Client.GenerateText(chatlog).ConfigureAwait(false);
-            Status = oldst;
-            RaiseOnQuickInferenceEnded(result);
-            return string.IsNullOrEmpty(result) ? string.Empty : result;
-        }
-
-        /// <summary>
         /// Send a system message to the bot and wait for a response. Message log is optional. No text streaming. This can be useful when the program needs to ask the LLM for something between user inputs.
         /// </summary>
         /// <param name="systemMessage">Message from sender</param>
@@ -438,113 +420,29 @@ namespace AIToolkit.LLM
 
         #endregion
 
+        #region *** Simple LLM Queries (provide full prompt, get response) ***
+
+        /// <summary>
+        /// Submit a chatlog, get a response from the LLM. No text streaming.
+        /// </summary>
+        /// <param name="chatlog">Full chatlog to sent to the LLM. GenerationInput for Text Completion API or ChatRequest for Chat Completion API. Use PromptBuilder to generate proper format for the currently loaded API automatically.</param>
+        /// <returns>LLM's Response</returns>
+        public static async Task<string> SimpleQuery(object chatlog)
+        {
+            if (Client == null)
+                return string.Empty;
+            using var _ = await AcquireModelSlotAsync(CancellationToken.None).ConfigureAwait(false);
+            var oldst = status;
+            Status = SystemStatus.Busy;
+            var result = await Client.GenerateText(chatlog).ConfigureAwait(false);
+            Status = oldst;
+            RaiseOnQuickInferenceEnded(result);
+            return string.IsNullOrEmpty(result) ? string.Empty : result;
+        }
+
+        #endregion
+
         #region *** Macros and Secondary Functions ***
-
-        /// <summary>
-        /// Replaces the macros in a string with the actual values. Assumes the current user and bot.
-        /// </summary>
-        /// <param name="inputText"></param>
-        /// <returns></returns>
-        public static string ReplaceMacros(string inputText)
-        {
-            return ReplaceMacros(inputText, User, Bot);
-        }
-
-        /// <summary>
-        /// Replaces the macros in a string with the actual values.
-        /// </summary>
-        /// <param name="inputText"></param>
-        /// <param name="user"></param>
-        /// <param name="character"></param>
-        /// <returns></returns>
-        public static string ReplaceMacros(string inputText, BasePersona user, BasePersona character)
-        {
-            if (string.IsNullOrEmpty(inputText))
-                return string.Empty;
-
-            return ReplaceMacrosInternal(inputText, user.Name, user.GetBio(character.Name), character);
-        }
-
-        /// <summary>
-        /// Replaces the macros in a string with the actual values using string userName.
-        /// </summary>
-        /// <param name="inputText"></param>
-        /// <param name="userName"></param>
-        /// <param name="character"></param>
-        /// <returns></returns>
-        public static string ReplaceMacros(string inputText, string userName, BasePersona character)
-        {
-            return ReplaceMacrosInternal(inputText, userName, "This is the user interacting with you.", character);
-        }
-
-        /// <summary>
-        /// Internal method that performs the actual macro replacement logic.
-        /// Handles both regular and group personas in a unified way.
-        /// </summary>
-        /// <param name="inputText">The text to process</param>
-        /// <param name="userName">The user's name</param>
-        /// <param name="userBio">The user's bio</param>
-        /// <param name="character">The character persona (can be BasePersona or GroupPersona)</param>
-        /// <returns>Text with macros replaced</returns>
-        private static string ReplaceMacrosInternal(string inputText, string userName, string userBio, BasePersona character)
-        {
-            if (string.IsNullOrEmpty(inputText))
-                return string.Empty;
-
-            StringBuilder res = new(inputText);
-
-            // Handle group vs single persona logic
-            if (character is GroupPersona groupPersona)
-            {
-                var currentBot = groupPersona.CurrentBot ?? groupPersona.BotPersonas.FirstOrDefault();
-                if (currentBot != null)
-                {
-                    // In group context, {{char}} and {{charbio}} refer to current bot
-                    res.Replace("{{user}}", userName)
-                       .Replace("{{userbio}}", userBio)
-                       .Replace("{{char}}", currentBot.Name)
-                       .Replace("{{charbio}}", currentBot.GetBio(userName))
-                       .Replace("{{currentchar}}", currentBot.Name)
-                       .Replace("{{currentcharbio}}", currentBot.GetBio(userName))
-                       .Replace("{{examples}}", currentBot.GetDialogExamples(userName))
-                       .Replace("{{group}}", groupPersona.GetGroupPersonasList(userName))
-                       .Replace("{{selfedit}}", currentBot.SelfEditField)
-                       .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? groupPersona.GetScenario(userName) : Settings.ScenarioOverride);
-                }
-                else
-                {
-                    // Fallback to group persona itself if no current bot
-                    res.Replace("{{user}}", userName)
-                       .Replace("{{userbio}}", userBio)
-                       .Replace("{{char}}", character.Name)
-                       .Replace("{{charbio}}", character.GetBio(userName))
-                       .Replace("{{currentchar}}", character.Name)
-                       .Replace("{{currentcharbio}}", character.GetBio(userName))
-                       .Replace("{{examples}}", character.GetDialogExamples(userName))
-                       .Replace("{{group}}", groupPersona.GetGroupPersonasList(userName))
-                       .Replace("{{selfedit}}", character.SelfEditField)
-                       .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? character.GetScenario(userName) : Settings.ScenarioOverride);
-                }
-            }
-            else
-            {
-                // Regular single persona logic
-                res.Replace("{{user}}", userName)
-                   .Replace("{{userbio}}", userBio)
-                   .Replace("{{char}}", character.Name)
-                   .Replace("{{charbio}}", character.GetBio(userName))
-                   .Replace("{{examples}}", character.GetDialogExamples(userName))
-                   .Replace("{{selfedit}}", character.SelfEditField)
-                   .Replace("{{scenario}}", string.IsNullOrWhiteSpace(Settings.ScenarioOverride) ? character.GetScenario(userName) : Settings.ScenarioOverride);
-            }
-
-            // Common replacements for both group and single
-            res.Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
-               .Replace("{{time}}", DateTime.Now.ToString("hh:mm tt", CultureInfo.InvariantCulture))
-               .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString());
-
-            return res.ToString().CleanupAndTrim();
-        }
 
         /// <summary>
         /// Returns the current token count of a string.
@@ -733,7 +631,7 @@ namespace AIToolkit.LLM
                 }
                 foreach (var ctxplug in ContextPlugins)
                 {
-                    if (ctxplug.Enabled && ctxplug.ReplaceOutput(ReplaceMacros(response), History, out var editedresponse))
+                    if (ctxplug.Enabled && ctxplug.ReplaceOutput(Bot.ReplaceMacros(response), History, out var editedresponse))
                         response = editedresponse;
                 }
                 Status = SystemStatus.Ready;
@@ -808,15 +706,15 @@ namespace AIToolkit.LLM
 
             if (Settings.SessionMemorySystem && History.Sessions.Count > 1)
             {
-                var shistory = History.GetPreviousSummaries(Settings.SessionReservedTokens - GetTokenCount(ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator, ignoreList: dataInserts.GetGuids());
+                var shistory = History.GetPreviousSummaries(Settings.SessionReservedTokens - GetTokenCount(Bot.ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator, ignoreList: dataInserts.GetGuids());
                 if (!string.IsNullOrEmpty(shistory))
                 {
-                    rawprompt.AppendLinuxLine(NewLine + ReplaceMacros(SystemPrompt.SessionHistoryTitle) + NewLine);
+                    rawprompt.AppendLinuxLine(NewLine + Bot.ReplaceMacros(SystemPrompt.SessionHistoryTitle) + NewLine);
                     rawprompt.AppendLinuxLine(shistory);
                 }
             }
 
-            return ReplaceMacros(rawprompt.ToString()).CleanupAndTrim();
+            return Bot.ReplaceMacros(rawprompt.ToString()).CleanupAndTrim();
         }
 
         /// <summary>
@@ -897,7 +795,7 @@ namespace AIToolkit.LLM
                     continue;
                 // Plugins may call LLMSystem.SimpleQuery here. We are intentionally NOT
                 // holding the model semaphore yet to avoid re-entrancy deadlocks.
-                var plugres = await ctxplug.ReplaceUserInput(ReplaceMacros(lastuserinput)).ConfigureAwait(false);
+                var plugres = await ctxplug.ReplaceUserInput(Bot.ReplaceMacros(lastuserinput)).ConfigureAwait(false);
                 if (plugres.IsHandled && !string.IsNullOrEmpty(plugres.Response))
                 {
                     if (plugres.Replace)

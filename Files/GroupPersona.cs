@@ -1,5 +1,6 @@
 using AIToolkit.LLM;
 using Newtonsoft.Json;
+using System.Globalization;
 using System.Text;
 
 namespace AIToolkit.Files
@@ -260,5 +261,58 @@ namespace AIToolkit.Files
             
             base.EndChat(backup);
         }
+
+        /// <summary>
+        /// Internal method that performs the actual macro replacement logic.
+        /// Handles both regular and group personas in a unified way.
+        /// </summary>
+        /// <param name="inputText">The text to process</param>
+        /// <param name="userName">The user's name</param>
+        /// <param name="userBio">The user's bio</param>
+        /// <param name="character">The character persona (can be BasePersona or GroupPersona)</param>
+        /// <returns>Text with macros replaced</returns>
+        protected override string ReplaceMacrosInternal(string inputText, string userName, string userBio)
+        {
+            if (string.IsNullOrEmpty(inputText))
+                return string.Empty;
+
+            StringBuilder res = new(inputText);
+
+            var currentBot = CurrentBot ?? BotPersonas.FirstOrDefault();
+            if (currentBot != null)
+            {
+                // In group context, {{char}} and {{charbio}} refer to current bot
+                res.Replace("{{user}}", userName)
+                    .Replace("{{userbio}}", userBio)
+                    .Replace("{{char}}", currentBot.Name)
+                    .Replace("{{charbio}}", currentBot.GetBio(userName))
+                    .Replace("{{currentchar}}", currentBot.Name)
+                    .Replace("{{currentcharbio}}", currentBot.GetBio(userName))
+                    .Replace("{{examples}}", currentBot.GetDialogExamples(userName))
+                    .Replace("{{group}}", GetGroupPersonasList(userName))
+                    .Replace("{{selfedit}}", currentBot.SelfEditField);
+            }
+            else
+            {
+                // Fallback to group persona itself if no current bot
+                res.Replace("{{user}}", userName)
+                    .Replace("{{userbio}}", userBio)
+                    .Replace("{{char}}", Name)
+                    .Replace("{{charbio}}", GetBio(userName))
+                    .Replace("{{currentchar}}", "[No character selected]")
+                    .Replace("{{currentcharbio}}", "[No character selected]")
+                    .Replace("{{examples}}", GetDialogExamples(userName))
+                    .Replace("{{group}}", GetGroupPersonasList(userName))
+                    .Replace("{{selfedit}}", SelfEditField);
+            }
+            // Common replacements for both group and single
+            res.Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
+               .Replace("{{time}}", DateTime.Now.ToString("hh:mm tt", CultureInfo.InvariantCulture))
+               .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString())
+               .Replace("{{scenario}}", string.IsNullOrWhiteSpace(LLMEngine.Settings.ScenarioOverride) ? GetScenario(userName) : LLMEngine.Settings.ScenarioOverride);
+
+            return res.ToString().CleanupAndTrim();
+        }
+
     }
 }

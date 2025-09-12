@@ -69,7 +69,7 @@ space ::= | " " | "\n"{1,2} [ \t]{0,20}
             {
                 requestedTask += $"- {prop.Key}: {prop.Value}\n";
             }
-            requestedTask = LLMEngine.ReplaceMacros(requestedTask);
+            requestedTask = LLMEngine.Bot.ReplaceMacros(requestedTask);
             return requestedTask;
         }
 

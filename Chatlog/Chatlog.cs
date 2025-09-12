@@ -400,7 +400,7 @@ namespace AIToolkit.Files
                 else
                     msgtxt += " The last chat was " + ((int)timespan.TotalMinutes).ToString() + " minutes ago.";
             }
-            LogMessage(AuthorRole.System, LLMEngine.ReplaceMacros(msgtxt, LLMEngine.User, LLMEngine.Bot), LLMEngine.User, LLMEngine.Bot);
+            LogMessage(AuthorRole.System, LLMEngine.Bot.ReplaceMacros(msgtxt), LLMEngine.User, LLMEngine.Bot);
         }
 
         /// <summary>

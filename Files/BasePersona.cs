@@ -1,8 +1,10 @@
 ﻿using AIToolkit.Agent;
 using AIToolkit.LLM;
 using AIToolkit.Memory;
+using CommunityToolkit.HighPerformance;
 using Newtonsoft.Json;
 using System;
+using System.Globalization;
 using System.Reflection.PortableExecutable;
 using System.Text;
 
@@ -418,5 +420,60 @@ namespace AIToolkit.Files
             return null;
         }
 
+        /// <summary>
+        /// Replaces the macros in a string with the actual values. Assumes the current user and bot.
+        /// </summary>
+        /// <param name="inputText"></param>
+        /// <returns></returns>
+        public virtual string ReplaceMacros(string inputText)
+        {
+            if (string.IsNullOrEmpty(inputText))
+                return string.Empty;
+            return ReplaceMacros(inputText, LLMEngine.User);
+        }
+
+        /// <summary>
+        /// Replaces the macros in a string with the actual values.
+        /// </summary>
+        /// <param name="inputText"></param>
+        /// <param name="user"></param>
+        /// <param name="character"></param>
+        /// <returns></returns>
+        public virtual string ReplaceMacros(string inputText, BasePersona user)
+        {
+            if (string.IsNullOrEmpty(inputText))
+                return string.Empty;
+
+            return ReplaceMacrosInternal(inputText, user.Name, user.GetBio(this.Name));
+        }
+
+        /// <summary>
+        /// Internal method that performs the actual macro replacement logic.
+        /// Handles both regular and group personas in a unified way.
+        /// </summary>
+        /// <param name="inputText">The text to process</param>
+        /// <param name="userName">The user's name</param>
+        /// <param name="userBio">The user's bio</param>
+        /// <param name="character">The character persona (can be BasePersona or GroupPersona)</param>
+        /// <returns>Text with macros replaced</returns>
+        protected virtual string ReplaceMacrosInternal(string inputText, string userName, string userBio)
+        {
+            if (string.IsNullOrEmpty(inputText))
+                return string.Empty;
+
+            StringBuilder res = new(inputText);
+            res.Replace("{{user}}", userName)
+               .Replace("{{userbio}}", userBio)
+               .Replace("{{char}}", Name)
+               .Replace("{{charbio}}", GetBio(userName))
+               .Replace("{{examples}}", GetDialogExamples(userName))
+               .Replace("{{selfedit}}", SelfEditField)
+               .Replace("{{scenario}}", string.IsNullOrWhiteSpace(LLMEngine.Settings.ScenarioOverride) ? GetScenario(userName) : LLMEngine.Settings.ScenarioOverride);
+
+            res.Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
+               .Replace("{{time}}", DateTime.Now.ToString("hh:mm tt", CultureInfo.InvariantCulture))
+               .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString());
+            return res.ToString().CleanupAndTrim();
+        }
     }
 }

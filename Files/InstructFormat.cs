@@ -138,7 +138,7 @@ namespace AIToolkit.Files
             {
                 res = ThinkingStart;
                 if (!string.IsNullOrWhiteSpace(ThinkingForcedThought))
-                    res += LLMEngine.ReplaceMacros(ThinkingForcedThought);
+                    res += LLMEngine.Bot.ReplaceMacros(ThinkingForcedThought);
 
                 if (LLMEngine.Settings.RAGMoveToThinkBlock && LLMEngine.dataInserts.Count > 0)
                 {
@@ -153,7 +153,7 @@ namespace AIToolkit.Files
                         {
                             if (insert?.Location > -1)
                             {
-                                res += "- " + LLMEngine.ReplaceMacros(insert.Content).RemoveNewLines().CleanupAndTrim() + LLMEngine.NewLine;
+                                res += "- " + LLMEngine.Bot.ReplaceMacros(insert.Content).RemoveNewLines().CleanupAndTrim() + LLMEngine.NewLine;
                             }
                         }
                         res += LLMEngine.NewLine;
@@ -165,7 +165,7 @@ namespace AIToolkit.Files
                         {
                             if (insert?.Location > -1)
                             {
-                                res += LLMEngine.ReplaceMacros(insert.Content).RemoveNewLines().CleanupAndTrim() + LLMEngine.NewLine + LLMEngine.NewLine;
+                                res += LLMEngine.Bot.ReplaceMacros(insert.Content).RemoveNewLines().CleanupAndTrim() + LLMEngine.NewLine + LLMEngine.NewLine;
                             }
                         }
                     }
@@ -179,7 +179,7 @@ namespace AIToolkit.Files
 
         public string GetResponseStart(BasePersona bot)
         {
-            var res = LLMEngine.ReplaceMacros(BotStart);
+            var res = bot.ReplaceMacros(BotStart);
             if (RealAddNameToPrompt)
                 res += bot.Name + ":";
             if (PrefillThinking)
@@ -189,45 +189,10 @@ namespace AIToolkit.Files
 
         public string GetUserStart(BasePersona user)
         {
-            var res = LLMEngine.ReplaceMacros(UserStart);
+            var res = LLMEngine.Bot.ReplaceMacros(UserStart, user);
             if (RealAddNameToPrompt)
                 res += user.Name + ":";
             return res;
-        }
-
-        public string FormatSinglePromptNoUserInfo(AuthorRole role, string userName, BasePersona bot, string prompt)
-        {
-            var realprompt = prompt;
-            if (RealAddNameToPrompt)
-            {
-                if (role == AuthorRole.Assistant)
-                    realprompt = string.Format("{0}: {1}", bot.Name, prompt);
-                else if (role == AuthorRole.User)
-                    realprompt = string.Format("{0}: {1}", userName, prompt);
-            }
-            switch (role)
-            {
-                case AuthorRole.Unknown:
-                    realprompt = "[" + LLMEngine.ReplaceMacros(realprompt, userName, bot) + "]";
-                    break;
-                case AuthorRole.System:
-                    realprompt =  LLMEngine.ReplaceMacros(SystemStart + realprompt + SystemEnd, userName, bot) ;
-                    break;
-                case AuthorRole.User:
-                    realprompt = LLMEngine.ReplaceMacros(UserStart + realprompt + UserEnd, userName, bot);
-                    break;
-                case AuthorRole.Assistant:
-                    realprompt = LLMEngine.ReplaceMacros(BotStart + realprompt + BotEnd, userName, bot);
-                    break;
-                case AuthorRole.SysPrompt:
-                    realprompt = LLMEngine.ReplaceMacros(SysPromptStart + realprompt + SysPromptEnd, userName, bot);
-                    break;
-                default:
-                    break;
-            }
-            if (NewLinesBetweenMessages)
-                realprompt += LLMEngine.NewLine;
-            return realprompt;
         }
 
         public string FormatSinglePrompt(AuthorRole role, BasePersona user, BasePersona bot, string prompt)
@@ -247,19 +212,19 @@ namespace AIToolkit.Files
             switch (role)
             {
                 case AuthorRole.Unknown:
-                    realprompt = "[" + LLMEngine.ReplaceMacros(realprompt, user, bot) + "]";
+                    realprompt = "[" + bot.ReplaceMacros(realprompt, user) + "]";
                     break;
                 case AuthorRole.System:
-                    realprompt = LLMEngine.ReplaceMacros(SystemStart + realprompt + SystemEnd, user, bot);
+                    realprompt = bot.ReplaceMacros(SystemStart + realprompt + SystemEnd, user);
                     break;
                 case AuthorRole.User:
-                    realprompt = LLMEngine.ReplaceMacros(UserStart + realprompt + UserEnd, user, bot);
+                    realprompt = bot.ReplaceMacros(UserStart + realprompt + UserEnd, user);
                     break;
                 case AuthorRole.Assistant:
-                    realprompt = LLMEngine.ReplaceMacros(BotStart + realprompt + BotEnd, user, bot);
+                    realprompt = bot.ReplaceMacros(BotStart + realprompt + BotEnd, user);
                     break;
                 case AuthorRole.SysPrompt:
-                    realprompt = LLMEngine.ReplaceMacros(SysPromptStart + realprompt + SysPromptEnd, user, bot);
+                    realprompt = bot.ReplaceMacros(SysPromptStart + realprompt + SysPromptEnd, user);
                     break;
                 default:
                     break;
