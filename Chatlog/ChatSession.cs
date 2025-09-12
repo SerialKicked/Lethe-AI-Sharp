@@ -134,7 +134,7 @@ namespace AIToolkit.Files
             var replyln = 2048;
             var availtokens = LLMEngine.MaxContextLength - replyln - 20;
 
-            var promptbuild = LLMEngine.Client!.GetPromptBuilder();
+            var promptbuild = LLMEngine.GetPromptBuilder();
 
             var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMEngine.NewLine +
                 LLMEngine.NewLine +
@@ -242,7 +242,7 @@ namespace AIToolkit.Files
             var replyln = 350;
             if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
                 replyln += 1024;
-            var promptBuilder = LLMEngine.Client.GetPromptBuilder();
+            var promptBuilder = LLMEngine.GetPromptBuilder();
             var msgtxt = "You are an automated system designed to give titles to summaries." + LLMEngine.NewLine +
                 LLMEngine.NewLine + "# Summary:" + LLMEngine.NewLine + LLMEngine.NewLine + sum;
             promptBuilder.AddMessage(AuthorRole.SysPrompt, msgtxt);
@@ -286,7 +286,7 @@ namespace AIToolkit.Files
                 replyln += 1024;
             var availtokens = LLMEngine.MaxContextLength - replyln - 20;
 
-            var promptbuild = LLMEngine.Client.GetPromptBuilder();
+            var promptbuild = LLMEngine.GetPromptBuilder();
 
             var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMEngine.NewLine +
                 LLMEngine.NewLine +

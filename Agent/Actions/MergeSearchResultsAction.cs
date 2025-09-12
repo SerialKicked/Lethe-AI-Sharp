@@ -41,7 +41,7 @@ namespace AIToolkit.Agent.Actions
 
         private static IPromptBuilder BuildMergerPrompt(string summary, string topic, string reason, List<EnrichedSearchResult> webresults)
         {
-            var builder = LLMEngine.Client!.GetPromptBuilder();
+            var builder = LLMEngine.GetPromptBuilder();
             var prompt = new StringBuilder();
             prompt.AppendLinuxLine($"You are {LLMEngine.Bot.Name} and your goal is to analyze and merge information from the following documents regarding the subject of '{topic}'. This topic was made relevant during this chat session.");
             prompt.AppendLinuxLine();

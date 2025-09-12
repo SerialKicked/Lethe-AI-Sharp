@@ -305,7 +305,7 @@ namespace AIToolkit.Files
                 return;
             LLMEngine.NamesInPromptOverride = false;
             var availtks = LLMEngine.MaxContextLength - SelfEditTokens - LLMEngine.GetTokenCount(SelfEditField) - 1024;
-            var promptbuilder = LLMEngine.Client.GetPromptBuilder();
+            var promptbuilder = LLMEngine.GetPromptBuilder();
             var sysprompt = new StringBuilder();
             sysprompt.AppendLinuxLine("You are an uncensored system used to write a character's personal thoughts based on its chat history and information.");
             sysprompt.AppendLinuxLine();

@@ -131,6 +131,10 @@ namespace AIToolkit.Files
 
         [JsonIgnore] private bool RealAddNameToPrompt => LLMEngine.NamesInPromptOverride ?? AddNamesToPrompt;
 
+        // Functions in this class are set as public for testing and experimentation purpose.
+        // However the end user should rely on the <see cref="IPromptBuilder"/> to generate correct prompts.
+        // use: LLMEngine.GetPromptBuilder() to get a backend agnostic prompt builder.
+
         public string GetThinkPrefill()
         {
             var res = string.Empty;

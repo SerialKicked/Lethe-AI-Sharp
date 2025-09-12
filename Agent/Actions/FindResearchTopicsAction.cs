@@ -31,7 +31,7 @@ namespace AIToolkit.Agent.Actions
             var replyln = 2048;
             var availtokens = LLMEngine.MaxContextLength - replyln - 20;
 
-            var promptbuild = LLMEngine.Client!.GetPromptBuilder();
+            var promptbuild = LLMEngine.GetPromptBuilder();
 
             var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions and stories." + LLMEngine.NewLine + LLMEngine.NewLine;
             if (param.IncludeBios)

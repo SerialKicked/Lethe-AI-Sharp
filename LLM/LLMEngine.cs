@@ -31,9 +31,9 @@ namespace AIToolkit.LLM
         public static ILLMServiceClient? Client { get; private set; }
 
         /// <summary>
-        /// Unified prompt builder to create prompts for the currently loaded backend.
+        /// Unified prompt builder to create prompts for the currently loaded backend. Used internally for the full chat system.
         /// </summary>
-        public static IPromptBuilder? PromptBuilder { get; private set; }
+        internal static IPromptBuilder? PromptBuilder { get; private set; }
 
         /// <summary> Total token context window the model can handle </summary>
         public static int MaxContextLength { 
@@ -212,7 +212,7 @@ namespace AIToolkit.LLM
             Client.BaseUrl = Settings.BackendUrl;
             Client.TokenReceived += Client_StreamingMessageReceived;
 
-            PromptBuilder = Client.GetPromptBuilder();
+            PromptBuilder = GetPromptBuilder();
             AgentRuntime.LoadDefaultActions();
 
             Status = SystemStatus.Ready;
@@ -423,15 +423,27 @@ namespace AIToolkit.LLM
         #region *** Simple LLM Queries (provide full prompt, get response) ***
 
         /// <summary>
+        /// Get a prompt builder for the currently loaded backend. Useful when you want to build your own prompts outside of the chat system.
+        /// </summary>
+        /// <returns>a new brompt builder instance </returns>
+        /// <exception cref="InvalidOperationException">The client must be initialized first</exception>
+        public static IPromptBuilder GetPromptBuilder()
+        {
+            if (Client == null)
+                throw new InvalidOperationException("Client is not initialized");
+            return Client.GetPromptBuilder();
+        }
+
+        /// <summary>
         /// Submit a chatlog, get a response from the LLM. No text streaming.
         /// </summary>
         /// <param name="chatlog">Full chatlog to sent to the LLM. GenerationInput for Text Completion API or ChatRequest for Chat Completion API. Use PromptBuilder to generate proper format for the currently loaded API automatically.</param>
         /// <returns>LLM's Response</returns>
-        public static async Task<string> SimpleQuery(object chatlog)
+        public static async Task<string> SimpleQuery(object chatlog, CancellationToken ctx = default)
         {
             if (Client == null)
                 return string.Empty;
-            using var _ = await AcquireModelSlotAsync(CancellationToken.None).ConfigureAwait(false);
+            using var _ = await AcquireModelSlotAsync(ctx).ConfigureAwait(false);
             var oldst = status;
             Status = SystemStatus.Busy;
             var result = await Client.GenerateText(chatlog).ConfigureAwait(false);
@@ -440,9 +452,22 @@ namespace AIToolkit.LLM
             return string.IsNullOrEmpty(result) ? string.Empty : result;
         }
 
+        /// <summary>
+        /// Submit a chatlog, get a response from the LLM. Streamed response through event system
+        /// </summary>
+        /// <param name="chatlog">Full chatlog to sent to the LLM. GenerationInput for Text Completion API or ChatRequest for Chat Completion API. Use PromptBuilder to generate proper format for the currently loaded API automatically.</param>
+        public static async Task SimpleQueryStreaming(object chatlog, CancellationToken ctx = default)
+        {
+            if (Client == null)
+                return;
+            using var _ = await AcquireModelSlotAsync(ctx).ConfigureAwait(false);
+            Status = SystemStatus.Busy;
+            await Client.GenerateTextStreaming(chatlog).ConfigureAwait(false);
+        }
+
         #endregion
 
-        #region *** Macros and Secondary Functions ***
+        #region *** Utility Functions ***
 
         /// <summary>
         /// Returns the current token count of a string.

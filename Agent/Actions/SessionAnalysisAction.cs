@@ -35,7 +35,7 @@ namespace AIToolkit.Agent.Actions
 
         private static IPromptBuilder GetSystemPromt(ChatSession param, string request)
         {
-            var promptbuild = LLMEngine.Client!.GetPromptBuilder();
+            var promptbuild = LLMEngine.GetPromptBuilder();
 
             var str = new StringBuilder();
             var tokenleft = LLMEngine.MaxContextLength - 1024; // leave some space for response + mix
