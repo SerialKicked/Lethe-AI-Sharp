@@ -74,7 +74,7 @@ namespace AIToolkit.Memory
         /// <summary>
         /// Move memories to to their proper slot, delete old stuff.
         /// </summary>
-        private void RefreshMemories()
+        protected void RefreshMemories()
         {
             MemoryDecay();
             // Select all natural memories within the cutoff period, order by Added descending, and enqueue them
@@ -285,7 +285,7 @@ namespace AIToolkit.Memory
         /// <summary>
         /// Move memories to to their proper slot, delete old stuff.
         /// </summary>
-        private void MemoryDecay()
+        protected void MemoryDecay()
         {
             // Remove old natural memories that haven't been inserted yet are are passed the cutoff
             Memories.RemoveAll(e => (e.Insertion == MemoryInsertion.Natural || e.Insertion == MemoryInsertion.NaturalForced) && (DateTime.Now - e.Added) > EurekaCutOff);
@@ -365,7 +365,18 @@ namespace AIToolkit.Memory
             Memories.Remove(mem);
         }
 
-        public List<MemoryUnit> GetMemoriesForRAG()
+        /// <summary>
+        /// Retrieves a list of memories filtered by the specified category.
+        /// </summary>
+        /// <param name="category">The category of memories to filter by. If <see langword="null"/>, all memories are returned.</param>
+        /// <returns>A list of <see cref="MemoryUnit"/> objects that match the specified category. If <paramref name="category"/>
+        /// is <see langword="null"/>, the entire list of memories is returned.</returns>
+        public List<MemoryUnit> GetMemories(MemoryType? category)
+        {
+            return Memories.FindAll(m => category == null || m.Category == category);
+        }
+
+        internal List<MemoryUnit> GetMemoriesForRAG()
         {
             return Memories.FindAll(m => m.Insertion == MemoryInsertion.Trigger && m.EmbedSummary.Length > 0);
         }
@@ -490,7 +501,7 @@ namespace AIToolkit.Memory
             return false;
         }
 
-        public SingleMessage? BuildAwayMessage()
+        public virtual SingleMessage? BuildAwayMessage()
         {
             // no previous user message, nothing to do
             if (!Owner.SenseOfTime && Inserts.Count == 0)
@@ -546,9 +557,7 @@ namespace AIToolkit.Memory
             return Owner.ReplaceMacros(msgtxt);
         }
 
-
         #endregion
-
 
     }
 }
