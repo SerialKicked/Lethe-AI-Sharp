@@ -254,14 +254,14 @@ namespace AIToolkit.Files
             if (!selpath.EndsWith('/') && !selpath.EndsWith('\\'))
                 selpath += Path.DirectorySeparatorChar;
 
-            if (backup && File.Exists(selpath + UniqueName + ".json"))
+            if (backup && File.Exists(selpath + UniqueName + ".log"))
             {
-                if (File.Exists(selpath + UniqueName + ".bak"))
-                    File.Delete(selpath + UniqueName + ".bak");
-                File.Move(selpath + UniqueName + ".json", selpath + UniqueName + ".bak");
+                if (File.Exists(selpath + UniqueName + ".log.bak"))
+                    File.Delete(selpath + UniqueName + ".log.bak");
+                File.Move(selpath + UniqueName + ".log", selpath + UniqueName + ".log.bak");
             }
 
-            History.SaveToFile(selpath + UniqueName + ".json");
+            History.SaveToFile(selpath + UniqueName + ".log");
         }
 
         /// <summary>
@@ -287,7 +287,7 @@ namespace AIToolkit.Files
             var selpath = path;
             if (!selpath.EndsWith('/') && !selpath.EndsWith('\\'))
                 selpath += Path.DirectorySeparatorChar;
-            var f = selpath + UniqueName + ".json";
+            var f = selpath + UniqueName + ".log";
             History = File.Exists(f) ? JsonConvert.DeserializeObject<Chatlog>(File.ReadAllText(f))! : CreateChatlog();
         }
 
