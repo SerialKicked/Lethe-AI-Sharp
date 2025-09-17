@@ -37,9 +37,11 @@ It includes easy-to-use (and easy to build upon) systems to handle most of the o
 - Background agent system (bot can run tasks in the background)
 - Group chat functionalities (one user and multiple AI characters)
 
-## Usage and Documentations
+## Usage and Documentation
 
-Check the `Docs/` folder for detailed instructions on how to use this library. The [LLM system docs](Docs/LLMSYSTEM.md) to get you started. You can go further with this doc about [Extending the Chatlog and Persona](Docs/LLMSYSTEM.md) functionalities.
+**New users**: Start with the [Quick Start Guide](Docs/QUICKSTART.md) to get running in 5 minutes!
+
+For comprehensive documentation, check the `Docs/` folder. The main [LLM System Documentation](Docs/LLMSYSTEM.md) covers the core LLMEngine functionality, including basic setup, simple queries, and full communication mode with personas and chat history.
 
 ## Third Party Libraries
 
