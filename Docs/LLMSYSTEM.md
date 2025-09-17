@@ -124,14 +124,20 @@ LLMEngine.Settings = settings;
 
 ## Simple Queries
 
-For basic text generation without conversation management, use the simple query methods:
+For basic text generation without conversation management, use the simple query methods. These methods require using the `IPromptBuilder` interface to construct backend-appropriate prompts.
 
 ### Non-Streaming Queries
 
 ```csharp
-// Simple text completion
-var prompt = "What is the capital of France?";
-var response = await LLMEngine.SimpleQuery(prompt);
+// Get a prompt builder for the current backend
+var builder = LLMEngine.GetPromptBuilder();
+
+// Add your prompt content
+builder.AddMessage(AuthorRole.User, "What is the capital of France?");
+
+// Convert to query and execute
+var query = builder.PromptToQuery(AuthorRole.Assistant);
+var response = await LLMEngine.SimpleQuery(query);
 Console.WriteLine($"Response: {response}");
 ```
 
@@ -151,27 +157,33 @@ LLMEngine.OnInferenceEnded += (sender, fullResponse) =>
     Console.WriteLine($"\nComplete response: {fullResponse}");
 };
 
-// Start streaming query
-var prompt = "Write a short story about a robot.";
-await LLMEngine.SimpleQueryStreaming(prompt);
+// Build the prompt
+var builder = LLMEngine.GetPromptBuilder();
+builder.AddMessage(AuthorRole.User, "Write a short story about a robot.");
+
+// Convert to query and start streaming
+var query = builder.PromptToQuery(AuthorRole.Assistant);
+await LLMEngine.SimpleQueryStreaming(query);
 ```
 
 ### Using PromptBuilder for Advanced Prompts
 
-For more complex prompts, use the PromptBuilder:
+The PromptBuilder allows you to create complex, multi-role conversations:
 
 ```csharp
-// Get a prompt builder for the current backend
+// Example with system prompt and user message
 var builder = LLMEngine.GetPromptBuilder();
 
 // Add messages with different roles
-builder.AddMessage(AuthorRole.System, "You are a helpful assistant.");
+builder.AddMessage(AuthorRole.SysPrompt, "You are a helpful assistant.");
 builder.AddMessage(AuthorRole.User, "Explain quantum physics in simple terms.");
 
 // Convert to query and execute
 var query = builder.PromptToQuery(AuthorRole.Assistant);
 var response = await LLMEngine.SimpleQuery(query);
 ```
+
+**Note**: Use `AuthorRole.SysPrompt` for system prompts and `AuthorRole.System` for system messages in conversation. The exact behavior depends on your backend and instruction format.
 
 ## Full Communication Mode
 
@@ -462,7 +474,13 @@ class SimpleBot
             if (input == "quit") break;
             
             Console.Write("Bot: ");
-            await LLMEngine.SimpleQueryStreaming($"User: {input}\nBot:");
+            
+            // Build prompt properly
+            var builder = LLMEngine.GetPromptBuilder();
+            builder.AddMessage(AuthorRole.User, input);
+            var query = builder.PromptToQuery(AuthorRole.Assistant);
+            
+            await LLMEngine.SimpleQueryStreaming(query);
         }
     }
 }

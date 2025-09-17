@@ -38,17 +38,27 @@ namespace AIToolkit.Examples
                 
                 // Step 3: Simple non-streaming query
                 Console.WriteLine("--- Non-Streaming Query ---");
-                var prompt = "What is the capital of France? Please provide a short answer.";
-                Console.WriteLine($"Query: {prompt}");
                 
-                var response = await LLMEngine.SimpleQuery(prompt);
+                // Build the prompt using the PromptBuilder
+                var builder = LLMEngine.GetPromptBuilder();
+                builder.AddMessage(AuthorRole.User, "What is the capital of France? Please provide a short answer.");
+                var query = builder.PromptToQuery(AuthorRole.Assistant);
+                
+                Console.WriteLine("Query: What is the capital of France? Please provide a short answer.");
+                
+                var response = await LLMEngine.SimpleQuery(query);
                 Console.WriteLine($"Response: {response}");
                 Console.WriteLine();
                 
                 // Step 4: Streaming query with events
                 Console.WriteLine("--- Streaming Query ---");
-                var streamingPrompt = "Write a very short story about a friendly robot in exactly two sentences.";
-                Console.WriteLine($"Query: {streamingPrompt}");
+                
+                // Build the streaming prompt
+                var streamBuilder = LLMEngine.GetPromptBuilder();
+                streamBuilder.AddMessage(AuthorRole.User, "Write a very short story about a friendly robot in exactly two sentences.");
+                var streamQuery = streamBuilder.PromptToQuery(AuthorRole.Assistant);
+                
+                Console.WriteLine("Query: Write a very short story about a friendly robot in exactly two sentences.");
                 Console.Write("Response: ");
                 
                 // Setup event handlers for streaming
@@ -68,7 +78,7 @@ namespace AIToolkit.Examples
                 };
                 
                 // Start streaming query
-                await LLMEngine.SimpleQueryStreaming(streamingPrompt);
+                await LLMEngine.SimpleQueryStreaming(streamQuery);
                 
                 // Wait for completion (in real apps, you'd handle this differently)
                 while (!responseComplete && LLMEngine.Status == SystemStatus.Busy)
@@ -80,13 +90,13 @@ namespace AIToolkit.Examples
                 
                 // Step 5: Using PromptBuilder for more complex prompts
                 Console.WriteLine("--- Advanced Prompt with PromptBuilder ---");
-                var builder = LLMEngine.GetPromptBuilder();
+                var advancedBuilder = LLMEngine.GetPromptBuilder();
                 
-                builder.AddMessage(AuthorRole.System, "You are a helpful science teacher.");
-                builder.AddMessage(AuthorRole.User, "Explain photosynthesis in simple terms.");
+                advancedBuilder.AddMessage(AuthorRole.System, "You are a helpful science teacher.");
+                advancedBuilder.AddMessage(AuthorRole.User, "Explain photosynthesis in simple terms.");
                 
-                var query = builder.PromptToQuery(AuthorRole.Assistant);
-                var scienceResponse = await LLMEngine.SimpleQuery(query);
+                var advancedQuery = advancedBuilder.PromptToQuery(AuthorRole.Assistant);
+                var scienceResponse = await LLMEngine.SimpleQuery(advancedQuery);
                 
                 Console.WriteLine("Query: System prompt + user question about photosynthesis");
                 Console.WriteLine($"Response: {scienceResponse}");

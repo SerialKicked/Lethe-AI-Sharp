@@ -35,12 +35,19 @@ if (LLMEngine.Status == SystemStatus.Ready)
 
 ```csharp
 // Non-streaming query
-var response = await LLMEngine.SimpleQuery("What is artificial intelligence?");
+var builder = LLMEngine.GetPromptBuilder();
+builder.AddMessage(AuthorRole.User, "What is artificial intelligence?");
+var query = builder.PromptToQuery(AuthorRole.Assistant);
+var response = await LLMEngine.SimpleQuery(query);
 Console.WriteLine(response);
 
 // Streaming query with real-time output
 LLMEngine.OnInferenceStreamed += (_, token) => Console.Write(token);
-await LLMEngine.SimpleQueryStreaming("Write a haiku about programming.");
+
+var streamBuilder = LLMEngine.GetPromptBuilder();
+streamBuilder.AddMessage(AuthorRole.User, "Write a haiku about programming.");
+var streamQuery = streamBuilder.PromptToQuery(AuthorRole.Assistant);
+await LLMEngine.SimpleQueryStreaming(streamQuery);
 ```
 
 ### Step 3: Conversational Chat

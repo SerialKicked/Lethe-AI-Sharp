@@ -75,7 +75,10 @@ LLMEngine.User = new BasePersona { /* configuration */ };
 LLMEngine.OnInferenceStreamed += (sender, token) => Console.Write(token);
 
 // 6. Use the engine
-await LLMEngine.SimpleQuery("Your prompt here");
+var builder = LLMEngine.GetPromptBuilder();
+builder.AddMessage(AuthorRole.User, "Your message here");
+var query = builder.PromptToQuery(AuthorRole.Assistant);
+await LLMEngine.SimpleQuery(query);
 // or
 await LLMEngine.SendMessageToBot(AuthorRole.User, "Your message");
 ```
