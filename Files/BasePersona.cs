@@ -210,26 +210,35 @@ namespace AIToolkit.Files
 
         /// <summary>
         /// Called when loading a character. Override this in derived classes to implement custom loading behavior.
-        /// A feature-complete overide should load the ChatLog, WorldInfo, and Plugins.
+        /// A feature-complete overide should load WorldInfo, and IContextPlugin plugins.
         /// </summary>
         public virtual void BeginChat()
         {
             LoadBrain(LLMEngine.Settings.DataPath);
             AgentSystem = new AgentRuntime(this);
             AgentSystem.Init();
+            LoadChatHistory();
         }
 
         /// <summary>
         /// Called when switching away from a character. Should be called when closing the application too. 
-        /// Override this in derived classes to implement custom saving behavior. Ideally, you should save the ChatLog in your derived class.
+        /// Override this in derived classes to implement custom saving behavior.
         /// </summary>
-        /// <param name="backup"></param>
+        /// <param name="backup">keep backup of previous chatfiles</param>
         public virtual void EndChat(bool backup = false)
         {
+            SaveChatHistory(backup);
             SaveBrain("data/chars/", backup);
             AgentSystem?.CloseSync();
             AgentSystem = null;
         }
+
+        /// <summary>
+        /// Saves the current chat history to the default data path. Can be overriden for custom behavior.
+        /// </summary>
+        /// <param name="backup">Indicates whether a backup of the chat history should be created.  <see langword="true"/> to create a
+        /// backup; otherwise, <see langword="false"/>.</param>
+        public virtual void SaveChatHistory(bool backup = false) => SaveChatHistory(LLMEngine.Settings.DataPath, backup);
 
         /// <summary>
         /// Save the chatlog to a file. Meant to be called by custom EndChat() in derived class, but you can call it manually too.
@@ -256,10 +265,18 @@ namespace AIToolkit.Files
         }
 
         /// <summary>
+        /// Loads the chat history from the default data path. Can be overridden for custom behavior.
+        /// </summary>
+        /// <remarks>This method retrieves the chat history using the default data path specified in the 
+        /// <see cref="LLMEngine.Settings.DataPath"/> property. Override this method in a derived class  to customize
+        /// the behavior or data source.</remarks>
+        public virtual void LoadChatHistory() => LoadChatHistory(LLMEngine.Settings.DataPath);
+
+        /// <summary>
         /// Load the chatlog from a file. Meant to be called by custom BeginChat() in derived class, but you can call it manually too.
         /// </summary>
         /// <param name="path">directory load the file from. File name is $UniqueName + ".json"</param>
-        public void LoadChatHistory(string path)
+        protected void LoadChatHistory(string path)
         {
             if (string.IsNullOrEmpty(UniqueName))
             {
@@ -460,7 +477,7 @@ namespace AIToolkit.Files
             res.Replace("{{date}}", StringExtensions.DateToHumanString(DateTime.Now))
                .Replace("{{time}}", DateTime.Now.ToString("hh:mm tt", CultureInfo.InvariantCulture))
                .Replace("{{day}}", DateTime.Now.DayOfWeek.ToString());
-            return res.ToString().CleanupAndTrim();
+            return res.ToString();
         }
     }
 }
