@@ -21,12 +21,17 @@ The `LLMEngine` is the core component of the AIToolkit library that provides a h
 1. [Quick Start Guide](QUICKSTART.md) - Get running in 5 minutes!
 2. [Basic Setup and Initialization](#basic-setup-and-initialization)
 3. [Settings Configuration](#settings-configuration)
-4. [Simple Queries](#simple-queries)
-5. [Full Communication Mode](#full-communication-mode)
-6. [Personas and Chat Management](#personas-and-chat-management)
-7. [Events and Streaming](#events-and-streaming)
-8. [Advanced Features](#advanced-features)
-9. [Examples](#examples)
+4. [Author Roles and Message Types](#author-roles-and-message-types)
+5. [Simple Queries](#simple-queries)
+6. [Full Communication Mode](#full-communication-mode)
+7. [Personas and Chat Management](#personas-and-chat-management)
+8. [Instruction Format (LLMEngine.Instruct)](#instruction-format-llmengineinstruct)
+9. [Sampling Settings (LLMEngine.Sampler)](#sampling-settings-llmenginesampler)
+10. [System Prompt (LLMEngine.SystemPrompt)](#system-prompt-llmenginesystemprompt)
+11. [Macros System](#macros-system)
+12. [Events and Streaming](#events-and-streaming)
+13. [Advanced Features](#advanced-features)
+14. [Examples](#examples)
 
 ## Basic Setup and Initialization
 
@@ -122,7 +127,42 @@ settings = LLMSettings.LoadFromFile("path/to/settings.json");
 LLMEngine.Settings = settings;
 ```
 
-## Simple Queries
+## Author Roles and Message Types
+
+The AIToolkit uses specific author roles to distinguish between different types of messages. Understanding these roles is crucial for proper prompt construction:
+
+### Core Roles
+
+```csharp
+public enum AuthorRole
+{
+    System,     // System messages within conversation
+    User,       // User/human messages  
+    Assistant,  // AI assistant responses
+    Unknown,    // Unknown/unspecified role
+    SysPrompt   // Main system prompt (beginning of conversation)
+}
+```
+
+### Important Distinction: SysPrompt vs System
+
+- **`AuthorRole.SysPrompt`**: Used for the **main system prompt** at the beginning of a conversation. This sets the overall context, character personality, and instructions for the entire session.
+
+- **`AuthorRole.System`**: Used for **system messages** inserted within the conversation flow. These are typically status updates, instructions, or contextual information that appear between user and assistant messages.
+
+```csharp
+// Example: Main system prompt (beginning of conversation)
+builder.AddMessage(AuthorRole.SysPrompt, "You are a helpful AI assistant specialized in science.");
+
+// Example: System message within conversation
+builder.AddMessage(AuthorRole.User, "What's the weather like?");
+builder.AddMessage(AuthorRole.System, "Weather data is currently unavailable.");
+builder.AddMessage(AuthorRole.Assistant, "I apologize, but I don't have access to current weather information.");
+```
+
+**Note**: For 90% of instruction formats, `SysPrompt` and `System` are handled identically. However, the library automatically handles the differences when using models with specific formatting requirements.
+
+## Settings Configuration
 
 For basic text generation without conversation management, use the simple query methods. These methods require using the `IPromptBuilder` interface to construct backend-appropriate prompts.
 
@@ -339,6 +379,213 @@ var session = LLMEngine.History.CurrentSession;
 Console.WriteLine($"Session started: {session.StartTime}");
 Console.WriteLine($"Message count: {session.Messages.Count}");
 ```
+
+## Instruction Format (LLMEngine.Instruct)
+
+The `LLMEngine.Instruct` property controls how messages are formatted for the underlying language model. This is crucial for proper model communication, especially with text completion backends like KoboldAPI.
+
+### Understanding Instruction Formats
+
+Different models expect different formatting. For example:
+- **ChatML**: `<|im_start|>user\nHello<|im_end|>`
+- **Alpaca**: `### Instruction:\nHello\n### Response:`
+- **Vicuna**: `USER: Hello\nASSISTANT:`
+
+### Accessing and Configuring
+
+```csharp
+// Access current instruction format
+var instruct = LLMEngine.Instruct;
+
+// Key properties for message formatting
+Console.WriteLine($"User start: '{instruct.UserStart}'");
+Console.WriteLine($"User end: '{instruct.UserEnd}'");
+Console.WriteLine($"Bot start: '{instruct.BotStart}'");
+Console.WriteLine($"Bot end: '{instruct.BotEnd}'");
+Console.WriteLine($"System prompt start: '{instruct.SysPromptStart}'");
+Console.WriteLine($"System prompt end: '{instruct.SysPromptEnd}'");
+```
+
+### ChatML Example Configuration
+
+```csharp
+// Configure for ChatML format
+LLMEngine.Instruct.SysPromptStart = "<|im_start|>system\n";
+LLMEngine.Instruct.SysPromptEnd = "<|im_end|>\n";
+LLMEngine.Instruct.UserStart = "<|im_start|>user\n";
+LLMEngine.Instruct.UserEnd = "<|im_end|>\n";
+LLMEngine.Instruct.BotStart = "<|im_start|>assistant\n";
+LLMEngine.Instruct.BotEnd = "<|im_end|>\n";
+LLMEngine.Instruct.AddNamesToPrompt = false;
+```
+
+### Key Settings
+
+- **`AddNamesToPrompt`**: Whether to include character names in messages
+- **`NewLinesBetweenMessages`**: Add newlines between message blocks
+- **`ThinkingStart/End`**: For chain-of-thought models
+- **`StopSequence`**: When to stop generation
+
+**Note**: OpenAI-compatible backends handle formatting internally, while KoboldAPI backends use these settings to properly format prompts.
+
+For detailed instruction format documentation, see [InstructFormat.md](INSTRUCTFORMAT.md).
+
+## Sampling Settings (LLMEngine.Sampler)
+
+The `LLMEngine.Sampler` controls how the model generates text, affecting creativity, randomness, and quality of responses.
+
+### Key Settings
+
+```csharp
+// Access current sampler settings
+var sampler = LLMEngine.Sampler;
+
+// Common settings
+sampler.Temperature = 0.7;      // Creativity (0.0-2.0, higher = more creative)
+sampler.Top_p = 0.9;           // Nucleus sampling (0.0-1.0)
+sampler.Top_k = 40;            // Top-k sampling (0 = disabled)
+sampler.Max_length = 512;      // Maximum response length in tokens
+sampler.Rep_pen = 1.1;         // Repetition penalty (1.0 = no penalty)
+
+// Advanced settings
+sampler.Min_p = 0.05;          // Minimum probability threshold
+sampler.Typical = 1.0;         // Typical sampling
+sampler.Tfs = 1.0;             // Tail-free sampling
+```
+
+### Quick Configuration Examples
+
+```csharp
+// Creative writing
+sampler.Temperature = 1.2;
+sampler.Top_p = 0.95;
+
+// Factual/precise responses  
+sampler.Temperature = 0.3;
+sampler.Top_p = 0.85;
+
+// Balanced conversation
+sampler.Temperature = 0.7;
+sampler.Top_p = 0.9;
+```
+
+The sampler settings are automatically applied to all generation methods (SimpleQuery, full communication mode, etc.).
+
+## System Prompt (LLMEngine.SystemPrompt)
+
+The `LLMEngine.SystemPrompt` is only relevant for **full communication mode** and defines the structure and content of the system prompt that's sent to the model.
+
+### Structure and Usage
+
+```csharp
+// Access system prompt settings
+var sysPrompt = LLMEngine.SystemPrompt;
+
+// Configure the main prompt template
+sysPrompt.Prompt = @"You are {{char}}, interacting with {{user}}.
+
+# Character Information
+Name: {{char}}
+Bio: {{charbio}}
+
+# User Information  
+Name: {{user}}
+Bio: {{userbio}}
+
+# Instructions
+Stay in character and respond naturally to {{user}}.";
+
+// Configure section titles
+sysPrompt.ScenarioTitle = "# Current Scenario";
+sysPrompt.DialogsTitle = "# Character's Writing Style";
+sysPrompt.WorldInfoTitle = "# Important Context";
+```
+
+### Dynamic Content Integration
+
+The system prompt automatically integrates:
+- **Character bio and personality** from `LLMEngine.Bot`
+- **Scenario information** from the loaded persona
+- **Example dialogs** to guide response style
+- **RAG/WorldInfo** retrieved content
+- **Previous session summaries** when enabled
+
+### Macro Support
+
+The system prompt fully supports the macro system (see [Macros System](#macros-system)) for dynamic content replacement.
+
+## Macros System
+
+The AIToolkit includes a powerful macro system that allows dynamic text replacement throughout the library. Macros can be used in system prompts, personas, and even simple queries.
+
+### Available Macros
+
+#### Character and User Macros
+- **`{{char}}`**: Current bot character's name
+- **`{{charbio}}`**: Current bot character's biography
+- **`{{user}}`**: Current user's name
+- **`{{userbio}}`**: Current user's biography
+- **`{{examples}}`**: Character's example dialogs
+- **`{{scenario}}`**: Current scenario description
+- **`{{selfedit}}`**: Character's self-editable field
+
+#### Time and Date Macros
+- **`{{time}}`**: Current time (e.g., "02:30 PM")
+- **`{{date}}`**: Current date in human-readable format
+- **`{{day}}`**: Current day of the week (e.g., "Monday")
+
+### Usage Examples
+
+#### In System Prompts
+```csharp
+LLMEngine.SystemPrompt.Prompt = @"You are {{char}}, a {{charbio}}.
+Today is {{day}}, {{date}} at {{time}}.
+You are talking with {{user}}.
+
+{{scenario}}";
+```
+
+#### In Simple Queries
+```csharp
+var builder = LLMEngine.GetPromptBuilder();
+builder.AddMessage(AuthorRole.SysPrompt, "You are {{char}}, interacting with {{user}} on {{day}}.");
+builder.AddMessage(AuthorRole.User, "Hello {{char}}!");
+var query = builder.PromptToQuery(AuthorRole.Assistant);
+var response = await LLMEngine.SimpleQuery(query);
+```
+
+#### In Persona Definitions
+```csharp
+var persona = new BasePersona
+{
+    Name = "Alice",
+    Bio = "I am {{char}}, a helpful assistant created to help {{user}}.",
+    Scenario = "{{char}} and {{user}} are working together on {{day}} morning.",
+    FirstMessage = new() { "Good morning {{user}}! It's {{time}} on {{day}}. How can I help?" }
+};
+```
+
+### Automatic Processing
+
+Macros are automatically processed in:
+- **Full communication mode**: All system prompts, character bios, scenarios
+- **Simple queries**: When using character context
+- **Chat history**: Welcome messages and dialog examples
+- **RAG content**: Retrieved information with character context
+
+### Manual Macro Processing
+
+You can also manually process macros:
+
+```csharp
+// Process macros for current bot and user
+string processedText = LLMEngine.Bot.ReplaceMacros("Hello {{user}}, I'm {{char}}!");
+
+// Process macros with specific user
+string customText = LLMEngine.Bot.ReplaceMacros("{{user}} is talking to {{char}} at {{time}}", specificUser);
+```
+
+This macro system ensures dynamic, contextual content that adapts to your current characters, time, and conversation state.
 
 ## Events and Streaming
 

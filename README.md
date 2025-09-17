@@ -41,7 +41,10 @@ It includes easy-to-use (and easy to build upon) systems to handle most of the o
 
 **New users**: Start with the [Quick Start Guide](Docs/QUICKSTART.md) to get running in 5 minutes!
 
-For comprehensive documentation, check the `Docs/` folder. The main [LLM System Documentation](Docs/LLMSYSTEM.md) covers the core LLMEngine functionality, including basic setup, simple queries, and full communication mode with personas and chat history.
+For comprehensive documentation, check the `Docs/` folder:
+- [LLM System Documentation](Docs/LLMSYSTEM.md) - Core LLMEngine functionality, personas, and chat management
+- [Instruction Format Guide](Docs/INSTRUCTFORMAT.md) - Configuring message formatting for different models
+- [Examples](Docs/Examples/) - Working code samples and tutorials
 
 ## Third Party Libraries
 
