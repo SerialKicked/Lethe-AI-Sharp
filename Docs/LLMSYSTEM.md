@@ -832,4 +832,7 @@ var isConnected = await LLMEngine.CheckBackend();
 Console.WriteLine($"Backend connected: {isConnected}");
 ```
 
-This documentation provides a comprehensive guide to using the LLMEngine. For more advanced features like agent tasks, RAG configuration, and plugin development, refer to the specific documentation files for those components.
+This documentation provides a comprehensive guide to using the LLMEngine. For more advanced features refer to:
+- **Agent Tasks**: See [AGENTS.md](AGENTS.md) for the autonomous agent system
+- **RAG and Memory**: See [MEMORY.md](MEMORY.md) for memory management and retrieval
+- **Personas**: See [PERSONAS.md](PERSONAS.md) for character development
