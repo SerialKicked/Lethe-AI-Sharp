@@ -50,6 +50,7 @@ NuGet packages are not yet available, but will be coming at some point.
 For comprehensive documentation, check the `Docs/` folder:
 - [LLM System Documentation](Docs/LLMSYSTEM.md) - Core LLMEngine functionality, personas, and chat management
 - [Instruction Format Guide](Docs/INSTRUCTFORMAT.md) - Configuring message formatting for different models
+- [Memory System](Docs/MEMORY.md) - Understand the various memory systems and how they interact
 - [Examples](Docs/Examples/) - Working code samples and tutorials
 
 ## 🤝 Third Party Libraries
