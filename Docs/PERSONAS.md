@@ -316,7 +316,7 @@ public override void BeginChat()
 Enable autonomous behavior. Bots can run tasks in the background while the user is AFK. The library comes with two sample tasks: `ActiveResearchTask` and `ResearchTask`.
 The first one will check the current chat sessions for things to search on the internet, while the second one will search in the previous chat session. 
 
-See the Agent documentation for more details, and for creating custom tasks.
+See [AGENTS.md](AGENTS.md) for comprehensive documentation on the agent system, including how to create custom tasks.
 
 ```csharp
 var autonomousBot = new BasePersona

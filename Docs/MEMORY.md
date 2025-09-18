@@ -163,7 +163,7 @@ Each WorldInfo entry is a `MemoryUnit` with additional keyword settings:
 
 ## Brain/Agent System
 
-The Brain/Agent system provides dynamic memory creation and research capabilities through autonomous agent tasks.
+The Brain/Agent system provides dynamic memory creation and research capabilities through autonomous agent tasks. For comprehensive documentation on the agent system, see [AGENTS.md](AGENTS.md).
 
 ### How It Works
 
