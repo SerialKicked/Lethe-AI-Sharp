@@ -835,4 +835,4 @@ Console.WriteLine($"Backend connected: {isConnected}");
 This documentation provides a comprehensive guide to using the LLMEngine. For more advanced features refer to:
 - **Agent Tasks**: See [AGENTS.md](AGENTS.md) for the autonomous agent system
 - **RAG and Memory**: See [MEMORY.md](MEMORY.md) for memory management and retrieval
-- **Personas**: See [PERSONAS.md](PERSONAS.md) for character development
+- **Personas**: See [PERSONAS.md](PERSONAS.md) for details about setting up (and overriding) the BasePersona class
