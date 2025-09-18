@@ -132,7 +132,7 @@ config.SetSetting("Delay", TimeSpan.FromMinutes(45)); // Research less frequentl
 Analyzes completed chat sessions and performs research on topics discussed.
 
 **What it does:**
-- Examines the second-to-last chat session (when a new session starts)
+- Examines the second-to-last chat session (the most recent archived one)
 - Identifies research-worthy topics from the entire session
 - Performs comprehensive web searches
 - Stores findings in memory with context about the previous conversation
@@ -150,7 +150,7 @@ var bot = new BasePersona
     AgentMode = true,
     AgentTasks = new List<string> { "ResearchTask" }
 };
-
+LLMSystem.Bot = bot;
 bot.BeginChat();
 
 // This task runs automatically when starting new chat sessions
@@ -169,7 +169,7 @@ var comprehensiveBot = new BasePersona
     AgentMode = true,
     AgentTasks = new List<string> { "ActiveResearchTask", "ResearchTask" }
 };
-
+LLMSystem.Bot = comprehensiveBot;
 comprehensiveBot.BeginChat();
 
 // ActiveResearchTask handles ongoing conversations
@@ -252,7 +252,7 @@ public class CustomAnalysisTask : IAgentTask
 
 ### Task Registration
 
-Register your custom task before using it:
+Register your custom task before using it. This should be done before even initializing the `LLMEngine`, right when your program starts.
 
 ```csharp
 // Option 1: Register a singleton instance
@@ -364,17 +364,15 @@ Agent tasks commonly store information in the persona's Brain for later recall:
 
 ### Storing Research Results
 
+See the [memory documentation](MEMORY.md) for more information.
+
 ```csharp
 // Create a memory with research findings
-var memory = new BrainMemory(
-    content: "Recent AI developments show increased focus on multimodal models...",
-    importance: MemoryImportance.High,
-    memoryType: "research_finding"
-)
+var memory = new MemoryUnit
 {
+    Title = "some title",
+    Content = "the content you want to store for the bot to retrieve when needed",
     Keywords = new List<string> { "AI", "multimodal", "technology trends" },
-    Source = "web_research",
-    CreatedAt = DateTime.Now
 };
 
 // Embed the text for semantic search
@@ -476,40 +474,10 @@ public async Task<bool> Observe(BasePersona owner, AgentTaskSetting cfg, Cancell
 }
 ```
 
-### Memory Management
-
-1. **Set appropriate importance levels**: Use `MemoryImportance.High` sparingly
-2. **Add relevant keywords**: Help with memory retrieval
-3. **Include source information**: Track where information came from
-4. **Clean up old memories**: Implement archival logic for outdated information
-
-```csharp
-var memory = new BrainMemory(content, MemoryImportance.Medium, "task_result")
-{
-    Keywords = ExtractKeywords(content),
-    Source = $"{Id}_{DateTime.Now:yyyyMMdd}",
-    ExpirationDate = DateTime.Now.AddMonths(6) // Optional expiration
-};
-```
-
-### User Experience
-
-1. **Inform users of activities**: Use `AddUserReturnInsert()` appropriately
-2. **Don't overwhelm**: Limit the number of return messages
-3. **Be specific**: Describe what the agent accomplished
-
-```csharp
-// Good: Specific and useful
-owner.Brain.AddUserReturnInsert("{{char}} researched quantum computing advances while you were away.");
-
-// Bad: Vague and not helpful
-owner.Brain.AddUserReturnInsert("{{char}} did some work.");
-```
-
 ### Error Handling
 
 1. **Log errors with context**: Include task ID and relevant parameters
-2. **Fail gracefully**: Don't crash the entire agent system
+2. **Fail gracefully**: Don't crash the entire agent system with your custom task
 3. **Implement retry logic**: For transient failures
 
 ```csharp
