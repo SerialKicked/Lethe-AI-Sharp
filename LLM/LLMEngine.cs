@@ -155,7 +155,7 @@ namespace AIToolkit.LLM
 
         private static SystemStatus status = SystemStatus.NotInit;
         private static string StreamingTextProgress = string.Empty;
-        private static int maxContextLength = 4096;
+        private static int maxContextLength = 8192;
         private static InstructFormat instruct = new();
         private static ILogger? logger = null;
         private static BasePersona bot = new() { IsUser = false, Name = "Bot", Bio = "You are an helpful AI assistant whose goal is to answer questions and complete tasks.", UniqueName = string.Empty };

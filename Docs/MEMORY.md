@@ -2,7 +2,7 @@
 
 This document explains the different memory systems used by the AIToolkit library to extend the persona's memory and knowledge. All memory systems are unified under the `MemoryUnit` format and can be triggered either manually through keywords or automatically through the RAGEngine's embedding similarity search.
 
-Note that most, if not all those systems are automatically handled by the library when in full chat mode. This is mostly to explain how things behave internally, especially has many classes and functions can be overriden to add more functionalities.
+Note that most, if not all those systems are automatically handled by the library when in full chat mode. This is mostly to explain how things behave internally, especially as many classes and functions can be overriden to add more functionalities.
 
 ## Overview
 
@@ -52,9 +52,9 @@ The `MemoryUnit` class is the unified format for all memory and knowledge storag
 
 ### Memory Insertion Modes
 
-- **Trigger** - Memory is activated by RAG similarity search or keyword matching
-- **Natural** - Automatically inserted when relevant, then converted to Trigger after use
-- **NaturalForced** - Forcefully inserted into the discussion after a while if no relevant entry point, converted to Trigger after use.
+- **Trigger** - Memory is activated by RAG similarity in user input. It stays in the prompt for "Duration" (unless it's a chat session, which is always 1)
+- **Natural** - Automatically inserted when relevant just before the user input message, it behaves like a normal message and scrolls until it gets out of the context window. It's converted to Trigger after use.
+- **NaturalForced** - Same as natural but is forcefully inserted into the discussion after a while if no relevant entry point present itself.
 - **None** - Disabled memory
 
 ## Chat Session Summaries
@@ -221,19 +221,21 @@ The library supports multiple strategies for inserting memories into conversatio
 
 - **Activation**: Memories are inserted when triggered by RAG similarity or keyword matching
 - **Use Case**: Most common for stored knowledge and past conversations
-- **Behavior**: Memories remain dormant until relevance is detected
+- **Behavior**: Memories remain dormant until relevance is detected and disappear quickly from context when not
 
 ### Natural Insertion
 
 - **Activation**: Memories are automatically evaluated for relevance during conversation
 - **Conversion**: After being used once, Natural memories become Trigger memories
-- **Use Case**: Fresh insights or temporary information
+- **Use Case**: Fresh insights or temporary information, 
+- **Behavior**: Inserted like a system message (just above the last user message), scrolls out of context over time
 
 ### Forced Natural Insertion
 
 - **Activation**: Always considered for insertion when relevant
-- **Persistence**: Remains Natural, doesn't convert to Trigger
-- **Use Case**: Critical information that should always be available (research findings, important facts)
+- **Conversion**: After being used once, those memories become Trigger memories
+- **Use Case**: Critical information that the user needs to know even if talking about something else.
+- **Behavior**: Inserted like a system message (just above the last user message), scrolls out of context over time
 
 ### Memory Lifecycle
 
@@ -244,6 +246,63 @@ The library supports multiple strategies for inserting memories into conversatio
 5. **Insertion**: Memory content is injected into conversation context
 6. **Evolution**: Natural memories may convert to Trigger memories after use
 7. **Decay**: Some memory types (Goals and WebSearch by default) will decay and be pruned if not triggered for a long time.
+
+## Example of a Full Featured Chatlog
+
+Here's an example of what a full prompt might look like when having all memory systems enabled and working together. Here, the user archived the last chat session a while back and is starting a new one. The program was kept running in the background. Bob is running the two ActiveResearchTask and ResearchTask agentic task, allowing it to do web research while the user is AFK.
+
+```
+[SystemPrompt]
+You are a helpful assistant named Bob.
+
+# Participants:
+- Bob: A knowledgeable and friendly AI assistant who can remember a great deal
+- User: Some user who knows very little
+
+# Past sessions:    // Automatically inserted by the bot in the system prompt, those are former chat sessions summaries (if any and if they no longer fit in context)
+- Session Title 1 (2025-05-16): Discussed the basics of AI and machine learning. User learned about supervised and unsupervised learning.
+- Session Title 2 (2025-06-02): Discussed the meaning of life, we ended up figuring out it was 42
+
+# Relevant Information: // Those are RAG triggered information from either past sessions, WorldInfo, or other tasks with their memory entries set to Trigger
+- some relevant info from a worldinfo entry about the last user message
+- some past chat session that's too old for the previous section but very relevant to the discussion at hand
+[/SystemPrompt]
+
+[Bot]
+Hello! How can I assist you today?
+[/Bot]
+
+[User]
+Hi Bob, did you look into the meaning of life we discussed last time?
+[/User]
+```
+
+In this example, assuming that Bob got time to do the research in the background while the user was afk. The prompt becomes:
+
+```
+[SystemPrompt] 
+(no changes)
+[/SystemPrompt]
+
+[Bot]
+Hello! How can I assist you today?
+[/Bot]
+
+[SystemMessage] // those messages are automatically inserted by the bot just above the last user message, they scroll out of context over time and are tagged as "hidden", meaning that they don't have to be displayed in the UI
+Bob has found the following information on the internet about the meaning of life: 
+(lot of text here, summarized from various sources)
+[/SystemMessage]
+
+[User]
+Hi Bob, Did you look into the meaning of life we discussed last time?
+[/User]
+
+[Bot]
+Oh yeah, I did! Here's the info I found.... (proceeds to reuse the info from the SystemMessage above in its own words)
+[/Bot]
+```
+
+Here the `Brain` class found that the user's query was very close to one of the memories it had with the Natural or NaturalForced trigger, so it inserted it just above the user message as a system message. The bot then can then reuse that information in its own words.
 
 ## Best Practices
 
