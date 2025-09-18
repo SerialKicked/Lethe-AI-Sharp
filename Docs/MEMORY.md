@@ -2,12 +2,14 @@
 
 This document explains the different memory systems used by the AIToolkit library to extend the persona's memory and knowledge. All memory systems are unified under the `MemoryUnit` format and can be triggered either manually through keywords or automatically through the RAGEngine's embedding similarity search.
 
+Note that most, if not all those systems are automatically handled by the library when in full chat mode. This is mostly to explain how things behave internally, especially has many classes and functions can be overriden to add more functionalities.
+
 ## Overview
 
 The AIToolkit library employs three primary memory systems that work together to provide comprehensive memory management for personas:
 
 1. **Chat Session Summaries** - Automatic summarization and embedding of past conversations
-2. **WorldInfo System** - Manual keyword-activated knowledge databases  
+2. **WorldInfo System** - Manual keyword-activated knowledge databases. It's the application's job to load them into the BasePersona.Worlds field.
 3. **Brain/Agent System** - Dynamic research and memory creation through agent tasks
 
 All memory types are stored using the unified `MemoryUnit` format, which provides consistent handling, embedding, and retrieval across the entire system.
@@ -34,7 +36,7 @@ The `MemoryUnit` class is the unified format for all memory and knowledge storag
 | `Insertion` | `MemoryInsertion` | How the memory is inserted (Trigger, Natural, NaturalForced, None) |
 | `Name` | `string` | Title or name for the memory entry |
 | `Content` | `string` | The actual memory content |
-| `Reason` | `string` | Context or reason why this memory is important |
+| `Reason` | `string` | Context or reason why this memory is important (optional) |
 | `EmbedSummary` | `float[]` | Vector embedding for RAG similarity search |
 | `Priority` | `int` | Importance level of the memory (affects retention and triggering) |
 
@@ -52,7 +54,7 @@ The `MemoryUnit` class is the unified format for all memory and knowledge storag
 
 - **Trigger** - Memory is activated by RAG similarity search or keyword matching
 - **Natural** - Automatically inserted when relevant, then converted to Trigger after use
-- **NaturalForced** - Always inserted when relevant, remains Natural
+- **NaturalForced** - Forcefully inserted into the discussion after a while if no relevant entry point, converted to Trigger after use.
 - **None** - Disabled memory
 
 ## Chat Session Summaries
@@ -138,7 +140,7 @@ The Brain/Agent system provides dynamic memory creation and research capabilitie
 
 ### How It Works
 
-1. **Topic Analysis**: Agent tasks analyze recent conversations to identify unfamiliar topics
+1. **Topic Analysis**: Agent tasks (if enabled) analyze recent conversations to identify unfamiliar topics
 2. **Automatic Research**: When `AgentSystem` is enabled and research tasks are assigned, the system:
    - Detects knowledge gaps in conversations
    - Performs web searches on unfamiliar topics
@@ -174,7 +176,7 @@ owner.Brain.Memorize(mem);
 ### Brain Memory Management
 
 The `Brain` class provides memory management functionality:
-- **Memorize()**: Add new memories with duplicate checking
+- **Memorize()**: Add new memories with duplicate checking. This is particularly useful if your app intends to feed the persona with external information.
 - **Forget()**: Remove specific memories
 - **GetMemoriesForRAG()**: Retrieve memories available for similarity search
 - **UpdateRagAndInserts()**: Refresh active memory insertions
@@ -241,26 +243,26 @@ The library supports multiple strategies for inserting memories into conversatio
 4. **Activation**: Memory is triggered by keywords or similarity search
 5. **Insertion**: Memory content is injected into conversation context
 6. **Evolution**: Natural memories may convert to Trigger memories after use
+7. **Decay**: Some memory types (Goals and WebSearch by default) will decay and be pruned if not triggered for a long time.
 
 ## Best Practices
 
 ### For Developers
 
 - Use appropriate `MemoryType` categories for better organization
-- Set realistic `Priority` levels to control memory retention
+- Set realistic `Priority` levels to control memory retention (0 priority means that a natural memory will be pruned immediately after use)
 - Configure `Duration` appropriately for WorldInfo entries
 - Enable `DoEmbeds` for WorldInfo when RAG integration is desired
 
 ### For Memory Design
 
-- Write clear, concise `Content` that provides context without being verbose
+- Write clear, concise `Content` that provides context without being verbose, always aim for less than 1024 tokens (512 is optimal)
 - Use descriptive `Name` fields for better identification
-- Include relevant `Reason` information to explain why the memory matters
+- The `Reason` information is optional, and mostly used for more natural intertion into the prompt
 - Choose appropriate `Insertion` strategies based on memory importance and usage patterns
 
 ### Performance Considerations
 
-- RAG searches are computationally expensive - use appropriate distance thresholds
-- Large numbers of memories can impact search performance
+- While extremely optimized, RAG searches are computationally expensive, going over >100k entries might take several seconds.
 - Regular memory cleanup helps maintain system responsiveness
 - WorldInfo keyword matching is faster than RAG similarity search for specific triggers
