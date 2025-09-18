@@ -12,6 +12,8 @@ It includes easy-to-use (and easy to build upon) systems to handle most of the o
 - **Kobold API:** Used by [KoboldCpp](https://github.com/LostRuins/koboldcpp). This is the recommended backend with the most features.
 - **OpenAI API:** Used by [LM Studio](https://lmstudio.ai/), [Text Generation WebUI](https://github.com/oobabooga/text-generation-webui), and others. Less features.
 
+**Lethe AI** technically supports remote backends but this hasn't been tested, this liberary is mostly designed for local (or local network) LLM inference.
+
 ## ⭐ Main Features
 - Easy to use classes for bot personas, system prompts, instruction formats, and inference settings
 - Session-based chatlog with automated summaries for past sessions
