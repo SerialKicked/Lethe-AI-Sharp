@@ -4,9 +4,9 @@ Powerful, object-oriented, and highly configurable, general purpose library used
 
 ## ℹ️ What is This?
 
-Simply put, this library offers a bunch of tools for those who want to code their own C# front-end or LLM-powered tools without having to do all the heavy lifting. It can  happily connect itself to the most popular backends (the program loading the LLM proper) and allows your code to "speak" with the LLM is a few function calls. 
+This library offers many tools and features for those who want to code their own C# front-end or LLM-powered tools without having to do all the heavy lifting. It can  happily connect itself to the most popular backends (the program loading the LLM proper) and allows your code to "speak" with the LLM is a few function calls. 
 
-It includes easy-to-use (and easy to build upon) systems to handle most of the operations you'd wish to do with a LLM, alongside many related features like RAG, web search, text to speech, semantic similarity testing, and string manipulation.
+It includes easy-to-use (and easy to build upon) systems to handle most of the operations you'd wish to do with a LLM, alongside many advanced features like RAG, agentic systems, web search, text to speech, semantic similarity testing, and prompt manipulation.
 
 ## 🧩 Compatible Backends
 - **Kobold API:** Used by [KoboldCpp](https://github.com/LostRuins/koboldcpp). This is the recommended backend with the most features.
@@ -31,19 +31,24 @@ It includes easy-to-use (and easy to build upon) systems to handle most of the o
 - Automatic (optional) and configurable insertion of relevant past chat sessions into the context
 
 ## 🧠 Agentic and Brain Module for personas
+- Background agent system (bot can run tasks in the background)
 - Analyze past chat sessions, run relevant web searches and mention results in next session
 - Mood tracking + drift system (personality coloring over time)
 - Goal‑driven behaviors (long‑term projects, self‑seeding topics of interest)
 
-## 🛠️ Advanced Features
-- Background agent system (bot can run tasks in the background)
+## 🛠️ Advanced Features (Work in progress / experimental)
 - Group chat functionalities (one user and multiple AI characters)
+- Sentiment analysis
 
 ## 🔎 Installation
 
-Right now, the best way to use that library is to add it to your C# solution as a library directly. 
+Right now, the best way to use that library is to add it to your C# solution as a library directly.
 
-NuGet packages are not yet available, but will be coming at some point.
+To take advantage of the RAG and Sentiment Analysis functionalities, you'll need to download 2 more files and place them into the `data/classifiers` folder of the library:
+- [gte-large.Q6_K.gguf](https://huggingface.co/SerialKicked/Lethe-AI-Repo/resolve/main/gte-large.Q6_K.gguf?download=true) - Required for all RAG and Memory related operations
+- [emotion-bert-classifier.gguf](https://huggingface.co/SerialKicked/Lethe-AI-Repo/resolve/main/emotion-bert-classifier.gguf?download=true) - Used for experimental and option Sentiment Analysis functions
+
+Then, in Visual Studio (or whatever editor you're using) make sure to set the build action _"Copy to Output Directory"_ to _"Copy if newer"_
 
 ## 🔎 Usage and Documentation
 
