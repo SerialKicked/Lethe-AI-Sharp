@@ -153,16 +153,10 @@ var format = new InstructFormat
 - Full control over message structure
 
 ### OpenAI API (Chat Completion)  
-- Ignores most InstructFormat settings
+- Ignores most settings except ThinkingStart and ThinkingEnd
+- You still should set the correct format, as it'll help with token count evaluation
 - Uses native message format internally
 - Limited customization options
-
-## Best Practices
-
-1. **Match Your Model**: Use the format your specific model was trained with
-2. **Test Thoroughly**: Different formats can significantly affect model behavior
-3. **Keep It Simple**: Start with standard formats before customizing
-4. **Document Changes**: Track format modifications for reproducibility
 
 ## Loading and Saving
 
@@ -181,7 +175,7 @@ LLMEngine.Instruct = loadedFormat;
 ### Common Issues
 
 - **Empty Responses**: Wrong format for your model
-- **Repetitive Output**: Missing stop sequences
+- **Repetitive and super long Output**: Bad BotEnd or missing stop sequence
 - **Poor Quality**: Format doesn't match training data
 
 ### Debugging
@@ -194,7 +188,7 @@ string formatted = builder.PromptToText();
 Console.WriteLine(formatted);
 ```
 
-This will show you exactly how your messages are being formatted, helping identify format issues.
+This will show you exactly how your messages are being formatted if you're using a Text completion API like KoboldCpp, helping identify format issues.
 
 ## Model-Specific Recommendations
 
