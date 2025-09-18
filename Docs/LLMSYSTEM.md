@@ -232,14 +232,18 @@ The full communication mode provides complete conversation management with perso
 ### Setting Up Personas
 
 ```csharp
-// Create a bot persona
+// Create a bot persona that can search information about the current chat topic while the user is AFK.
 var bot = new BasePersona
 {
     Name = "Alice",
     Bio = "A knowledgeable AI assistant with expertise in science and technology.",
     IsUser = false,
     Scenario = "You are Alice, a helpful AI assistant in a research lab.",
-    FirstMessage = new List<string> { "Hello! I'm Alice, how can I help you today?" }
+    FirstMessage = new List<string> { "Hello! I'm Alice, how can I help you today?" },
+    AgentMode = true,
+    AgentTasks = [ "ActiveResearchTask" ],
+    SenseOfTime = true,
+    DatesInSessionSummaries = true
 };
 
 // Create a user persona
@@ -293,18 +297,17 @@ foreach (var msg in messages)
     Console.WriteLine($"{msg.Role}: {msg.Message}");
 }
 
-// Clear chat history
+// Clear full chat history (you probably don't want to do this often, the library is meant to use chat sessions instead)
 history.Clear();
 
 // Start a new session (archiving the previous one if it has content)
 await history.StartNewChatSession();
 
-// Save history to file
+// Save history to file, done automatically via LLMEngine.Bot.EndChat()
 history.SaveToFile("path/to/chat.json");
 
-// Load history from file
+// Load history from file, done automatically via LLMEngine.Bot.BeginChat()
 var loadedHistory = Chatlog.LoadFromFile("path/to/chat.json");
-LLMEngine.Bot.History = loadedHistory;
 ```
 
 ### Bot Actions
@@ -357,13 +360,13 @@ var persona = new BasePersona
 
 // Load the persona
 LLMEngine.Bot = persona;
-persona.BeginChat(); // Initializes plugins and loads context
+persona.BeginChat(); // Initializes plugins and loads context, this *must* be done before a chat with a given persona
 ```
 
 ### Session Management
 
 ```csharp
-// Start a new chat session
+// Start a new chat session, this will archive the previous chat and prepare it for RAG retrieval
 await LLMEngine.History.StartNewChatSession();
 
 // Add a welcome message
@@ -637,6 +640,7 @@ LLMEngine.OnBotChanged += (sender, newBot) =>
 ## Advanced Features
 
 ### RAG (Retrieval-Augmented Generation)
+RAG automatically retrieves the summary of previous chat session with the current bot based on the conversation, and inserts it into the prompt at the specified index. This is extremely effective for maintaining context over long-term conversations. It's also used for other advanced functions like WorldInfo, or the agent mode's different tasks.
 
 ```csharp
 // Enable RAG in settings
@@ -644,19 +648,15 @@ LLMEngine.Settings.AllowWorldInfo = true;
 LLMEngine.Settings.RAGMaxEntries = 5;
 LLMEngine.Settings.RAGIndex = 3; // Insert at message index 3
 
-// RAG automatically retrieves relevant context based on the conversation
-// and inserts it into the prompt at the specified index
 ```
 
 ### Web Search Integration
+Web search is automatically triggered by some agent tasks when the bot needs additional information from the web.
 
 ```csharp
 // Configure web search
 LLMEngine.Settings.WebSearchAPI = BackendSearchAPI.DuckDuckGo;
 LLMEngine.Settings.WebSearchDetailedResults = true;
-
-// Web search is automatically triggered by agent tasks
-// when the bot needs current information
 ```
 
 ### Token Management
@@ -676,7 +676,7 @@ Console.WriteLine($"Tokens remaining: {remaining}");
 ### Grammar and Structured Output
 
 ```csharp
-// For backends that support GBNF grammar
+// For backends that support GBNF grammar (KoboldAPI only)
 if (LLMEngine.SupportsGrammar)
 {
     // Define a class for structured output
@@ -714,7 +714,7 @@ class SimpleBot
         LLMEngine.OnInferenceStreamed += (_, token) => Console.Write(token);
         LLMEngine.OnInferenceEnded += (_, response) => Console.WriteLine("\n");
         
-        // Interactive loop
+        // Interactive loop (this has no brain, it'll just recall the system prompt and user input)
         while (true)
         {
             Console.Write("You: ");
@@ -724,10 +724,10 @@ class SimpleBot
             Console.Write("Bot: ");
             
             // Build prompt properly
-            var builder = LLMEngine.GetPromptBuilder();
             builder.AddMessage(AuthorRole.User, input);
+            var builder = LLMEngine.GetPromptBuilder();
+            builder.AddMessage(AuthorRole.SysPrompt, "You are a helpful assistant.");
             var query = builder.PromptToQuery(AuthorRole.Assistant);
-            
             await LLMEngine.SimpleQueryStreaming(query);
         }
     }
@@ -768,13 +768,17 @@ class CharacterChat
         
         // Setup events
         LLMEngine.OnInferenceStreamed += (_, token) => Console.Write(token);
-        LLMEngine.OnInferenceEnded += (_, response) => Console.WriteLine("\n");
+        LLMEngine.OnInferenceEnded += (_, response) => 
+        {
+            Console.WriteLine("\n");
+            LLMEngine.History.LogMessage(AuthorRole.Assistant, response, user, bot);
+        }
         
+        LLMEngine.Bot.BeginChat(); // Initialize plugins and context, and load history if exists
         // Start conversation
         var welcome = bot.GetWelcomeLine(user.Name);
         Console.WriteLine($"Einstein: {welcome}");
         LLMEngine.History.LogMessage(AuthorRole.Assistant, welcome, user, bot);
-        
         // Chat loop
         while (true)
         {
@@ -787,75 +791,7 @@ class CharacterChat
         }
         
         // Save history
-        LLMEngine.History.SaveToFile("einstein_chat.json");
-    }
-}
-```
-
-### Example 3: Multi-Session Chat Manager
-
-```csharp
-using AIToolkit.LLM;
-using AIToolkit.Files;
-
-class ChatManager
-{
-    public static async Task Main()
-    {
-        // Setup
-        LLMEngine.Setup("http://localhost:5001", BackendAPI.KoboldAPI);
-        await LLMEngine.Connect();
-        
-        // Load or create personas
-        var bot = BasePersona.LoadFromFile("my_character.json") ?? new BasePersona
-        {
-            Name = "Assistant",
-            Bio = "A helpful AI assistant"
-        };
-        
-        LLMEngine.Bot = bot;
-        
-        // Setup events
-        LLMEngine.OnInferenceEnded += (_, response) =>
-        {
-            Console.WriteLine($"\n[{DateTime.Now:HH:mm}] Bot: {response}");
-            
-            // Auto-save after each response
-            LLMEngine.History.SaveToFile($"chat_{DateTime.Now:yyyy-MM-dd}.json");
-        };
-        
-        // Load previous session if exists
-        var todayFile = $"chat_{DateTime.Now:yyyy-MM-dd}.json";
-        if (File.Exists(todayFile))
-        {
-            LLMEngine.Bot.History = Chatlog.LoadFromFile(todayFile);
-            Console.WriteLine("Previous session loaded.");
-        }
-        
-        // Chat interface
-        Console.WriteLine("Chat started. Type 'new' for new session, 'quit' to exit.");
-        
-        while (true)
-        {
-            Console.Write($"[{DateTime.Now:HH:mm}] You: ");
-            var input = Console.ReadLine();
-            
-            switch (input?.ToLower())
-            {
-                case "quit":
-                    return;
-                case "new":
-                    await LLMEngine.History.StartNewChatSession();
-                    Console.WriteLine("New session started.");
-                    continue;
-                case "reroll":
-                    await LLMEngine.RerollLastMessage();
-                    continue;
-                default:
-                    await LLMEngine.SendMessageToBot(AuthorRole.User, input);
-                    break;
-            }
-        }
+        LLMEngine.Bot.EndChat(); // Saves history automatically
     }
 }
 ```

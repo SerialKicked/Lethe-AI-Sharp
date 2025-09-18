@@ -77,6 +77,8 @@ namespace AIToolkit.Examples
                 
                 LLMEngine.OnInferenceEnded += (sender, response) =>
                 {
+                    // it's the app's responsibility to save the received message (or not)
+                    LLMEngine.History.LogMessage(AuthorRole.Assistant, response, user, bot);
                     Console.WriteLine(); // New line after response
                 };
                 
@@ -85,8 +87,9 @@ namespace AIToolkit.Examples
                     if (status == SystemStatus.Busy)
                         Console.Write($"{bot.Name}: ");
                 };
-                
+
                 // Step 4: Start conversation with welcome message
+                LLMEngine.Bot.BeginChat();
                 Console.WriteLine("Starting conversation...");
                 var welcomeMessage = bot.GetWelcomeLine(user.Name);
                 Console.WriteLine($"{bot.Name}: {welcomeMessage}");
@@ -146,12 +149,9 @@ namespace AIToolkit.Examples
                 }
                 
                 Console.WriteLine();
-                
+
                 // Step 8: Save chat history
-                var filename = $"science_chat_{DateTime.Now:yyyy-MM-dd_HH-mm}.json";
-                LLMEngine.History.SaveToFile(filename);
-                Console.WriteLine($"Chat history saved to: {filename}");
-                
+                LLMEngine.Bot.EndChat();
             }
             catch (Exception ex)
             {

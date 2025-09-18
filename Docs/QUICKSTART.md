@@ -50,33 +50,7 @@ var streamQuery = streamBuilder.PromptToQuery(AuthorRole.Assistant);
 await LLMEngine.SimpleQueryStreaming(streamQuery);
 ```
 
-### Step 3: Conversational Chat
-
-```csharp
-// Create a chatbot persona
-LLMEngine.Bot = new BasePersona
-{
-    Name = "Assistant",
-    Bio = "A helpful AI assistant",
-    IsUser = false
-};
-
-// Setup streaming display
-LLMEngine.OnInferenceStreamed += (_, token) => Console.Write(token);
-LLMEngine.OnStatusChanged += (_, status) => 
-{
-    if (status == SystemStatus.Busy) Console.Write("Bot: ");
-};
-
-// Have a conversation
-await LLMEngine.SendMessageToBot(AuthorRole.User, "Hello, how are you?");
-
-// Wait for response to complete
-while (LLMEngine.Status == SystemStatus.Busy)
-    await Task.Delay(100);
-```
-
-## Complete Example
+## Full Chat Mode
 
 Here's a minimal working chat application:
 
@@ -112,6 +86,15 @@ class Program
         {
             if (status == SystemStatus.Busy) Console.Write("Bot: ");
         };
+
+        LLMEngine.OnInferenceEnded += (_, response) => 
+        {
+            Console.WriteLine("\n");
+            LLMEngine.History.LogMessage(AuthorRole.Assistant, response, user, bot);
+        }
+
+        // Init Bot, load/create' chatlog
+        LLMEngine.Bot.BeginChat();
         
         // Chat loop
         Console.WriteLine("Chat started! Type 'quit' to exit.");
@@ -128,9 +111,10 @@ class Program
             // Wait for response
             while (LLMEngine.Status == SystemStatus.Busy)
                 await Task.Delay(50);
-                
-            Console.WriteLine(); // New line after response
         }
+        // End chat session and save log
+        LLMEngine.Bot.Endhat();
+
     }
 }
 ```
