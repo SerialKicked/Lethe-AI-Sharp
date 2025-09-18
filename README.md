@@ -37,6 +37,12 @@ It includes easy-to-use (and easy to build upon) systems to handle most of the o
 - Background agent system (bot can run tasks in the background)
 - Group chat functionalities (one user and multiple AI characters)
 
+## 🔎 Installation
+
+Right now, the best way to use that library is to add it to your C# solution as a library directly. 
+
+NuGet packages are not yet available, but will be coming at some point.
+
 ## 🔎 Usage and Documentation
 
 **New users**: Start with the [Quick Start Guide](Docs/QUICKSTART.md) to get running in 5 minutes!
