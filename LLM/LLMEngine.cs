@@ -1,16 +1,16 @@
-﻿using AIToolkit.Agent;
-using AIToolkit.API;
-using AIToolkit.Files;
-using AIToolkit.Memory;
+﻿using LetheAISharp.Agent;
+using LetheAISharp.API;
+using LetheAISharp.Files;
+using LetheAISharp.Memory;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Drawing;
 using System.Globalization;
 using System.Text;
-using static AIToolkit.SearchAPI.WebSearchAPI;
+using static LetheAISharp.SearchAPI.WebSearchAPI;
 using Message = OpenAI.Chat.Message;
 
-namespace AIToolkit.LLM
+namespace LetheAISharp.LLM
 {
     public enum SystemStatus { NotInit, Ready, Busy }
     public enum BackendAPI { KoboldAPI, OpenAI }

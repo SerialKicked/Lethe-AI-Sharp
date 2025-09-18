@@ -1,4 +1,4 @@
-﻿using AIToolkit.LLM;
+﻿using LetheAISharp.LLM;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
     /// <summary>
     /// Represents a configurable instruction formatting system for constructing prompts and messages used in

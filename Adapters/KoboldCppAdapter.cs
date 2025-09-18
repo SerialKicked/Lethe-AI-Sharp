@@ -1,11 +1,11 @@
-﻿using AIToolkit.LLM;
-using AIToolkit.SearchAPI;
+﻿using LetheAISharp.LLM;
+using LetheAISharp.SearchAPI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema.Generation;
 using System;
 
-namespace AIToolkit.API
+namespace LetheAISharp.API
 {
     
     /// <summary>

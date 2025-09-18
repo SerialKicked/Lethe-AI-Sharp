@@ -6,7 +6,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace AIToolkit
+namespace LetheAISharp
 {
     public static class ImageUtils
     {

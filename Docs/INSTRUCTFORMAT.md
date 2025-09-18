@@ -1,6 +1,6 @@
 # InstructFormat Documentation
 
-The `InstructFormat` class is a core component of the AIToolkit that defines how messages are formatted for different language models. This is particularly important for text completion backends (KoboldAPI). While chat completion backends (OpenAI) handle formatting internally, providing the correct instruction format will lead to much better token count evaluation and handling of CoT / Thinking models.
+The `InstructFormat` class is a core component of the LetheAISharp that defines how messages are formatted for different language models. This is particularly important for text completion backends (KoboldAPI). While chat completion backends (OpenAI) handle formatting internally, providing the correct instruction format will lead to much better token count evaluation and handling of CoT / Thinking models.
 
 ## Overview
 

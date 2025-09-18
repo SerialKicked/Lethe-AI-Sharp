@@ -1,8 +1,8 @@
-﻿using AIToolkit.LLM;
+﻿using LetheAISharp.LLM;
 using Newtonsoft.Json;
 using OpenAI.Chat;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
     /// <summary>
     /// Represents a single message exchanged in a conversational context, including metadata such as the author role,

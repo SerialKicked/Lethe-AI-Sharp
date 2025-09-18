@@ -1,8 +1,8 @@
-﻿using AIToolkit.Agent;
-using AIToolkit.GBNF;
-using AIToolkit.LLM;
+﻿using LetheAISharp.Agent;
+using LetheAISharp.GBNF;
+using LetheAISharp.LLM;
 
-namespace AIToolkit.SearchAPI
+namespace LetheAISharp.SearchAPI
 {
 
     public enum BackendSearchAPI { DuckDuckGo, Brave }

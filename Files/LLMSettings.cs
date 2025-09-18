@@ -1,5 +1,5 @@
-﻿using AIToolkit.LLM;
-using AIToolkit.SearchAPI;
+﻿using LetheAISharp.LLM;
+using LetheAISharp.SearchAPI;
 using HNSW.Net;
 using System;
 using System.Collections.Generic;
@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
     public class LLMSettings : BaseFile
     {

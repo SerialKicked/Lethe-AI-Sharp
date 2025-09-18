@@ -1,5 +1,5 @@
-﻿using AIToolkit.Agent;
-using AIToolkit.LLM;
+﻿using LetheAISharp.Agent;
+using LetheAISharp.LLM;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -8,7 +8,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AIToolkit.GBNF
+namespace LetheAISharp.GBNF
 {
 
     public class SessionMetaInfo : LLMExtractableBase<SessionMetaInfo>

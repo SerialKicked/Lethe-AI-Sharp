@@ -2,14 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using AIToolkit.LLM;
-using AIToolkit.Files;
+using LetheAISharp.LLM;
+using LetheAISharp.Files;
 using Newtonsoft.Json;
-using AIToolkit.API;
+using LetheAISharp.API;
 using System.Text.RegularExpressions;
 using System.Globalization;
 
-namespace AIToolkit
+namespace LetheAISharp
 {
     public class StringFix(bool removeAllBoldedText, bool fixQuotes, bool removeSingleWorldEmphasis, bool removeAllQuotes, bool removeItalic, float removeItalicRatio, int removeItalicMaxWords, bool lastParagraphDeleter)
     {

@@ -1,6 +1,6 @@
-﻿using AIToolkit.Agent;
-using AIToolkit.LLM;
-using AIToolkit.Memory;
+﻿using LetheAISharp.Agent;
+using LetheAISharp.LLM;
+using LetheAISharp.Memory;
 using CommunityToolkit.HighPerformance;
 using Newtonsoft.Json;
 using System;
@@ -8,7 +8,7 @@ using System.Globalization;
 using System.Reflection.PortableExecutable;
 using System.Text;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
     /// <summary>
     /// Represents a base persona, which serves as a customizable character or user profile with attributes, behaviors,

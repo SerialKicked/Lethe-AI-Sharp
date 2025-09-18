@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
-using AIToolkit.LLM;
-using AIToolkit.Files;
+using LetheAISharp.LLM;
+using LetheAISharp.Files;
 using System.Collections.Generic;
 
-namespace AIToolkit.Examples
+namespace LetheAISharp.Examples
 {
     /// <summary>
     /// Example demonstrating full communication mode with personas and chat history

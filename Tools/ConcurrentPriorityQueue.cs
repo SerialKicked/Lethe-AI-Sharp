@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace AIToolkit
+namespace LetheAISharp
 {
     public class ThreadSafePriorityQueue<T> : IDisposable where T : class
     {

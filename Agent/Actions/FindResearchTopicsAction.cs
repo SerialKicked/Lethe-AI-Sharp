@@ -1,10 +1,10 @@
-﻿using AIToolkit.API;
-using AIToolkit.Files;
-using AIToolkit.GBNF;
-using AIToolkit.LLM;
+﻿using LetheAISharp.API;
+using LetheAISharp.Files;
+using LetheAISharp.GBNF;
+using LetheAISharp.LLM;
 using Newtonsoft.Json;
 
-namespace AIToolkit.Agent.Actions
+namespace LetheAISharp.Agent.Actions
 {
     public class FindResearchTopicsParams
     {

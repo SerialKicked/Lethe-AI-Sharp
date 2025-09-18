@@ -1,7 +1,7 @@
-﻿using AIToolkit.LLM;
+﻿using LetheAISharp.LLM;
 using Newtonsoft.Json;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
     public interface IEmbed
     {

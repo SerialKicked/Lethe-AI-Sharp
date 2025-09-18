@@ -1,10 +1,10 @@
-using AIToolkit.Files;
-using AIToolkit.LLM;
+using LetheAISharp.Files;
+using LetheAISharp.LLM;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 
-namespace AIToolkit.Files.Tests
+namespace LetheAISharp.Files.Tests
 {
     /// <summary>
     /// Test class to verify group chat functionality

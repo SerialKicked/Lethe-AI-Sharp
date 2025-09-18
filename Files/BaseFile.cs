@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
 
     public class BaseFile : IFile

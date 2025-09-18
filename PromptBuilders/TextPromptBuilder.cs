@@ -1,6 +1,6 @@
-﻿using AIToolkit.API;
-using AIToolkit.Files;
-using AIToolkit.LLM;
+﻿using LetheAISharp.API;
+using LetheAISharp.Files;
+using LetheAISharp.LLM;
 using CommunityToolkit.HighPerformance;
 using System;
 using System.Collections.Generic;
@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AIToolkit
+namespace LetheAISharp
 {
     internal class TextPromptBuilder : IPromptBuilder
     {

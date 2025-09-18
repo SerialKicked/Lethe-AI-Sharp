@@ -5,10 +5,10 @@ using LLama.Extensions;
 using MessagePack;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
-using AIToolkit.Files;
-using AIToolkit.Memory;
+using LetheAISharp.Files;
+using LetheAISharp.Memory;
 
-namespace AIToolkit.LLM
+namespace LetheAISharp.LLM
 {
     /// <summary>
     /// Basic RNG for the SmallWorld implementation (not thread safe)

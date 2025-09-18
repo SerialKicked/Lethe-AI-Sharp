@@ -1,4 +1,4 @@
-﻿using AIToolkit.Files;
+﻿using LetheAISharp.Files;
 using LLama;
 using LLama.Common;
 using Microsoft.Extensions.Logging;
@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 // Ignore IDE1006 for this file to allow deserialization of JSON with lowercase property names
 #pragma warning disable IDE1006
 
-namespace AIToolkit.LLM
+namespace LetheAISharp.LLM
 {
 
     internal sealed class ThresholdConfig

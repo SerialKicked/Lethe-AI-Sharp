@@ -1,4 +1,4 @@
-﻿using AIToolkit.LLM;
+﻿using LetheAISharp.LLM;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using OpenAI;
@@ -10,7 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AIToolkit.API
+namespace LetheAISharp.API
 {
 
     public class OpenTokenResponse

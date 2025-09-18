@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-This guide will get you up and running with the AIToolkit LLMEngine in just a few minutes.
+This guide will get you up and running with the LetheAISharp LLMEngine in just a few minutes.
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ This guide will get you up and running with the AIToolkit LLMEngine in just a fe
 ### Step 1: Basic Connection
 
 ```csharp
-using AIToolkit.LLM;
+using LetheAISharp.LLM;
 
 // Connect to your backend (adjust URL/port as needed)
 LLMEngine.Setup("http://localhost:5001", BackendAPI.KoboldAPI);
@@ -55,8 +55,8 @@ await LLMEngine.SimpleQueryStreaming(streamQuery);
 Here's a minimal working chat application:
 
 ```csharp
-using AIToolkit.LLM;
-using AIToolkit.Files;
+using LetheAISharp.LLM;
+using LetheAISharp.Files;
 
 class Program
 {

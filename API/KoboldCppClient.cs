@@ -4,17 +4,17 @@
 #pragma warning disable 8618 // Disable "CS8618 Non-nullable field is uninitialized"
 #pragma warning disable 8625 // Disable "CS8625 Cannot convert null literal to non-nullable reference type"
 
-using AIToolkit.LLM;
+using LetheAISharp.LLM;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Net.Http.Headers;
 using System.Text;
-using static AIToolkit.SearchAPI.WebSearchAPI;
+using static LetheAISharp.SearchAPI.WebSearchAPI;
 
 
-namespace AIToolkit.API
+namespace LetheAISharp.API
 {
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.1.0.0 (NJsonSchema v11.0.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public class KoboldCppClient 

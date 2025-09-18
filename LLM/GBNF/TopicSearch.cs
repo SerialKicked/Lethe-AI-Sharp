@@ -1,5 +1,5 @@
-﻿using AIToolkit.Files;
-using AIToolkit.LLM;
+﻿using LetheAISharp.Files;
+using LetheAISharp.LLM;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AIToolkit.GBNF
+namespace LetheAISharp.GBNF
 {
     public class TopicSearch : LLMExtractableBase<TopicSearch>
     {

@@ -1,14 +1,14 @@
-﻿using AIToolkit.Agent.Actions;
-using AIToolkit.API;
-using AIToolkit.GBNF;
-using AIToolkit.LLM;
-using AIToolkit.Memory;
+﻿using LetheAISharp.Agent.Actions;
+using LetheAISharp.API;
+using LetheAISharp.GBNF;
+using LetheAISharp.LLM;
+using LetheAISharp.Memory;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System.Runtime.Serialization;
 using System.Text;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
     public class ChatSession : MemoryUnit
     {

@@ -1,5 +1,5 @@
-﻿using AIToolkit.Files;
-using AIToolkit.LLM;
+﻿using LetheAISharp.Files;
+using LetheAISharp.LLM;
 using CommunityToolkit.HighPerformance;
 using OpenAI.Chat;
 using System;
@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AIToolkit
+namespace LetheAISharp
 {
     internal class ChatPromptBuilder : IPromptBuilder
     {

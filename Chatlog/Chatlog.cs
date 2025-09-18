@@ -1,8 +1,8 @@
-﻿using AIToolkit.Agent;
-using AIToolkit.API;
-using AIToolkit.GBNF;
-using AIToolkit.LLM;
-using AIToolkit.Memory;
+﻿using LetheAISharp.Agent;
+using LetheAISharp.API;
+using LetheAISharp.GBNF;
+using LetheAISharp.LLM;
+using LetheAISharp.Memory;
 using CommunityToolkit.HighPerformance;
 using LLama.Sampling;
 using Newtonsoft.Json;
@@ -13,7 +13,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using static System.Collections.Specialized.BitVector32;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
 
     /// <summary>

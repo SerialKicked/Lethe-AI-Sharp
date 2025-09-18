@@ -1,8 +1,8 @@
-﻿using AIToolkit.GBNF;
-using AIToolkit.LLM;
-using static AIToolkit.SearchAPI.WebSearchAPI;
+﻿using LetheAISharp.GBNF;
+using LetheAISharp.LLM;
+using static LetheAISharp.SearchAPI.WebSearchAPI;
 
-namespace AIToolkit.Agent.Actions
+namespace LetheAISharp.Agent.Actions
 {
     /// <summary>
     /// Represents an action that performs web searches based on the provided search queries and returns a list of

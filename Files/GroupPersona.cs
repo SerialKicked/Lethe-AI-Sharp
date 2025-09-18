@@ -1,9 +1,9 @@
-using AIToolkit.LLM;
+using LetheAISharp.LLM;
 using Newtonsoft.Json;
 using System.Globalization;
 using System.Text;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
     /// <summary>
     /// Represents a group persona that manages multiple bot personas for group chat scenarios.

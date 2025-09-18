@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AIToolkit.Agent
+namespace LetheAISharp.Agent
 {
     public enum AgentActionRequirements
     {

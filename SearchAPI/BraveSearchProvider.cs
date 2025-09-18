@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace AIToolkit.SearchAPI
+namespace LetheAISharp.SearchAPI
 {
     // Brave Search Provider
     public class BraveSearchProvider(HttpClient httpClient, string apiKey) : ISearchProvider

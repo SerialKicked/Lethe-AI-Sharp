@@ -1,7 +1,7 @@
-﻿using AIToolkit.LLM;
+﻿using LetheAISharp.LLM;
 using System.Text;
 
-namespace AIToolkit.Memory
+namespace LetheAISharp.Memory
 {
     public class MoodState
     {

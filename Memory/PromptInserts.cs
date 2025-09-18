@@ -1,9 +1,9 @@
-﻿using AIToolkit.Files;
-using AIToolkit.LLM;
+﻿using LetheAISharp.Files;
+using LetheAISharp.LLM;
 using System.Text;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace AIToolkit.Memory
+namespace LetheAISharp.Memory
 {
     public class PromptInsert
     {

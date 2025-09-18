@@ -2,9 +2,9 @@
 
 ## Overview
 
-The `LLMEngine` is the core component of the AIToolkit library that provides a high-level interface for communicating with Large Language Models (LLMs). It acts as a middleware layer that handles connections to various backends, manages chat history, personas, and provides both simple query methods and full conversation management.
+The `LLMEngine` is the core component of the LetheAISharp library that provides a high-level interface for communicating with Large Language Models (LLMs). It acts as a middleware layer that handles connections to various backends, manages chat history, personas, and provides both simple query methods and full conversation management.
 
-> 🚀 **New to AIToolkit?** Start with the [Quick Start Guide](QUICKSTART.md) for a 5-minute setup!
+> 🚀 **New to LetheAISharp?** Start with the [Quick Start Guide](QUICKSTART.md) for a 5-minute setup!
 
 ## Key Features
 
@@ -40,8 +40,8 @@ The `LLMEngine` is the core component of the AIToolkit library that provides a h
 The first step is to configure and connect to your LLM backend:
 
 ```csharp
-using AIToolkit.LLM;
-using AIToolkit.Files;
+using LetheAISharp.LLM;
+using LetheAISharp.Files;
 
 // Setup connection to KoboldCpp (recommended)
 LLMEngine.Setup("http://localhost:5001", BackendAPI.KoboldAPI);
@@ -129,7 +129,7 @@ LLMEngine.Settings = settings;
 
 ## Author Roles and Message Types
 
-The AIToolkit uses specific author roles to distinguish between different types of messages. Understanding these roles is crucial for proper prompt construction:
+The LetheAISharp uses specific author roles to distinguish between different types of messages. Understanding these roles is crucial for proper prompt construction:
 
 ### Core Roles
 
@@ -520,7 +520,7 @@ The system prompt fully supports the macro system (see [Macros System](#macros-s
 
 ## Macros System
 
-The AIToolkit includes a powerful macro system that allows dynamic text replacement throughout the library. Macros can be used in system prompts, personas, and even simple queries.
+The LetheAISharp includes a powerful macro system that allows dynamic text replacement throughout the library. Macros can be used in system prompts, personas, and even simple queries.
 
 ### Available Macros
 
@@ -699,8 +699,8 @@ if (LLMEngine.SupportsGrammar)
 ### Example 1: Simple Q&A Bot
 
 ```csharp
-using AIToolkit.LLM;
-using AIToolkit.Files;
+using LetheAISharp.LLM;
+using LetheAISharp.Files;
 
 class SimpleBot
 {
@@ -737,8 +737,8 @@ class SimpleBot
 ### Example 2: Character Chat with Personas
 
 ```csharp
-using AIToolkit.LLM;
-using AIToolkit.Files;
+using LetheAISharp.LLM;
+using LetheAISharp.Files;
 
 class CharacterChat
 {

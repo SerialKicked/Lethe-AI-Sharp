@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AIToolkit
+namespace LetheAISharp
 {
 
     public static class DescriptionHelper

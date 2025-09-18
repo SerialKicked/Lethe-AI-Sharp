@@ -1,13 +1,13 @@
-﻿using AIToolkit;
-using AIToolkit.Files;
-using AIToolkit.GBNF;
-using AIToolkit.LLM;
+﻿using LetheAISharp;
+using LetheAISharp.Files;
+using LetheAISharp.GBNF;
+using LetheAISharp.LLM;
 using CommunityToolkit.HighPerformance;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
 
-namespace AIToolkit.Memory
+namespace LetheAISharp.Memory
 {
     public class UserReturnInsert(string info)
     {

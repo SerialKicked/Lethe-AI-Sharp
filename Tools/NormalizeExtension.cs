@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Numerics.Tensors;
 
-namespace AIToolkit
+namespace LetheAISharp
 {
     /// <summary>
     /// Extensions to span which apply <b>in-place</b> normalization

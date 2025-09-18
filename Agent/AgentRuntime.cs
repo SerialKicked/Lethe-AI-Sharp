@@ -1,7 +1,7 @@
-﻿using AIToolkit.Agent.Actions;
-using AIToolkit.Agent.Plugins;
-using AIToolkit.Files;
-using AIToolkit.LLM;
+﻿using LetheAISharp.Agent.Actions;
+using LetheAISharp.Agent.Plugins;
+using LetheAISharp.Files;
+using LetheAISharp.LLM;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -10,7 +10,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AIToolkit.Agent
+namespace LetheAISharp.Agent
 {
 
     public class AgentConfig

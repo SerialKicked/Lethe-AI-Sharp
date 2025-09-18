@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System.IO;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
     public interface IFile
     {

@@ -1,6 +1,6 @@
-# AIToolkit Examples
+# LetheAISharp Examples
 
-This directory contains practical examples demonstrating how to use the AIToolkit library and LLMEngine.
+This directory contains practical examples demonstrating how to use the LetheAISharp library and LLMEngine.
 
 ## Running the Examples
 
@@ -8,7 +8,7 @@ These examples are provided as reference code. To run them:
 
 1. Make sure you have a compatible LLM backend running (KoboldCpp or OpenAI-compatible server)
 2. Copy the example code into your own project
-3. Ensure you have the AIToolkit library referenced
+3. Ensure you have the LetheAISharp library referenced
 4. Modify the connection URL and settings as needed
 
 ## Available Examples

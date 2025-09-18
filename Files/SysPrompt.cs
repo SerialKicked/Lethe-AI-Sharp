@@ -1,7 +1,7 @@
 ﻿using System.Text;
-using AIToolkit.LLM;
+using LetheAISharp.LLM;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
     /// <summary>
     /// System prompt template and related settings. This is used to generate the system prompt that is sent to the LLM at the start of each chat session.

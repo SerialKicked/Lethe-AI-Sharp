@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace AIToolkit.SearchAPI
+namespace LetheAISharp.SearchAPI
 {
     // DuckDuckGo Search Provider
     public class DuckDuckGoSearchProvider(HttpClient httpClient) : ISearchProvider

@@ -1,12 +1,12 @@
 # Memory Systems Documentation
 
-This document explains the different memory systems used by the AIToolkit library to extend the persona's memory and knowledge. All memory systems are unified under the `MemoryUnit` format and can be triggered either manually through keywords or automatically through the RAGEngine's embedding similarity search.
+This document explains the different memory systems used by the LetheAISharp library to extend the persona's memory and knowledge. All memory systems are unified under the `MemoryUnit` format and can be triggered either manually through keywords or automatically through the RAGEngine's embedding similarity search.
 
 Note that most, if not all those systems are automatically handled by the library when in full chat mode. This is mostly to explain how things behave internally, especially as many classes and functions can be overriden to add more functionalities.
 
 ## Overview
 
-The AIToolkit library employs three primary memory systems that work together to provide comprehensive memory management for personas:
+The LetheAISharp library employs three primary memory systems that work together to provide comprehensive memory management for personas:
 
 1. **Chat Session Summaries** - Automatic summarization and embedding of past conversations
 2. **WorldInfo System** - Manual keyword-activated knowledge databases. It's the application's job to load them into the BasePersona.Worlds field.

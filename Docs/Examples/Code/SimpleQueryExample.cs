@@ -1,9 +1,9 @@
 using System;
 using System.Threading.Tasks;
-using AIToolkit.LLM;
-using AIToolkit.Files;
+using LetheAISharp.LLM;
+using LetheAISharp.Files;
 
-namespace AIToolkit.Examples
+namespace LetheAISharp.Examples
 {
     /// <summary>
     /// Simple example demonstrating basic LLMEngine usage with simple queries

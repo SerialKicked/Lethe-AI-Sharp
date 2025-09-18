@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using AIToolkit.Files;
-using AIToolkit.LLM;
+using LetheAISharp.Files;
+using LetheAISharp.LLM;
 using SharpToken;
 
-namespace AIToolkit
+namespace LetheAISharp
 {
     public static class TokenTools
     {

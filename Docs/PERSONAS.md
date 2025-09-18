@@ -1,6 +1,6 @@
 # Persona Development Guide
 
-This document explains how to create and customize personas using `BasePersona` in the AIToolkit library, and how to extend it for application-specific behaviors. It complements `LLMSYSTEM.md` and `QUICKSTART.md`.
+This document explains how to create and customize personas using `BasePersona` in the LetheAISharp library, and how to extend it for application-specific behaviors. It complements `LLMSYSTEM.md` and `QUICKSTART.md`.
 
 ## Overview
 
@@ -73,8 +73,8 @@ persona.EndChat(backup: true); // backup = true saves .bak files
 ## Basic Usage Example
 
 ```csharp
-using AIToolkit.Files;
-using AIToolkit.LLM;
+using LetheAISharp.Files;
+using LetheAISharp.LLM;
 
 // Create a basic bot persona
 var bot = new BasePersona

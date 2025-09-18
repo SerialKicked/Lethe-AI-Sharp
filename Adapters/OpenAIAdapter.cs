@@ -1,10 +1,10 @@
-﻿using AIToolkit.LLM;
-using AIToolkit.SearchAPI;
+﻿using LetheAISharp.LLM;
+using LetheAISharp.SearchAPI;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using OpenAI.Chat;
 
-namespace AIToolkit.API
+namespace LetheAISharp.API
 {
     /// <summary>
     /// Adapter for OpenAI-compatible backends (we'll see later)

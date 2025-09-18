@@ -1,8 +1,8 @@
-﻿using AIToolkit.LLM;
+﻿using LetheAISharp.LLM;
 using Newtonsoft.Json;
 using System.Runtime.CompilerServices;
 
-namespace AIToolkit.LLM
+namespace LetheAISharp.LLM
 {
     public abstract class LLMExtractableBase<T>
     {

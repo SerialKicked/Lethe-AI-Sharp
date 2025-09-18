@@ -5,7 +5,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AIToolkit.API
+namespace LetheAISharp.API
 {
     public enum CompletionType { Text, Chat }
 

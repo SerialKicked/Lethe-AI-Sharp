@@ -1,6 +1,6 @@
-﻿using AIToolkit.Files;
+﻿using LetheAISharp.Files;
 
-namespace AIToolkit.Agent
+namespace LetheAISharp.Agent
 {
     public interface IAgentTask
     {

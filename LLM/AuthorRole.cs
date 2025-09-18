@@ -1,4 +1,4 @@
-﻿namespace AIToolkit.LLM
+﻿namespace LetheAISharp.LLM
 {
     public enum AuthorRole
     {

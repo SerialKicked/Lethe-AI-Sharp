@@ -1,5 +1,5 @@
-﻿using AIToolkit.LLM;
-using AIToolkit.Files;
+﻿using LetheAISharp.LLM;
+using LetheAISharp.Files;
 using Newtonsoft.Json;
 using OpenAI;
 using System;
@@ -9,7 +9,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace AIToolkit.Memory
+namespace LetheAISharp.Memory
 {
     public enum WEPosition { SystemPrompt, Chat }
     public enum KeyWordLink

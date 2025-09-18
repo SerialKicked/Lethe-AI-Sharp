@@ -1,4 +1,4 @@
-﻿namespace AIToolkit.Memory
+﻿namespace LetheAISharp.Memory
 {
     /// <summary>
     /// list of "what's up" and similar sentences open ended intros to trigger a memory recall

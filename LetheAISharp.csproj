@@ -7,6 +7,12 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
      <NeutralLanguage>en-US</NeutralLanguage>
      <FileEncoding>utf-8</FileEncoding>
+     <Title>Lethe AI Sharp</Title>
+     <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+     <PackageLicenseFile>LICENSE</PackageLicenseFile>
+     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+     <PackageReadmeFile>README.md</PackageReadmeFile>
+     <PackageIcon>Sarah.png</PackageIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="HNSW" Version="25.3.56901" />
@@ -60,8 +66,22 @@
     <None Update="Docs\Examples\InstructFormat\Mistral Tekken7.json">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
+    <None Update="LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Docs\Examples\Personas\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\WaifuAI\bin\Debug\net9.0-windows\data\img\Sarah.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 </Project>

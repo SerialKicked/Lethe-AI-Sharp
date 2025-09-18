@@ -1,7 +1,7 @@
-﻿using AIToolkit.Files;
+﻿using LetheAISharp.Files;
 using Newtonsoft.Json.Linq;
 
-namespace AIToolkit.Agent
+namespace LetheAISharp.Agent
 {
     public class AgentTaskSetting
     {

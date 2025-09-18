@@ -1,4 +1,4 @@
-﻿namespace AIToolkit.SearchAPI
+﻿namespace LetheAISharp.SearchAPI
 {
     // Common interface for search providers
     public interface ISearchProvider

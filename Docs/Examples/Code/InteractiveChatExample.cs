@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
-using AIToolkit.LLM;
-using AIToolkit.Files;
+using LetheAISharp.LLM;
+using LetheAISharp.Files;
 using System.Linq;
 
-namespace AIToolkit.Examples
+namespace LetheAISharp.Examples
 {
     /// <summary>
     /// Interactive console chat application demonstrating real-world usage

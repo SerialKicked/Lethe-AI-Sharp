@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using AIToolkit.API;
+using LetheAISharp.API;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
     public class SamplerSettings : GenerationInput, IFile
     {

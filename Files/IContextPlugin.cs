@@ -1,6 +1,6 @@
-﻿using AIToolkit.LLM;
+﻿using LetheAISharp.LLM;
 
-namespace AIToolkit.Files
+namespace LetheAISharp.Files
 {
     public class PluginResponse
     {

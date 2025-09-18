@@ -1,14 +1,14 @@
-﻿using AIToolkit.Agent.Actions;
-using AIToolkit.Files;
-using AIToolkit.GBNF;
-using AIToolkit.LLM;
-using AIToolkit.Memory;
+﻿using LetheAISharp.Agent.Actions;
+using LetheAISharp.Files;
+using LetheAISharp.GBNF;
+using LetheAISharp.LLM;
+using LetheAISharp.Memory;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
-using static AIToolkit.SearchAPI.WebSearchAPI;
+using static LetheAISharp.SearchAPI.WebSearchAPI;
 
-namespace AIToolkit.Agent.Plugins
+namespace LetheAISharp.Agent.Plugins
 {
     /// <summary>
     /// Provides an active research task that monitors the ongoing chat session and performs web searches on unfamiliar topics.

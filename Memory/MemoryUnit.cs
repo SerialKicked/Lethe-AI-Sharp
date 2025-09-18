@@ -1,5 +1,5 @@
-﻿using AIToolkit.Files;
-using AIToolkit.LLM;
+﻿using LetheAISharp.Files;
+using LetheAISharp.LLM;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace AIToolkit.Memory
+namespace LetheAISharp.Memory
 {
     public enum MemoryInsertionStrategy
     {

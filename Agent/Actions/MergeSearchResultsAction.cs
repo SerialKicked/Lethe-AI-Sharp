@@ -1,11 +1,11 @@
-﻿using AIToolkit.GBNF;
-using AIToolkit.LLM;
+﻿using LetheAISharp.GBNF;
+using LetheAISharp.LLM;
 using Microsoft.Extensions.Logging;
 using System.Drawing;
 using System.Text;
-using static AIToolkit.SearchAPI.WebSearchAPI;
+using static LetheAISharp.SearchAPI.WebSearchAPI;
 
-namespace AIToolkit.Agent.Actions
+namespace LetheAISharp.Agent.Actions
 {
     public class MergeSearchParams(string context , string topic, string reason, List<SearchAPI.WebSearchAPI.EnrichedSearchResult> results)
     {
