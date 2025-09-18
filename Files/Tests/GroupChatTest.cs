@@ -34,7 +34,7 @@ namespace LetheAISharp.Files.Tests
             };
 
             // Set up LLMSystem.LoadedPersonas for the test
-            LLMEngine.LoadPersona(new List<BasePersona> { alice, bob });
+            LLMEngine.LoadPersonas(new List<BasePersona> { alice, bob });
 
             // Create group persona
             var groupPersona = new GroupPersona

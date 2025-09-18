@@ -215,6 +215,33 @@ namespace LetheAISharp.LLM
             PromptBuilder = GetPromptBuilder();
             AgentRuntime.LoadDefaultActions();
 
+            if (LoadedPersonas.Count == 0)
+            {
+                // Check Settings.DataPath for json files and load them as personas
+                var personaFiles = Directory.GetFiles(Settings.DataPath, "*.json");
+                foreach (var file in personaFiles)
+                {
+                    try
+                    {
+                        var json = File.ReadAllText(file);
+                        var persona = JsonConvert.DeserializeObject<BasePersona>(json);
+                        if (persona != null)
+                        {
+                            // set UniqueName as filename without extention
+                            persona.UniqueName = Path.GetFileNameWithoutExtension(file);
+                            if (!string.IsNullOrEmpty(persona.UniqueName) && !LoadedPersonas.ContainsKey(persona.UniqueName))
+                            {
+                                LoadedPersonas.Add(persona.UniqueName, persona);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.LogError(ex, "Failed to load persona from file {File}: {Message}", file, ex.Message);
+                    }
+                }
+            }
+
             Status = SystemStatus.Ready;
         }
 
@@ -222,7 +249,7 @@ namespace LetheAISharp.LLM
         /// Preload personas available in the application, so the system can interpret chatlogs from personas that aren't the currently loaded ones.
         /// </summary>
         /// <param name="toload"></param>
-        public static void LoadPersona(List<BasePersona> toload)
+        public static void LoadPersonas(List<BasePersona> toload)
         {
             LoadedPersonas = [];
             foreach (var item in toload)
