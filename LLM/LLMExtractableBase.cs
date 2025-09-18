@@ -8,7 +8,7 @@ namespace AIToolkit.LLM
     {
         public virtual string GetQuery()
         {
-            var requestedTask = "Write a JSON file containing the following information based on the data shown above:\n";
+            var requestedTask = "Respond using a JSON format containing the following information:\n";
             var schema = DescriptionHelper.GetAllDescriptionsRecursive<T>();
 
             foreach (var prop in schema)

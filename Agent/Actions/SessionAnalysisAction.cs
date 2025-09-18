@@ -13,10 +13,17 @@ namespace AIToolkit.Agent.Actions
         public string Request = request;
     }
 
+    /// <summary>
+    /// Represents an action that analyzes a session and generates a response based on the session's context and the
+    /// request provided as a parameter.
+    /// </summary>
+    /// <remarks>This action uses a language model to process the session data and user request, generating a
+    /// response that reflects on the session. It requires specific capabilities, such as access to a language model, 
+    /// to execute successfully.</remarks>
     public class SessionAnalysisAction : IAgentAction<string, SessionAnalysisParams>
     {
         public string Id => "SessionAnalysisAction";
-        public HashSet<AgentActionRequirements> Requirements => [ AgentActionRequirements.LLM, AgentActionRequirements.Grammar ];
+        public HashSet<AgentActionRequirements> Requirements => [ AgentActionRequirements.LLM ];
         public async Task<string> Execute(SessionAnalysisParams param, CancellationToken ct)
         {
             if (ct.IsCancellationRequested)
@@ -24,7 +31,7 @@ namespace AIToolkit.Agent.Actions
 
             var prompt = GetSystemPromt(param.Session, param.Request);
             var fullprompt = prompt.PromptToQuery(AuthorRole.Assistant, LLMEngine.Sampler.Temperature, 1024);
-            var response = await LLMEngine.SimpleQuery(fullprompt).ConfigureAwait(false);
+            var response = await LLMEngine.SimpleQuery(fullprompt, ct).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
             {
                 response = response.RemoveThinkingBlocks(LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd);

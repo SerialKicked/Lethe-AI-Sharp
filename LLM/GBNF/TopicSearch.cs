@@ -13,7 +13,7 @@ namespace AIToolkit.GBNF
     public class TopicSearch : LLMExtractableBase<TopicSearch>
     {
         [Required]
-        [Description("The infamiliar topic to look at.")]
+        [Description("The topic to look at.")]
         public string Topic { get; set; } = string.Empty;
         [Required]
         [Description("The context or reason why this topic is of interest to {{char}}, {{user}}, or both.")]
@@ -63,7 +63,7 @@ space ::= | " " | "\n"{1,2} [ \t]{0,20}
 
         public override string GetQuery()
         {
-            var requestedTask = "Review the conversation log above. Identify between 1 and 3 topics or concepts that {{char}} is not familiar with. Inform your choices based on the information presented in the log and the character descriptions. Only include topics that are of interest to {{char}} and {{user}}. Avoid any topic that could be considered illegal, terrorist, or CSAM. Respond in valid JSON using this schema:" + LLMEngine.NewLine;
+            var requestedTask = "Respond in valid JSON using this schema:" + LLMEngine.NewLine;
             var schema = DescriptionHelper.GetAllDescriptionsRecursive<TopicLookup>();
             foreach (var prop in schema)
             {

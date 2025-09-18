@@ -4,6 +4,14 @@ using static AIToolkit.SearchAPI.WebSearchAPI;
 
 namespace AIToolkit.Agent.Actions
 {
+    /// <summary>
+    /// Represents an action that performs web searches based on the provided search queries and returns a list of
+    /// enriched search results.
+    /// </summary>
+    /// <remarks>This action is designed to execute web searches for all queries specified in the <see
+    /// cref="TopicSearch"/> parameter. The results are aggregated into a single list of <see
+    /// cref="EnrichedSearchResult"/> objects. If the operation is canceled via the <see cref="CancellationToken"/>, the
+    /// method will return the results collected up to that point.</remarks>
     public class WebSearchAction : IAgentAction<List<EnrichedSearchResult>, TopicSearch>
     {
         public string Id => "WebSearchAction";
