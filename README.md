@@ -1,4 +1,4 @@
-# EsKa's AI Toolkit - A C# Middleware LLM Library
+# Lethe AI - A C# Middleware LLM Library
 
 Powerful, object-oriented, and highly configurable, general purpose library used to connect a local back-end running a Large Language Model (LLM) to a front-end.
 
