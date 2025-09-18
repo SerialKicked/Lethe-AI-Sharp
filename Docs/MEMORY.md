@@ -63,7 +63,7 @@ The chat session memory system automatically summarizes and embeds past conversa
 
 ### Recent Past Sessions 
 
-The summary of the chat sessions just before the current one can be inserted in the system prompt for long term contextual awareness. The behavior can be adjusted through the LLMEngine.Settings:
+The summary of the chat sessions just before the current one can be inserted in the system prompt for long term contextual awareness. The behavior can be adjusted through the `LLMEngine.Settings`:
 
 - **SessionMemorySystem** - true/false (allow or disallow the behavior entirely)
 - **SessionReservedTokens** - The maximum amount of tokens you want to reserve for the feature
