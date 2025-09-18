@@ -59,12 +59,32 @@ The `MemoryUnit` class is the unified format for all memory and knowledge storag
 
 ## Chat Session Summaries
 
-The chat session memory system automatically summarizes and embeds past conversations, making them searchable through the RAGEngine.
+The chat session memory system automatically summarizes and embeds past conversations, making them searchable through the RAGEngine. There are 2 different insertion methods. 
+
+### Recent Past Sessions 
+
+The summary of the chat sessions just before the current one can be inserted in the system prompt for long term contextual awareness. The behavior can be adjusted through the LLMEngine.Settings:
+
+- **SessionMemorySystem** - true/false (allow or disallow the behavior entirely)
+- **SessionReservedTokens** - The maximum amount of tokens you want to reserve for the feature
+- **SessionHandling** - How to handle the chatlog itself
+  - **CurrentOnly** - The chatlog will only contain the current session, with the previous ones summarized in system prompt
+  - **FitAll** - The chatlog will feature as much log as possible (even across multiple sessions) depending on maximum Context Size, sessions coming before all this will be inserted in system prompt
+
+### Long Term Recall
+
+Older chat session can be retrieved through RAG. Their summary are compared to the user's input, for embedding distance / similarity. If judged relevant enough, those can be inserted into the prompt at different levels under different policies.
 
 ### How It Works
 
-1. **Automatic Summarization**: When a chat session ends, the system generates a comprehensive summary including:
-   - Session title and metadata
+When a chat session ends, which is controlled by your app through the following command:
+````csharp
+LLMSystem.Bot.History.StartNewChatSession()
+````
+the library processes the chat to turn it into useful data:
+
+1. **Automatic Summarization**: 
+   - Session title, summary and metadata
    - Key topics discussed
    - Character interactions and developments
    - Future goals mentioned
@@ -76,6 +96,7 @@ The chat session memory system automatically summarizes and embeds past conversa
 
 ### Session Summary Process
 
+Any chat session can be (re)processed individually, however it can take a few minutes depending on the backend, model, and processing power. 
 ```csharp
 // Automatic session update process
 await session.UpdateSession();
@@ -85,6 +106,12 @@ await session.UpdateSession();
 // - MetaData.FutureGoals (mentioned objectives)
 // - EmbedSummary (vector embedding)
 ```
+
+Instead when the user or app decides that a chat session has ended, call:
+````csharp
+LLMSystem.Bot.History.StartNewChatSession()
+````
+It'll automatically process, and archive the current one before starting a new empty session.
 
 ### Memory Storage
 
