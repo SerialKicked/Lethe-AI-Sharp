@@ -1,0 +1,16 @@
+{
+  "SysPromptStart": "<|system|>",
+  "SysPromptEnd": "",
+  "SystemStart": "<|system|>",
+  "SystemEnd": "",
+  "UserStart": "<|user|>",
+  "UserEnd": "",
+  "BotStart": "<|model|>",
+  "BotEnd": "",
+  "BoSToken": "<s>",
+  "StopSequence": "</s>",
+  "AddNamesToPrompt": false,
+  "NewLinesBetweenMessages": false,
+  "StopStrings": [ "<|user" ],
+  "UniqueName": "Metharme"
+}

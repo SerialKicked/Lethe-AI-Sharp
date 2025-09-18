@@ -1,0 +1,12 @@
+{
+	"SysPromptStart": "<start_of_turn>system\n",
+	"SysPromptEnd": "<end_of_turn>",
+	"SystemStart": "<start_of_turn>system\n",
+	"SystemEnd": "<end_of_turn>",
+	"UserStart": "<start_of_turn>user\n",
+	"UserEnd": "<end_of_turn>",
+	"BotStart": "<start_of_turn>model\n",
+	"BotEnd": "<end_of_turn>",
+	"AddNamesToPrompt": false,
+	"NewLinesBetweenMessages": true
+}

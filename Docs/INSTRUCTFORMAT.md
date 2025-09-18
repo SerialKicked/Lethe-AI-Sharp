@@ -1,58 +1,53 @@
 # InstructFormat Documentation
 
-The `InstructFormat` class is a core component of the AIToolkit that defines how messages are formatted for different language models. This is particularly important for text completion backends (KoboldAPI), while chat completion backends (OpenAI) handle formatting internally.
+The `InstructFormat` class is a core component of the AIToolkit that defines how messages are formatted for different language models. This is particularly important for text completion backends (KoboldAPI). While chat completion backends (OpenAI) handle formatting internally, providing the correct instruction format will lead to much better token count evaluation and handling of CoT / Thinking models.
 
 ## Overview
 
 Different language models expect specific formatting for conversations. The `InstructFormat` class provides a flexible way to configure these formats without changing your application code.
 
+The library has json formated presets for many popular models in the examples folder.
+
 ## Common Instruction Formats
 
 ### ChatML Format
-Used by many modern models including GPT-4, Claude, and instruction-tuned models:
+Used by most modern models including Qwen.
 
 ```csharp
 var chatml = new InstructFormat
 {
     SysPromptStart = "<|im_start|>system\n",
-    SysPromptEnd = "<|im_end|>\n",
+    SysPromptEnd = "<|im_end|>",
+    SystemStart = "<|im_start|>system\n",
+    SystemEnd = "<|im_end|>",
     UserStart = "<|im_start|>user\n", 
-    UserEnd = "<|im_end|>\n",
+    UserEnd = "<|im_end|>",
     BotStart = "<|im_start|>assistant\n",
-    BotEnd = "<|im_end|>\n",
-    AddNamesToPrompt = false
+    BotEnd = "<|im_end|>",
+    AddNamesToPrompt = false,
+    NewLinesBetweenMessages = true
 };
 ```
 
-### Alpaca Format
-Popular format for many fine-tuned models:
+### ChatML Thinking
+Used by models that support chain-of-thought reasoning.
 
 ```csharp
-var alpaca = new InstructFormat
+var chatmlThinking = new InstructFormat
 {
-    SysPromptStart = "### Instruction:\n",
-    SysPromptEnd = "\n\n",
-    UserStart = "### Instruction:\n",
-    UserEnd = "\n\n",
-    BotStart = "### Response:\n",
-    BotEnd = "\n\n",
-    AddNamesToPrompt = false
-};
-```
-
-### Vicuna Format
-Used by Vicuna and similar models:
-
-```csharp
-var vicuna = new InstructFormat
-{
-    SysPromptStart = "SYSTEM: ",
-    SysPromptEnd = "\n",
-    UserStart = "USER: ",
-    UserEnd = "\n",
-    BotStart = "ASSISTANT: ",
-    BotEnd = "\n",
-    AddNamesToPrompt = false
+    SysPromptStart = "<|im_start|>system\n",
+    SysPromptEnd = "<|im_end|>",
+    SystemStart = "<|im_start|>system\n",
+    SystemEnd = "<|im_end|>",
+    UserStart = "<|im_start|>user\n", 
+    UserEnd = "<|im_end|>",
+    BotStart = "<|im_start|>assistant\n",
+    BotEnd = "<|im_end|>",
+    AddNamesToPrompt = false,
+    NewLinesBetweenMessages = true,
+    ThinkingStart = "<think>\n",
+    ThinkingEnd = "</think>",
+    PrefillThinking = true
 };
 ```
 
@@ -61,19 +56,20 @@ var vicuna = new InstructFormat
 ### Message Delimiters
 
 - **`SysPromptStart/End`**: Wraps the main system prompt at conversation start
-- **`SystemStart/End`**: Wraps system messages within conversations  
+- **`SystemStart/End`**: Wraps system messages within conversations (when in doubt, use the same as with SysPrompt)
 - **`UserStart/End`**: Wraps user messages
 - **`BotStart/End`**: Wraps assistant/bot responses
 
-### Special Tokens
+### Special Sequences
 
 - **`BoSToken`**: Beginning-of-sequence token (rarely needed)
 - **`StopSequence`**: Forces generation to stop when encountered
+- **`StopStrings`**: Forces generation to stop when any of the strings are encountered (useful for bad fine tunes, or when you want to inforce some behaviors, like forcing the model to stop "talking" after a new line).
 
 ### Behavior Controls
 
-- **`AddNamesToPrompt`**: Include character names before messages
-- **`NewLinesBetweenMessages`**: Add newlines between message blocks
+- **`AddNamesToPrompt`**: Include character names before messages (some roleplay models like that)
+- **`NewLinesBetweenMessages`**: Add newlines between message blocks (to avoid adding '\n' after all your End)
 
 ### Chain-of-Thought Support
 
@@ -90,9 +86,9 @@ var vicuna = new InstructFormat
 LLMEngine.Instruct = new InstructFormat
 {
     UserStart = "<|user|>",
-    UserEnd = "<|/user|>",
+    UserEnd = "<|end|>",
     BotStart = "<|assistant|>", 
-    BotEnd = "<|/assistant|>"
+    BotEnd = "<|end|>"
 };
 ```
 
@@ -129,32 +125,11 @@ For models that support chain-of-thought reasoning:
 ```csharp
 var thinkingFormat = new InstructFormat
 {
-    ThinkingStart = "<thinking>",
-    ThinkingEnd = "</thinking>",
-    PrefillThinking = true,
-    ThinkingForcedThought = "Let me think about this step by step."
+    ThinkingStart = "<think>",
+    ThinkingEnd = "</think>",
+    PrefillThinking = true, // most local models will require this to trigger CoT mode
+    ThinkingForcedThought = "Let me think about this step by step." // optional, leave empty unless you know what you're doing
 };
-```
-
-### Named Characters
-
-When using character names in conversations:
-
-```csharp
-var namedFormat = new InstructFormat
-{
-    UserStart = "",
-    UserEnd = ":",
-    BotStart = "",
-    BotEnd = ":",
-    AddNamesToPrompt = true,
-    NewLinesBetweenMessages = true
-};
-
-// Results in:
-// John: Hello!
-// 
-// Alice: Hi there!
 ```
 
 ### Stop Sequences
@@ -164,8 +139,9 @@ Control when generation should stop:
 ```csharp
 var format = new InstructFormat
 {
-    StopSequence = "[END]",
-    // Generation stops when model outputs [END]
+    StopSequence = "</s>",
+    // Generation stops when the model outputs this sequence (the sequence is not put into history contrary to Bot/User/...-End sequences)
+    // Mostly used for models with badly defined Instruction Formats (old Mistral models) 
 };
 ```
 
@@ -224,10 +200,9 @@ This will show you exactly how your messages are being formatted, helping identi
 
 ### Popular Models and Their Preferred Formats
 
-- **Llama 2 Chat**: ChatML or custom Llama format
-- **Code Llama**: Alpaca format works well
-- **Vicuna**: Vicuna format (obviously)
-- **Alpaca**: Alpaca format
-- **Most Modern Instruct Models**: ChatML
+- **Qwen and most models**: ChatML / ChatML-Thinker
+- **Mistral Small**: L7 Tekken (sometimes ChatML)
+- **Llama 3 and over**: Llama3 Chat
 
-When in doubt, check the model's documentation or training details for the recommended instruction format.
+When in doubt, check the model's documentation or internal files for the recommended instruction format. 
+

@@ -1,0 +1,19 @@
+{
+  "BoSToken": "",
+  "SystemStart": "<|im_start|>system\n",
+  "SystemEnd": "<|im_end|>",
+  "UserStart": "<|im_start|>user\n",
+  "UserEnd": "<|im_end|>",
+  "BotStart": "<|im_start|>assistant\n",
+  "BotEnd": "<|im_end|>",
+  "StopSequence": "",
+  "SysPromptStart": "<|im_start|>system\n",
+  "SysPromptEnd": "<|im_end|>",
+  "AddNamesToPrompt": true,
+  "NewLinesBetweenMessages": true,
+  "StopStrings": [],
+  "ThinkingStart": "<think>\n",
+  "ThinkingEnd": "</think>",
+  "PrefillThinking": true,
+  "UniqueName": "ChatML-Thinker"
+}

@@ -1,0 +1,25 @@
+{
+  "BoSToken": "",
+  "SystemStart": "### Instruction:\n",
+  "SystemEnd": "",
+  "UserStart": "### Input:\n",
+  "UserEnd": "",
+  "BotStart": "### Response:\n",
+  "BotEnd": "",
+  "StopSequence": "",
+  "SysPromptStart": "### Instruction:\n",
+  "SysPromptEnd": "",
+  "AddNamesToPrompt": false,
+  "NewLinesBetweenMessages": true,
+  "StopStrings": [
+    "### Input",
+    "### Instruction",
+    "### Response"
+  ],
+  "ThinkingStart": "",
+  "ThinkingEnd": "",
+  "ThinkingForcedThought": "",
+  "PrefillThinking": false,
+  "ForceRAGToThinkingPrompt": false,
+  "UniqueName": "Alpaca"
+}

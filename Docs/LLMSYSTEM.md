@@ -223,7 +223,7 @@ var query = builder.PromptToQuery(AuthorRole.Assistant);
 var response = await LLMEngine.SimpleQuery(query);
 ```
 
-**Note**: Use `AuthorRole.SysPrompt` for system prompts and `AuthorRole.System` for system messages in conversation. The exact behavior depends on your backend and instruction format.
+**Note**: Use `AuthorRole.SysPrompt` for system prompts and `AuthorRole.System` for system messages in conversation.
 
 ## Full Communication Mode
 
@@ -383,6 +383,7 @@ Console.WriteLine($"Message count: {session.Messages.Count}");
 ## Instruction Format (LLMEngine.Instruct)
 
 The `LLMEngine.Instruct` property controls how messages are formatted for the underlying language model. This is crucial for proper model communication, especially with text completion backends like KoboldAPI.
+
 
 ### Understanding Instruction Formats
 
@@ -861,14 +862,12 @@ class ChatManager
 
 ## Best Practices
 
-1. **Always check backend connectivity** before making queries
-2. **Monitor token usage** to avoid context overflow
-3. **Use streaming** for better user experience with long responses
-4. **Save chat history regularly** to preserve conversations
-5. **Handle errors gracefully** with try-catch blocks around async calls
-6. **Use personas** to create more engaging and consistent character behavior
-7. **Leverage events** for real-time UI updates
-8. **Configure settings** appropriately for your use case
+1. **Check backend connectivity** before making queries
+2. **Monitor token usage** to avoid context overflow in Simple mode (full discussion mode handles that automatically)
+3. **Save chat history regularly** to preserve conversations
+4. **Use personas** to create more engaging and consistent character behavior
+5. **Leverage events** for real-time UI updates
+6. **Configure settings** appropriately for your use case
 
 ## Troubleshooting
 
@@ -877,8 +876,7 @@ class ChatManager
 1. **Connection Failed**: Ensure the backend URL is correct and the service is running
 2. **Empty Responses**: Check if the model is loaded correctly in your backend
 3. **Token Overflow**: Monitor context length and implement history trimming
-4. **Slow Responses**: Consider using streaming for better UX
-5. **Persona Not Loading**: Ensure JSON files are properly formatted and accessible
+4. **Slow Responses**: Consider using streaming for better UX (and that you're running a model that can fit on your computer)
 
 ### Debug Information
 

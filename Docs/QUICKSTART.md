@@ -5,7 +5,7 @@ This guide will get you up and running with the AIToolkit LLMEngine in just a fe
 ## Prerequisites
 
 1. **Backend Server**: You need a running LLM backend server. Popular options:
-   - [KoboldCpp](https://github.com/LostRuins/koboldcpp) (recommended)
+   - [KoboldCpp](https://github.com/LostRuins/koboldcpp) (heavily recommended)
    - [LM Studio](https://lmstudio.ai/) 
    - [Text Generation WebUI](https://github.com/oobabooga/text-generation-webui)
 
@@ -153,7 +153,7 @@ class Program
 ## Next Steps
 
 - Explore the [complete documentation](LLMSYSTEM.md)
-- Try the [examples](Examples/)
+- Try the [examples](Examples/Code)
 - Customize personas and conversation flow
 - Add RAG and web search capabilities
 

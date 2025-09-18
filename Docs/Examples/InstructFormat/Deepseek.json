@@ -1,0 +1,16 @@
+{
+  "BoSToken": "",
+  "SystemStart": "<｜User｜> System Instruction:\n",
+  "SystemEnd": "",
+  "UserStart": "<｜User｜>",
+  "UserEnd": "",
+  "BotStart": "<｜Assistant｜>",
+  "BotEnd": "",
+  "StopSequence": "<｜end▁of▁sentence｜>",
+  "SysPromptStart": "<｜begin▁of▁sentence｜>",
+  "SysPromptEnd": "",
+  "AddNamesToPrompt": false,
+  "NewLinesBetweenMessages": false,
+  "StopStrings": [],
+  "UniqueName": "Deepseek"
+}

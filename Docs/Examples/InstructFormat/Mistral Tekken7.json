@@ -1,0 +1,16 @@
+{
+  "BoSToken": "<s>",
+  "SystemStart": "[SYSTEM_PROMPT]",
+  "SystemEnd": "[/SYSTEM_PROMPT]",
+  "UserStart": "[INST]",
+  "UserEnd": "[/INST]",
+  "BotStart": "",
+  "BotEnd": "</s>",
+  "StopSequence": "",
+  "SysPromptStart": "[SYSTEM_PROMPT]",
+  "SysPromptEnd": "[/SYSTEM_PROMPT]",
+  "AddNamesToPrompt": false,
+  "NewLinesBetweenMessages": false,
+  "StopStrings": [],
+  "UniqueName": "Mistral Tekken7"
+}
