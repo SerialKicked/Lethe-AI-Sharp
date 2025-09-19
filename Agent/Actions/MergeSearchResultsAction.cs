@@ -2,6 +2,7 @@
 using LetheAISharp.LLM;
 using Microsoft.Extensions.Logging;
 using System.Drawing;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using static LetheAISharp.SearchAPI.WebSearchAPI;
 
@@ -57,6 +58,8 @@ namespace LetheAISharp.Agent.Actions
             var cnt = 0;
             foreach (var item in webresults)
             {
+                if (string.IsNullOrWhiteSpace(item.Description) && string.IsNullOrWhiteSpace(item.FullContent))
+                    continue;
                 prompt.AppendLinuxLine($"## {item.Title}").AppendLinuxLine();
                 prompt.AppendLinuxLine($"{item.Description}").AppendLinuxLine();
                 if (item.ContentExtracted && LLMEngine.GetTokenCount(item.FullContent) <= 3000)
@@ -70,7 +73,7 @@ namespace LetheAISharp.Agent.Actions
                 {
                     var item = webresults[i];
                     var tks = LLMEngine.GetTokenCount(item.FullContent);
-                    if (item.ContentExtracted && tks > 100 && tks <= 2500)
+                    if (item.ContentExtracted && tks > 100 && tks <= 3000)
                     {
                         prompt.AppendLinuxLine($"## {item.Title} (Full Content)");
                         prompt.AppendLinuxLine($"{item.FullContent.CleanupAndTrim()}").AppendLinuxLine().AppendLinuxLine();
@@ -78,7 +81,7 @@ namespace LetheAISharp.Agent.Actions
                 }
             }
             builder.AddMessage(AuthorRole.SysPrompt, prompt.ToString().CleanupAndTrim());
-            var txt = new StringBuilder($"You are researching '{topic}' for the following reason: {reason}").AppendLinuxLine().Append($"Merge the information available in the system prompt to offer an explanation on this topic. Don't use markdown formatting, favor natural language. The explanation should be 1 to 3 paragraphs long.");
+            var txt = new StringBuilder($"You are researching '{topic}' for the following reason: {reason}").AppendLinuxLine().Append($"Merge the information available in the system prompt to offer a complex and detailed explanation on this topic. Don't use markdown formatting, favor natural language. The explanation should be 1 to 3 paragraphs long.");
             builder.AddMessage(AuthorRole.User, txt.ToString());
             return builder;
         }

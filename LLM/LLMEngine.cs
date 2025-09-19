@@ -780,7 +780,6 @@ namespace LetheAISharp.LLM
             PromptBuilder!.Clear();
 
             // setup user message (+ optional plugin message) and count tokens used
-            var pluginmsg = string.IsNullOrEmpty(pluginMessage) ? string.Empty : Instruct.FormatSinglePrompt(AuthorRole.System, User, Bot, pluginMessage);
             if (!string.IsNullOrEmpty(newMessage))
             {
                 availtokens -= PromptBuilder.GetTokenCount(MsgSender, newMessage);
@@ -806,16 +805,17 @@ namespace LetheAISharp.LLM
             // get the full, formated chat history complemented by the data inserts
             var addinserts = string.IsNullOrEmpty(Instruct.ThinkingStart) || !Settings.RAGMoveToThinkBlock;
             History.AddHistoryToPrompt(Settings.SessionHandling, availtokens, addinserts ? dataInserts : null);
+            if (!string.IsNullOrEmpty(newMessage) || MsgSender != AuthorRole.User)
+            {
+                if (!string.IsNullOrEmpty(pluginMessage))
+                {
+                    PromptBuilder.AddMessage(AuthorRole.System, pluginMessage);
+                }
+            }
+
             if (!string.IsNullOrEmpty(newMessage))
             {
                 PromptBuilder.AddMessage(MsgSender, newMessage);
-            }
-            if (!string.IsNullOrEmpty(newMessage) || MsgSender != AuthorRole.User)
-            {
-                if (!string.IsNullOrEmpty(pluginmsg))
-                {
-                    PromptBuilder.AddMessage(AuthorRole.System, pluginmsg);
-                }
             }
 
             var final = PromptBuilder.GetTokenUsage();

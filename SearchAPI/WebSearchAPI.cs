@@ -118,7 +118,7 @@ namespace LetheAISharp.SearchAPI
             }
         }
 
-        private async Task<string> ExtractContentWithJinaAsync(string url)
+        public async Task<string> ExtractContentWithJinaAsync(string url)
         {
             try
             {
@@ -130,7 +130,17 @@ namespace LetheAISharp.SearchAPI
                 if (response.IsSuccessStatusCode)
                 {
                     var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    return content.Trim();
+
+                    // content is in markdown, remove all links completely (including the text or image or whatever is linked)
+                    content = System.Text.RegularExpressions.Regex.Replace(content, @"\[.*?\]\(.*?\)", string.Empty); // Remove links
+                    // remove lines that contains no text, no letter a-Z
+                    content = System.Text.RegularExpressions.Regex.Replace(content, @"^\s*$\n|\r", string.Empty, System.Text.RegularExpressions.RegexOptions.Multiline);
+                    // remove lines with only a * (and leading/trailing spaces)
+                    content = System.Text.RegularExpressions.Regex.Replace(content, @"^\s*\*\s*$\n|\r", string.Empty, System.Text.RegularExpressions.RegexOptions.Multiline);
+
+
+
+                    return content.CleanupAndTrim();;
                 }
                 else
                 {

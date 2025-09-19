@@ -23,8 +23,8 @@ namespace LetheAISharp.GBNF
         public int Urgency { get; set; } = 1;
         [Required]
         [MinLength(1)]
-        [MaxLength(3)]
-        [Description("1 to 3 concise, high-quality search queries that would help {{char}} learn about the topic.")]
+        [MaxLength(2)]
+        [Description("1 to 2 concise, high-quality search queries that would help {{char}} learn about the topic.")]
         public List<string> SearchQueries { get; set; } = [];
     }
 

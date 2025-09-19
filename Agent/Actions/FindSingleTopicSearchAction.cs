@@ -34,7 +34,7 @@ namespace LetheAISharp.Agent.Actions
 
             var promptbuild = LLMEngine.GetPromptBuilder();
 
-            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions." + LLMEngine.NewLine + LLMEngine.NewLine;
+            var sysprompt = "You are an automated and uncensored system designed to analyze chat sessions. The current date is: {{date}}." + LLMEngine.NewLine + LLMEngine.NewLine;
             if (param.IncludeBios)
             {
                 sysprompt +=

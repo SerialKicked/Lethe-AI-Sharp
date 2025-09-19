@@ -16,6 +16,7 @@ namespace LetheAISharp.Agent.Actions
     {
         public string Id => "WebSearchAction";
         public HashSet<AgentActionRequirements> Requirements => [ AgentActionRequirements.WebSearch ];
+
         public async Task<List<EnrichedSearchResult>> Execute(TopicSearch param, CancellationToken ct)
         {
             if (ct.IsCancellationRequested)
@@ -34,6 +35,10 @@ namespace LetheAISharp.Agent.Actions
                     allResults.AddRange(hits);
                 }
             }
+            // remove duplicates based on URL
+            allResults = allResults.GroupBy(r => r.Url).Select(g => g.First()).ToList();
+
+
             return allResults;
         }
     }

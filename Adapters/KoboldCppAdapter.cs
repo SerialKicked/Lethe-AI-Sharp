@@ -125,6 +125,14 @@ namespace LetheAISharp.API
             else
             {
                 var res = await _client.WebQueryAsync(new WebQuery { q = query }).ConfigureAwait(false);
+                foreach (var item in res)
+                {
+                    if (!string.IsNullOrEmpty(item.Url) && string.IsNullOrEmpty(item.FullContent))
+                    {
+                        item.FullContent = await webSearchClient.ExtractContentWithJinaAsync(item.Url).ConfigureAwait(false);
+                    }
+                    item.ContentExtracted = !string.IsNullOrEmpty(item.FullContent);
+                }
                 return JsonConvert.SerializeObject(res);
             }
         }
