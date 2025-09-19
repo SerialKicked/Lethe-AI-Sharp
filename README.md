@@ -52,7 +52,7 @@ To take advantage of the RAG and Sentiment Analysis functionalities, you'll need
 - [gte-large.Q6_K.gguf](https://huggingface.co/SerialKicked/Lethe-AI-Repo/resolve/main/gte-large.Q6_K.gguf?download=true) - Required for all RAG and Memory related operations
 - [emotion-bert-classifier.gguf](https://huggingface.co/SerialKicked/Lethe-AI-Repo/resolve/main/emotion-bert-classifier.gguf?download=true) - Used for experimental and option Sentiment Analysis functions
 
-Then, in Visual Studio (or whatever editor you're using) make sure to set the build action _"Copy to Output Directory"_ to _"Copy if newer"_
+Then, in Visual Studio (or whatever editor you're using) make sure to set the build action _"Copy to Output Directory"_ to _"Copy if newer"_ for both files.
 
 ## 🔎 Usage and Documentation
 
