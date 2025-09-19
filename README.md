@@ -40,6 +40,10 @@ It includes easy-to-use (and easy to build upon) systems to handle most of the o
 - Group chat functionalities (one user and multiple AI characters)
 - Sentiment analysis
 
+## 👀 See it in action
+
+To demonstrate how powerful **Lethe AI** can be, check out [Lethe AI Chat](https://github.com/SerialKicked/Lethe-AI-Chat/). This is a powerful AI chat program for _Windows_ that uses most of the features present in the library. It comes with its own integrated editors, extended agentic tasks, and extensive settings. It can rival with most of the dedicated AI chat programs currently available.
+
 ## 🔎 Installation
 
 Right now, the best way to use that library is to add it to your C# solution as a library directly.
