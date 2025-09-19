@@ -325,10 +325,9 @@ namespace LetheAISharp.Memory
             var mindist = float.MaxValue;
             var bestmatch = (MemoryUnit?)null;
             var comparelist = Memories.FindAll(e => e.Category == mem.Category);
+
             foreach (var item in comparelist)
             {
-                if (item.Category != mem.Category)
-                    continue;
                 var dist = RAGEngine.GetDistance(item, mem);
                 if (dist < mindist)
                 {
@@ -347,11 +346,8 @@ namespace LetheAISharp.Memory
                     return;
                 }
             }
-            else
-            {
-                // No similar memory found, add new
-                Memories.Add(mem);
-            }
+
+            Memories.Add(mem);
         }
 
         /// <summary>
