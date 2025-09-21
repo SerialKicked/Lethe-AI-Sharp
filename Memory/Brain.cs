@@ -23,14 +23,46 @@ namespace LetheAISharp.Memory
     public class Brain(BasePersona basePersona)
     {
         [JsonIgnore] private BasePersona Owner { get; set; } = basePersona;
+
+        /// <summary>
+        /// Minimum time between two automatic memory inserts.
+        /// </summary>
         public TimeSpan MinInsertDelay { get; set; } = TimeSpan.FromMinutes(30);
+
+        /// <summary>
+        /// Minimum number of user messages between two automatic memory inserts.
+        /// </summary>
         public int MinMessageDelay { get; set; } = 4;
+
+        /// <summary>
+        /// Time in hours of inactivity after which the bot will send a mood/away message.
+        /// </summary>
         public float HoursBeforeAFK { get; set; } = 4;
+
+        /// <summary>
+        /// Determines how long a natural memory remains available for insertion.
+        /// </summary>
         public TimeSpan EurekaCutOff { get; set; } = TimeSpan.FromDays(15);
-        public DateTime LastInsertTime { get; set; }
-        public int CurrentDelay { get; set; } = 0;
-        public HashSet<MemoryType> DecayableMemories { get; set; } = [ MemoryType.WebSearch, MemoryType.Goal ];
+
+        /// <summary>
+        /// Disable all automatic natural memory inserts.
+        /// </summary>
+        public bool DisableEurekas { get; set; } = false;
+
+        /// <summary>
+        /// List of memory types that are subject to decay and deletion if not recalled within a certain timeframe.
+        /// </summary>
+        public HashSet<MemoryType> DecayableMemories { get; set; } = [MemoryType.WebSearch, MemoryType.Goal];
+
+        /// <summary>
+        /// Gets or sets the minimum number of days that an item must remain unaccessed  before it is eligible for
+        /// deletion, (it's multiplied by its priority level).
+        /// </summary>
         public int MinNoRecallDaysBeforeDeletionPerPrioLevel { get; set; } = 10;
+
+
+        public DateTime LastInsertTime { get; protected set; }
+        public int CurrentDelay { get; protected set; } = 0;
 
         [JsonProperty] protected List<MemoryUnit> Memories { get; set; } = [];
         [JsonProperty] protected List<UserReturnInsert> Inserts { get; set; } = [];
@@ -115,7 +147,7 @@ namespace LetheAISharp.Memory
             }
 
             RefreshMemories();
-            if (!string.IsNullOrWhiteSpace(LLMEngine.Settings.ScenarioOverride) || Eurekas.Count == 0)
+            if (Eurekas.Count == 0 || DisableEurekas)
                 return;
             CurrentDelay++;
             // If there's a super relevant eureka to the user input, insert it immediately
