@@ -23,7 +23,7 @@ namespace LetheAISharp.Memory
     public class Brain(BasePersona basePersona)
     {
         [JsonIgnore] private BasePersona Owner { get; set; } = basePersona;
-        public TimeSpan MinInsertDelay { get; set; } = TimeSpan.FromMinutes(15);
+        public TimeSpan MinInsertDelay { get; set; } = TimeSpan.FromMinutes(30);
         public int MinMessageDelay { get; set; } = 4;
         public float HoursBeforeAFK { get; set; } = 4;
         public TimeSpan EurekaCutOff { get; set; } = TimeSpan.FromDays(15);
@@ -395,7 +395,19 @@ namespace LetheAISharp.Memory
 
             foreach (var item in Eurekas)
             {
+                if (item.CheckKeywords(userinput))
+                    return item;
+
+                // get item.Name and compare it to userinput to count amount of identical words (ignoring case)
+                var itemWords = item.Name.ToLowerInvariant().Split([' ', '\t', '\n', '\r', '.', ',', '!', '?', ';', ':'], StringSplitOptions.RemoveEmptyEntries);
+                var inputWords = userinput.ToLowerInvariant().Split([' ', '\t', '\n', '\r', '.', ',', '!', '?', ';', ':'], StringSplitOptions.RemoveEmptyEntries);
+                var commonWordCount = itemWords.Intersect(inputWords).Count();
+               
                 var dist = await RAGEngine.GetDistanceAsync(userinput, item).ConfigureAwait(false);
+                dist -= commonWordCount * 0.02f; // each common word reduces distance by 0.02
+                if (item.Insertion == MemoryInsertion.NaturalForced)
+                    dist -= 0.02f;
+
                 if (dist <= maxDistance)
                 {
                     return item;
