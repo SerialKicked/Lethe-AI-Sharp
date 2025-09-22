@@ -1,5 +1,6 @@
 ﻿using LetheAISharp.LLM;
 using LetheAISharp.SearchAPI;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema.Generation;
@@ -86,7 +87,14 @@ namespace LetheAISharp.API
         {
             if (parameters is not GenerationInput input)
                 throw new ArgumentException("Parameters must be of type GenerationInput");
-            await _client.GenerateTextStreamAsync(input).ConfigureAwait(false);
+            try
+            {
+                await _client.GenerateTextStreamAsync(input).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                LLMEngine.Logger?.LogError(ex, "Error during generation: {ex}", ex.Message);
+            }
         }
 
         public async Task<bool> AbortGeneration()
