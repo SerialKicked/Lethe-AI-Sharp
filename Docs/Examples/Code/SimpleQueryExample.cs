@@ -35,12 +35,31 @@ namespace LetheAISharp.Examples
                 Console.WriteLine($"Backend: {LLMEngine.Backend}");
                 Console.WriteLine($"Max Context: {LLMEngine.MaxContextLength} tokens");
                 Console.WriteLine();
-                
-                // Step 3: Simple non-streaming query
+
+                // Step 3: Set an instruction format 
+                // We'll use a common format here, ChatML, but in practice this depends on the model being used.
+                // Using the wrong format may lead to very poor results.
+                var instructionFormat = new InstructFormat()
+                {
+                    SysPromptStart = "<|im_start|>system\n",
+                    SysPromptEnd = "<|im_end|>",
+                    SystemStart = "<|im_start|>system\n",
+                    SystemEnd = "<|im_end|>",
+                    UserStart = "<|im_start|>user\n",
+                    UserEnd = "<|im_end|>",
+                    BotStart = "<|im_start|>assistant\n",
+                    BotEnd = "<|im_end|>",
+                    AddNamesToPrompt = false,
+                    NewLinesBetweenMessages = true
+                };
+                LLMEngine.Instruct = instructionFormat;
+
+                // Step 4: Simple non-streaming query
                 Console.WriteLine("--- Non-Streaming Query ---");
-                
-                // Build the prompt using the PromptBuilder
+
+                // Build the prompt using the PromptBuilder, the backend-agnostic way to create prompts
                 var builder = LLMEngine.GetPromptBuilder();
+                builder.AddMessage(AuthorRole.SysPrompt, "You are an useful assistant.");
                 builder.AddMessage(AuthorRole.User, "What is the capital of France? Please provide a short answer.");
                 var query = builder.PromptToQuery(AuthorRole.Assistant);
                 
@@ -50,11 +69,12 @@ namespace LetheAISharp.Examples
                 Console.WriteLine($"Response: {response}");
                 Console.WriteLine();
                 
-                // Step 4: Streaming query with events
+                // Step 5: Streaming query with events
                 Console.WriteLine("--- Streaming Query ---");
                 
                 // Build the streaming prompt
                 var streamBuilder = LLMEngine.GetPromptBuilder();
+                streamBuilder.AddMessage(AuthorRole.SysPrompt, "You are an useful assistant.");
                 streamBuilder.AddMessage(AuthorRole.User, "Write a very short story about a friendly robot in exactly two sentences.");
                 var streamQuery = streamBuilder.PromptToQuery(AuthorRole.Assistant);
                 
@@ -80,27 +100,13 @@ namespace LetheAISharp.Examples
                 // Start streaming query
                 await LLMEngine.SimpleQueryStreaming(streamQuery);
                 
-                // Wait for completion (in real apps, you'd handle this differently)
+                // Wait for completion (in real apps, you'd handle this very differently)
                 while (!responseComplete && LLMEngine.Status == SystemStatus.Busy)
                 {
                     await Task.Delay(100);
                 }
                 
-                Console.WriteLine();
-                
-                // Step 5: Using PromptBuilder for more complex prompts
-                Console.WriteLine("--- Advanced Prompt with PromptBuilder ---");
-                var advancedBuilder = LLMEngine.GetPromptBuilder();
-                
-                advancedBuilder.AddMessage(AuthorRole.System, "You are a helpful science teacher.");
-                advancedBuilder.AddMessage(AuthorRole.User, "Explain photosynthesis in simple terms.");
-                
-                var advancedQuery = advancedBuilder.PromptToQuery(AuthorRole.Assistant);
-                var scienceResponse = await LLMEngine.SimpleQuery(advancedQuery);
-                
-                Console.WriteLine("Query: System prompt + user question about photosynthesis");
-                Console.WriteLine($"Response: {scienceResponse}");
-                
+                Console.WriteLine();                              
             }
             catch (Exception ex)
             {

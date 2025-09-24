@@ -32,7 +32,26 @@ namespace LetheAISharp.Examples
                 }
                 
                 Console.WriteLine($"Connected to {LLMEngine.CurrentModel}");
-                
+
+
+                // Set an instruction format 
+                // We'll use a common format here, ChatML, but in practice this depends on the model being used.
+                // Using the wrong format may lead to very poor results.
+                var instructionFormat = new InstructFormat()
+                {
+                    SysPromptStart = "<|im_start|>system\n",
+                    SysPromptEnd = "<|im_end|>",
+                    SystemStart = "<|im_start|>system\n",
+                    SystemEnd = "<|im_end|>",
+                    UserStart = "<|im_start|>user\n",
+                    UserEnd = "<|im_end|>",
+                    BotStart = "<|im_start|>assistant\n",
+                    BotEnd = "<|im_end|>",
+                    AddNamesToPrompt = false,
+                    NewLinesBetweenMessages = true
+                };
+                LLMEngine.Instruct = instructionFormat;
+
                 // Create a chatbot persona
                 var bot = new BasePersona
                 {
@@ -51,10 +70,18 @@ namespace LetheAISharp.Examples
                 
                 LLMEngine.Bot = bot;
                 LLMEngine.User = user;
-                
+                // make each chat session individual (previous session's content won't be included in the prompt)
+                LLMEngine.Settings.SessionHandling = SessionHandling.CurrentOnly;
+
                 // Setup event handlers for real-time response display
                 LLMEngine.OnInferenceStreamed += (sender, token) => Console.Write(token);
-                LLMEngine.OnInferenceEnded += (sender, response) => Console.WriteLine();
+                LLMEngine.OnInferenceEnded += (sender, response) =>
+                {
+                    // It's the app's responsibility to log the complete response to the chatlog
+                    // thats what we do here
+                    LLMEngine.History.LogMessage(AuthorRole.Assistant, response, user, bot);
+                    Console.WriteLine();
+                };
                 LLMEngine.OnStatusChanged += (sender, status) =>
                 {
                     if (status == SystemStatus.Busy)
@@ -81,6 +108,8 @@ namespace LetheAISharp.Examples
                     {
                         case "quit":
                         case "exit":
+                            // Save the chatlog
+                            LLMEngine.Bot.EndChat();
                             Console.WriteLine("Goodbye!");
                             return;
                             
@@ -125,6 +154,7 @@ namespace LetheAISharp.Examples
         
         private static async Task WaitForResponse()
         {
+            // this is a really crude way to handle things, in a proper app, you'd probably want to use events or callbacks
             while (LLMEngine.Status == SystemStatus.Busy)
             {
                 await Task.Delay(50);

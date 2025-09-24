@@ -30,7 +30,25 @@ namespace LetheAISharp.Examples
                 
                 Console.WriteLine("Connected successfully!");
                 Console.WriteLine();
-                
+
+                // Set an instruction format 
+                // We'll use a common format here, ChatML, but in practice this depends on the model being used.
+                // Using the wrong format may lead to very poor results.
+                var instructionFormat = new InstructFormat()
+                {
+                    SysPromptStart = "<|im_start|>system\n",
+                    SysPromptEnd = "<|im_end|>",
+                    SystemStart = "<|im_start|>system\n",
+                    SystemEnd = "<|im_end|>",
+                    UserStart = "<|im_start|>user\n",
+                    UserEnd = "<|im_end|>",
+                    BotStart = "<|im_start|>assistant\n",
+                    BotEnd = "<|im_end|>",
+                    AddNamesToPrompt = false,
+                    NewLinesBetweenMessages = true
+                };
+                LLMEngine.Instruct = instructionFormat;
+
                 // Step 2: Create personas
                 Console.WriteLine("Creating personas...");
                 
@@ -112,8 +130,8 @@ namespace LetheAISharp.Examples
                     
                     // Send message and get response
                     await LLMEngine.SendMessageToBot(AuthorRole.User, question);
-                    
-                    // Wait for response to complete
+
+                    // Wait for response to complete (the dirty way to do this)
                     while (LLMEngine.Status == SystemStatus.Busy)
                     {
                         await Task.Delay(100);
