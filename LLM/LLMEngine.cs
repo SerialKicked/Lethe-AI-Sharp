@@ -85,7 +85,7 @@ namespace LetheAISharp.LLM
         public static bool SupportsVision => Client?.SupportsVision ?? false;
 
         /// <summary> Set to true if the backend supports GBNF grammar output </summary>
-        public static bool SupportsGrammar => Client?.SupportsSchema ?? false;
+        public static bool SupportsSchema => Client?.SupportsSchema ?? false;
 
         public static CompletionType CompletionAPIType => Client?.CompletionType ?? CompletionType.Text;
 
@@ -571,6 +571,35 @@ namespace LetheAISharp.LLM
         public static void RemoveQuickInferenceEventHandler()
         {
             OnQuickInferenceEnded = null;
+        }
+
+        /// <summary>
+        /// Asynchronously retrieves the grammar representation for the specified class type.
+        /// </summary>
+        /// <remarks>This method requires a valid backend client that supports grammar extraction. If the
+        /// backend client is not initialized or does not support grammar extraction, the method logs an error and
+        /// returns an empty string.</remarks>
+        /// <typeparam name="ClassToConvert">The type of the class for which the grammar representation is to be generated.</typeparam>
+        /// <returns>A <see cref="Task{TResult}"/> representing the asynchronous operation. The task result contains the grammar
+        /// representation as a string. Returns an empty string if grammar extraction is not supported or if an error
+        /// occurs.</returns>
+        public static async Task<string> GetGrammar<ClassToConvert>()
+        {
+            var res = string.Empty;
+            if (Client == null || !SupportsSchema)
+            {
+                Logger?.LogError("Grammar extraction is not supported by the current backend.");
+                return res;
+            }
+            try
+            {
+                res = await Client!.SchemaToGrammar(typeof(ClassToConvert)).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "Failed to get grammar: {Message}", ex.Message);
+            }
+            return res;
         }
 
         #endregion

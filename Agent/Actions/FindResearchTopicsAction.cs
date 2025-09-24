@@ -22,9 +22,6 @@ namespace LetheAISharp.Agent.Actions
             if (ct.IsCancellationRequested)
                 return null;
             var searchlookup = new TopicLookup();
-            var grammar = await searchlookup.GetGrammar().ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(grammar))
-                throw new Exception("Something went wrong when building summary grammar and json format.");
 
             LLMEngine.NamesInPromptOverride = false;
             var prefill = LLMEngine.Instruct.PrefillThinking;
@@ -58,12 +55,8 @@ namespace LetheAISharp.Agent.Actions
 
 
             promptbuild.AddMessage(AuthorRole.User, q + LLMEngine.NewLine + searchlookup.GetQuery());
-
+            await promptbuild.SetStructuredOutput(searchlookup);
             var query = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, replyln);
-            if (query is GenerationInput input)
-            {
-                input.Grammar = grammar;
-            }
             var finalstr = await LLMEngine.SimpleQuery(query, ct).ConfigureAwait(false);
             try
             {

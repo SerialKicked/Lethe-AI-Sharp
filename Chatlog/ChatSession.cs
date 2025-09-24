@@ -95,7 +95,7 @@ namespace LetheAISharp.Files
             }
             EndTime = Messages.Last().Date;
 
-            if (LLMEngine.SupportsGrammar == true)
+            if (LLMEngine.SupportsSchema == true)
             {
                 var meta = await GetSessionInfo().ConfigureAwait(false);
                 MetaData = meta;
@@ -124,9 +124,9 @@ namespace LetheAISharp.Files
         protected virtual async Task<SessionMetaInfo> GetSessionInfo()
         {
             var session = new SessionMetaInfo();
-            var grammar = await session.GetGrammar().ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(grammar))
-                throw new Exception("Something went wrong when building summary grammar and json format.");
+            //var grammar = await session.GetGrammar().ConfigureAwait(false);
+            //if (string.IsNullOrWhiteSpace(grammar))
+            //    throw new Exception("Something went wrong when building summary grammar and json format.");
 
             LLMEngine.NamesInPromptOverride = false;
             var prefill = LLMEngine.Instruct.PrefillThinking;
@@ -156,12 +156,13 @@ namespace LetheAISharp.Files
             var docs = GetRawDialogs(availtokens, false, true, false, LLMEngine.Settings.CutInTheMiddleSummaryStrategy);
             promptbuild.AddMessage(AuthorRole.SysPrompt, sysprompt + docs);
             promptbuild.AddMessage(AuthorRole.User, requestedTask);
+            await promptbuild.SetStructuredOutput(session);
 
             var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, replyln);
-            if (ct is GenerationInput input)
-            {
-                input.Grammar = grammar;
-            }
+            //if (ct is GenerationInput input)
+            //{
+            //    input.Grammar = grammar;
+            //}
             var finalstr = await LLMEngine.SimpleQuery(ct).ConfigureAwait(false);
             session = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
             session?.ClampRelevance();

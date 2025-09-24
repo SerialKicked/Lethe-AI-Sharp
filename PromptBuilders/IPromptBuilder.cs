@@ -1,5 +1,6 @@
 ﻿using LetheAISharp.Files;
 using LetheAISharp.LLM;
+using OpenAI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -48,6 +49,7 @@ namespace LetheAISharp
         /// <returns>a string for text completion. a List<Message> for chat completion </returns>
         object GetFullPrompt();
 
+
         /// <summary>
         /// Converts the current prompt to a query object suitable for sending to the LLM backend.
         /// </summary>
@@ -87,5 +89,10 @@ namespace LetheAISharp
         /// <param name="talker">the Bot or the User supposed to talk</param>
         /// <returns>Tokens used</returns>
         int GetResponseTokenCount(BasePersona talker) => LLMEngine.GetTokenCount(LLMEngine.Instruct.GetResponseStart(talker));
+
+        Task SetStructuredOutput<ClassToConvert>();
+        Task SetStructuredOutput(object classToConvert);
+
+        void UnsetStructuredOutput();
     }
 }

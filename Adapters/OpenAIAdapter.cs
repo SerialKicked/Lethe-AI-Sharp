@@ -103,9 +103,9 @@ namespace LetheAISharp.API
             throw new NotImplementedException();
         }
 
-        public Task<int> CountTokens(string text)
+        public async Task<int> CountTokens(string text)
         {
-            return Task.FromResult(_client.CountTokens(text));
+            return await Task.FromResult(_client.CountTokens(text));
         }
 
         public int CountTokensSync(string text)
@@ -113,10 +113,10 @@ namespace LetheAISharp.API
             return _client.CountTokens(text);
         }
 
-        public Task<byte[]> TextToSpeech(string text, string voice)
+        public async Task<byte[]> TextToSpeech(string text, string voice)
         {
             // OpenAI does not support TTS directly
-            return Task.FromResult(Array.Empty<byte>());
+            return await Task.FromResult(Array.Empty<byte>());
         }
 
         public async Task<string> WebSearch(string query)
@@ -163,9 +163,11 @@ namespace LetheAISharp.API
             throw new NotSupportedException("OpenAI API does not support KV cache manipulation");
         }
 
-        public Task<string> SchemaToGrammar(Type jsonclass)
+        public async Task<string> SchemaToGrammar(Type jsonclass)
         {
-            throw new NotImplementedException("Schema to grammar conversion not supported yet.");
+            OpenAI.JsonSchema jsonSchema = jsonclass.GetType();
+            var res = jsonSchema.Schema.ToJsonString();
+            return await Task.FromResult(res!).ConfigureAwait(false);
         }
 
 
@@ -174,6 +176,6 @@ namespace LetheAISharp.API
         public bool SupportsVision => false;  // TODO
         public bool SupportsWebSearch => true;
         public bool SupportsStateSave => false; // Not Available
-        public bool SupportsSchema => false; // TODO
+        public bool SupportsSchema => true; // TODO
     }
 }

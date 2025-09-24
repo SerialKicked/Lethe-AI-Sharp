@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace LetheAISharp.LLM
 {
-    public abstract class LLMExtractableBase<T>
+    public abstract class LLMExtractableBase<T> : ILLMExtractableBase
     {
         public virtual string GetQuery()
         {
@@ -22,7 +22,7 @@ namespace LetheAISharp.LLM
 
         public virtual async Task<string> GetGrammar()
         {
-            return await LLMEngine.Client!.SchemaToGrammar(typeof(T)).ConfigureAwait(false);
+            return await LLMEngine.GetGrammar<T>().ConfigureAwait(false);
         }
     }
 }

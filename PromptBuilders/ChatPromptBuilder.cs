@@ -7,12 +7,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using OpenAI;
 
 namespace LetheAISharp
 {
     internal class ChatPromptBuilder : IPromptBuilder
     {
         private readonly List<Message> _prompt = [];
+        private OpenAI.JsonSchema? _currentSchema = null;
 
         public int Count => _prompt.Count;
 
@@ -57,8 +59,11 @@ namespace LetheAISharp
                 seed: LLMEngine.Sampler.Sampler_seed != -1 ? LLMEngine.Sampler.Sampler_seed : null,
                 user: LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt ? LLMEngine.User.Name : null,
                 stops: [.. LLMEngine.Instruct.GetStoppingStrings(LLMEngine.User, LLMEngine.Bot)],
+                responseFormat: _currentSchema is not null ? OpenAI.TextResponseFormat.JsonSchema : OpenAI.TextResponseFormat.Auto,
+                jsonSchema: _currentSchema,
                 maxTokens: responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride,
                 temperature: tempoverride >= 0 ? tempoverride : (LLMEngine.ForceTemperature >= 0) ? LLMEngine.ForceTemperature : LLMEngine.Sampler.Temperature);
+
             return chatrq;
         }
 
@@ -117,6 +122,23 @@ namespace LetheAISharp
                 }
             }
             return new Message(TokenTools.InternalRoleToChatRole(role), bot.ReplaceMacros(realprompt, user), selname);
+        }
+
+        public async Task SetStructuredOutput<ClassToConvert>()
+        {
+            _currentSchema = typeof(ClassToConvert);
+            await Task.Delay(1).ConfigureAwait(false);
+        }
+
+        public async Task SetStructuredOutput(object classToConvert)
+        {
+            _currentSchema = classToConvert.GetType();
+            await Task.Delay(1).ConfigureAwait(false);
+        }
+
+        public void UnsetStructuredOutput()
+        {
+            _currentSchema = null;
         }
     }
 }

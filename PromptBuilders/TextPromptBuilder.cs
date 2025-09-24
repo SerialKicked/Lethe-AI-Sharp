@@ -1,10 +1,11 @@
-﻿using LetheAISharp.API;
+﻿using CommunityToolkit.HighPerformance;
+using LetheAISharp.API;
 using LetheAISharp.Files;
 using LetheAISharp.LLM;
-using CommunityToolkit.HighPerformance;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -13,6 +14,7 @@ namespace LetheAISharp
     internal class TextPromptBuilder : IPromptBuilder
     {
         private readonly List<string> _prompt = [];
+        private string grammar = string.Empty;
         public int Count => _prompt.Count;
 
         public int AddMessage(AuthorRole role, string message)
@@ -32,6 +34,56 @@ namespace LetheAISharp
             }
             return fullprompt.ToString();
         }
+
+        public async Task SetStructuredOutput(object? classToConvert)
+        {
+            // Highest priority: extractable => let it provide grammar (handles caching/special cases)
+            if (classToConvert is ILLMExtractableBase extract)
+            {
+                grammar = await extract.GetGrammar().ConfigureAwait(false);
+                return;
+            }
+
+            // If a Type representing a class was provided
+            Type? targetType = classToConvert as Type;
+            if (targetType is null && classToConvert is not null)
+            {
+                var rt = classToConvert.GetType();
+                if (rt.IsClass) targetType = rt;
+            }
+
+            if (targetType is not null && targetType.IsClass)
+            {
+                grammar = await InvokeEngineGetGrammarForType(targetType).ConfigureAwait(false);
+                return;
+            }
+
+            // Fallback: nothing to set
+            grammar = string.Empty;
+        }
+
+        // Keep interface compatibility without adding another public method
+        public async Task SetStructuredOutput<ClassToConvert>()
+        {
+            // This blocks intentionally to respect the IPromptBuilder signature
+            await SetStructuredOutput(typeof(ClassToConvert));
+        }
+
+        private static async Task<string> InvokeEngineGetGrammarForType(Type type)
+        {
+            var mi = typeof(LLMEngine).GetMethod(nameof(LLMEngine.GetGrammar), BindingFlags.Public | BindingFlags.Static);
+            if (mi == null) return string.Empty;
+
+            var generic = mi.MakeGenericMethod(type);
+            var task = (Task<string>)generic.Invoke(null, null)!;
+            return await task.ConfigureAwait(false);
+        }
+
+        public void UnsetStructuredOutput()
+        {
+            grammar = string.Empty;
+        }
+
 
         public object PromptToQuery(AuthorRole responserole, double tempoverride = -1, int responseoverride = -1, bool? overridePrefill = null)
         {
@@ -57,6 +109,8 @@ namespace LetheAISharp
             genparams.Stop_sequence = LLMEngine.Instruct.GetStoppingStrings(LLMEngine.User, LLMEngine.Bot);
             genparams.Prompt = fullquery;
             genparams.Images = [.. LLMEngine.vlm_pictures];
+            if (!string.IsNullOrWhiteSpace(grammar))
+                genparams.Grammar = grammar;
             return genparams;
         }
 
