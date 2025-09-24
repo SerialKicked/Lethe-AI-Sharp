@@ -354,6 +354,22 @@ namespace LetheAISharp.Memory
                 return;
             }
 
+            // special case, just check name first
+            if (mem.Category == MemoryType.Person || mem.Category == MemoryType.Location)
+            {
+                var existing = Memories.Find(e => e.Category == MemoryType.Person && e.Name.Equals(mem.Name, StringComparison.InvariantCultureIgnoreCase));
+                if (existing != null)
+                {
+                    var idx = Memories.IndexOf(existing);
+                    if (idx != -1)
+                    {
+                        Memories[idx] = mem;
+                        mem.Touch();
+                        return;
+                    }
+                }
+            }
+
             var mindist = float.MaxValue;
             var bestmatch = (MemoryUnit?)null;
             var comparelist = Memories.FindAll(e => e.Category == mem.Category);

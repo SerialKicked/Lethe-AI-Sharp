@@ -367,8 +367,7 @@ namespace LetheAISharp.Files
                 rln += 1024;
             var finalstr = await LLMEngine.SimpleQuery(promptbuilder.PromptToQuery(AuthorRole.Assistant, -1, rln)).ConfigureAwait(false);
             LLMEngine.NamesInPromptOverride = null;
-            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
-                finalstr = finalstr.RemoveThinkingBlocks(LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd);
+            finalstr = finalstr.RemoveThinkingBlocks();
 
             SelfEditField = finalstr.RemoveUnfinishedSentence().RemoveNewLines().CleanupAndTrim().RemoveTitle();
         }

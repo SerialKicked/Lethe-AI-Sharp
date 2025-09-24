@@ -32,10 +32,7 @@ namespace LetheAISharp.Agent.Actions
             var prompt = GetSystemPromt(param.Session, param.Request);
             var fullprompt = prompt.PromptToQuery(AuthorRole.Assistant, LLMEngine.Sampler.Temperature, 1024);
             var response = await LLMEngine.SimpleQuery(fullprompt, ct).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
-            {
-                response = response.RemoveThinkingBlocks(LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd);
-            }
+            response = response.RemoveThinkingBlocks();
             response = response.RemoveUnfinishedSentence().CleanupAndTrim();
             return response;
         }

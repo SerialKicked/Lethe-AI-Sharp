@@ -33,10 +33,7 @@ namespace LetheAISharp.Agent.Actions
             LLMEngine.NamesInPromptOverride = false;
             var fullprompt = BuildMergerPrompt(param.Context, param.Topic, param.Reason, param.Results).PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, 1024);
             var response = await LLMEngine.SimpleQuery(fullprompt, ct).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
-            {
-                response = response.RemoveThinkingBlocks(LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd);
-            }
+            response = response.RemoveThinkingBlocks();
             response = response.RemoveUnfinishedSentence();
             LLMEngine.Logger?.LogInformation("WebSearch Plugin Result: {output}", response);
             LLMEngine.NamesInPromptOverride = null;

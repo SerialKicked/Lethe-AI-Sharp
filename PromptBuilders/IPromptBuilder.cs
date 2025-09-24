@@ -56,7 +56,7 @@ namespace LetheAISharp
         /// <param name="responserole">Expected role for the response (should be Assistant normally)</param>
         /// <param name="tempoverride">Override the temperature set in LLMEngine.Sampler</param>
         /// <param name="responseoverride">Override the maximum response size</param>
-        /// <param name="overridePrefill">Override the prefill setting for CoT models</param>
+        /// <param name="overridePrefill">Override the prefill setting for CoT models (null = keep as is, otherwise use this as setting)</param>
         /// <returns></returns>
         object PromptToQuery(AuthorRole responserole, double tempoverride = -1, int responseoverride = -1, bool? overridePrefill = null);
 

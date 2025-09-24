@@ -253,8 +253,7 @@ namespace LetheAISharp.Files
                 temp = 0.5f;
             var genparam = promptBuilder.PromptToQuery(AuthorRole.Assistant, temp, replyln);
             var finalstr = await LLMEngine.SimpleQuery(genparam).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
-                finalstr = finalstr.RemoveThinkingBlocks(LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd);
+            finalstr = finalstr.RemoveThinkingBlocks();
             finalstr = finalstr.Replace("\"", "").Trim();
             LLMEngine.NamesInPromptOverride = null;
             return finalstr;
@@ -309,10 +308,7 @@ namespace LetheAISharp.Files
 
             var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.5) ? 0.5 : LLMEngine.Sampler.Temperature, replyln);
             var finalstr = await LLMEngine.SimpleQuery(ct).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
-            {
-                finalstr = finalstr.RemoveThinkingBlocks(LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd);
-            }
+            finalstr = finalstr.RemoveThinkingBlocks();
             LLMEngine.NamesInPromptOverride = null;
             return finalstr.CleanupAndTrim();
         }

@@ -323,7 +323,7 @@ namespace LetheAISharp
         public static string RemoveThinkingBlocks(this string text, string thinkstart, string thinkend)
         {
             var workstring = text;
-            if (!string.IsNullOrEmpty(thinkstart) && workstring.Contains(thinkend))
+            if (!string.IsNullOrWhiteSpace(thinkstart) && workstring.Contains(thinkend))
             {
                 // remove everything before the thinking end tag (included)
                 var idx = workstring.IndexOf(thinkend);
@@ -331,6 +331,7 @@ namespace LetheAISharp
             }
             return workstring;
         }
+
 
         public static string RemoveTitle(this string text)
         {

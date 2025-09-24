@@ -80,6 +80,8 @@ namespace LetheAISharp.API
             if (parameters is not GenerationInput input)
                 throw new ArgumentException("Parameters must be of type GenerationInput");
             var result = await _client.GenerateAsync(input).ConfigureAwait(false);
+            if (result is null)
+                return string.Empty;
             return string.Join("", result.Results.Select(r => r.Text));
         }
 
