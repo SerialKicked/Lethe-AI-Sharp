@@ -40,9 +40,9 @@ A persona represents either the user or the bot (NPC/agent) in a conversation. T
 
 ## Essential Lifecycle Management
 
-**Critical**: You must call `BeginChat()` when loading a persona and `EndChat()` when switching away or closing the application. These methods handle essential initialization and cleanup.
+**Critical**: `BasePersona.BeginChat()` and `BasePersona.EndChat()` handles essential initialization and cleanup when switching persona or closing the application. Setting the `LLMEngine.Bot` property to persona will make those calls automatically using `EndChat()` on the previous one, if any, and using `BeginChat()` on the new one. However, the library doesn't intercepts the application being closed, so, if you want to make sure that the chatlog, and other information is being correctly saved, you *must* manually call `EndChat()` on the currently loaded persona before exiting.
 
-### BeginChat() - Required at Session Start
+
 ```csharp
 var persona = new BasePersona
 {
@@ -51,19 +51,14 @@ var persona = new BasePersona
     // ... configure properties
 };
 
-// REQUIRED: Initialize the persona before use
-persona.BeginChat();
-
-// Now the persona is ready - Brain loaded, plugins initialized, history loaded
+// Automatically calls BeginChat() at the library's level.
 LLMEngine.Bot = persona;
 ```
 
-### EndChat() - Required at Session End
+### EndChat() - Required when closing the application
 ```csharp
 // REQUIRED: Cleanup when switching personas or closing app
 persona.EndChat(backup: true); // backup = true saves .bak files
-
-// The persona is now safely persisted and cleaned up
 ```
 
 **What these methods do:**
@@ -95,17 +90,14 @@ var bot = new BasePersona
     }
 };
 
-// REQUIRED: Initialize before use
-bot.BeginChat();
-
-// Set as active bot
+// Set and init bot
 LLMEngine.Bot = bot;
 
 // Use in conversation...
 var welcome = bot.GetWelcomeLine("User");
 Console.WriteLine($"Bot: {welcome}");
 
-// REQUIRED: Cleanup when done
+// REQUIRED: Cleanup when done before exiting app 
 bot.EndChat(backup: true);
 ```
 
