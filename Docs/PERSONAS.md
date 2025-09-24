@@ -42,7 +42,6 @@ A persona represents either the user or the bot (NPC/agent) in a conversation. T
 
 **Critical**: `BasePersona.BeginChat()` and `BasePersona.EndChat()` handles essential initialization and cleanup when switching persona or closing the application. Setting the `LLMEngine.Bot` property to persona will make those calls automatically using `EndChat()` on the previous one, if any, and using `BeginChat()` on the new one. However, the library doesn't intercepts the application being closed, so, if you want to make sure that the chatlog, and other information is being correctly saved, you *must* manually call `EndChat()` on the currently loaded persona before exiting.
 
-
 ```csharp
 var persona = new BasePersona
 {
@@ -51,7 +50,7 @@ var persona = new BasePersona
     // ... configure properties
 };
 
-// Automatically calls BeginChat() at the library's level.
+// Automatically calls BeginChat() at the library's level, and EndChat() on previously active bot (if any).
 LLMEngine.Bot = persona;
 ```
 
@@ -319,7 +318,7 @@ var autonomousBot = new BasePersona
     AgentTasks = new List<string> { "ActiveResearchTask", "ResearchTask" }
 };
 
-autonomousBot.BeginChat(); // Agent system starts automatically
+LLMEngine.Bot = autonomousBot; // Agent system starts automatically
 ```
 
 ## Self-Editing Field
@@ -335,7 +334,7 @@ var evolvingBot = new BasePersona
     SelfEditField = "I am just beginning my journey..." // Initial thoughts
 };
 
-// After several chat sessions, SelfEditField will automatically update
+// After each chat sessions, SelfEditField will automatically update
 // with the character's reflections on important conversations
 ```
 
@@ -389,11 +388,13 @@ public override void SaveChatHistory(bool backup = false) => SaveChatHistory("da
 1. **Always call base methods first** in `BeginChat()` - they handle essential initialization
 2. **Always call base methods** in `EndChat()` - they handle essential cleanup and persistence  
 3. **Handle IsUser properly** - skip bot-specific logic when `IsUser = true`
+4. **Use Overrides for custom behavior** - All the key lifecycle methods are virtual and can be overridden to add custom functionality
 
 ## Summary
 
 - `BasePersona` is the foundation for all conversation participants
-- **MUST** call `BeginChat()` before use and `EndChat()` when done
+- Select the currently active persona by using `LLMEngine.Bot = persona;` (automatically calls `BeginChat()` and `EndChat()` as needed)
+- **MUST** call `EndChat()` before closing the application (or data will be lost)
 - Override virtual methods to add custom behavior
 - Use macros for dynamic text replacement
 - Enable agent mode for autonomous behavior  
