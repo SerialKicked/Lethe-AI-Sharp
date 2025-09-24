@@ -51,8 +51,8 @@ var researchBot = new BasePersona
     AgentTasks = new List<string> { "ActiveResearchTask", "ResearchTask" }
 };
 
-// IMPORTANT: Always call BeginChat() to initialize the agent system
-researchBot.BeginChat();
+// IMPORTANT: Always assign the bot to initialize the agent system
+LLMEngine.Bot = researchBot;
 
 // The agent system is now running in the background
 // It will activate when the user is inactive for 15+ minutes (default)
@@ -71,12 +71,12 @@ var bot = new BasePersona
     AgentTasks = new List<string> { "ActiveResearchTask", "ResearchTask", "MyCustomTask" }
 };
 
-bot.BeginChat();
+LLMEngine.Bot = bot;
 
 // Customize inactivity threshold (default is 15 minutes)
 bot.AgentSystem.Config.MinInactivityTime = TimeSpan.FromMinutes(5);
 
-// Task-specific settings are managed automatically but can be accessed
+// Task-specific settings are managed automatically but can be accessed and edited
 var activeResearchConfig = bot.AgentSystem.Config.PluginSettings["ActiveResearchTask"];
 activeResearchConfig.SetSetting("MinMessages", 3); // Require 3+ new messages before researching
 ```
@@ -119,7 +119,7 @@ var bot = new BasePersona
     AgentTasks = new List<string> { "ActiveResearchTask" }
 };
 
-bot.BeginChat();
+LLEngine.Bot = bot;
 
 // Customize research behavior
 var config = bot.AgentSystem.Config.PluginSettings["ActiveResearchTask"];
@@ -151,7 +151,6 @@ var bot = new BasePersona
     AgentTasks = new List<string> { "ResearchTask" }
 };
 LLMSystem.Bot = bot;
-bot.BeginChat();
 
 // This task runs automatically when starting new chat sessions
 // It will research topics from the previous session
@@ -170,7 +169,6 @@ var comprehensiveBot = new BasePersona
     AgentTasks = new List<string> { "ActiveResearchTask", "ResearchTask" }
 };
 LLMSystem.Bot = comprehensiveBot;
-comprehensiveBot.BeginChat();
 
 // ActiveResearchTask handles ongoing conversations
 // ResearchTask handles retrospective analysis
@@ -275,10 +273,9 @@ var bot = new BasePersona
 Tasks can be configured through their settings:
 
 ```csharp
-bot.BeginChat();
 
 // Access and modify task settings
-var taskConfig = bot.AgentSystem.Config.PluginSettings["CustomAnalysisTask"];
+var taskConfig = LLMEngine.Bot.AgentSystem.Config.PluginSettings["CustomAnalysisTask"];
 taskConfig.SetSetting("AnalysisDepth", 10);
 taskConfig.SetSetting("RunInterval", TimeSpan.FromMinutes(30));
 
@@ -506,7 +503,7 @@ public async Task Execute(BasePersona owner, AgentTaskSetting cfg, CancellationT
 
 **Agent tasks not running:**
 - Check that `AgentMode = true` on the persona
-- Verify `BeginChat()` was called
+- Verify `LLMEngine.Bot = (your bot)` was called 
 - Ensure user inactivity period has passed (default 15 minutes)
 - Check `LLMEngine.Status == SystemStatus.Ready`
 
@@ -698,8 +695,6 @@ var emotionalBot = new BasePersona
     AgentMode = true,
     AgentTasks = new List<string> { "MoodAnalysisTask" }
 };
-
-emotionalBot.BeginChat();
 ```
 
 This example demonstrates all the key concepts: observation logic, execution with LLM integration, memory storage, configuration management, and error handling.

@@ -89,7 +89,6 @@ namespace LetheAISharp.Examples
                 };
 
                 // Step 4: Start conversation with welcome message
-                LLMEngine.Bot.BeginChat();
                 Console.WriteLine("Starting conversation...");
                 var welcomeMessage = bot.GetWelcomeLine(user.Name);
                 Console.WriteLine($"{bot.Name}: {welcomeMessage}");

@@ -92,9 +92,6 @@ class Program
             Console.WriteLine("\n");
             LLMEngine.History.LogMessage(AuthorRole.Assistant, response, user, bot);
         }
-
-        // Init Bot, load/create' chatlog
-        LLMEngine.Bot.BeginChat();
         
         // Chat loop
         Console.WriteLine("Chat started! Type 'quit' to exit.");

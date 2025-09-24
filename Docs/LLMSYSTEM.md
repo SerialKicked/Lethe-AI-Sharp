@@ -359,8 +359,7 @@ var persona = new BasePersona
 };
 
 // Load the persona
-LLMEngine.Bot = persona;
-persona.BeginChat(); // Initializes plugins and loads context, this *must* be done before a chat with a given persona
+LLMEngine.Bot = persona; // Initializes plugins and loads context, this *must* be done before a chat with a given persona
 ```
 
 ### Session Management
@@ -763,8 +762,6 @@ class CharacterChat
             IsUser = true
         };
         
-        LLMEngine.Bot = bot;
-        LLMEngine.User = user;
         
         // Setup events
         LLMEngine.OnInferenceStreamed += (_, token) => Console.Write(token);
@@ -774,7 +771,9 @@ class CharacterChat
             LLMEngine.History.LogMessage(AuthorRole.Assistant, response, user, bot);
         }
         
-        LLMEngine.Bot.BeginChat(); // Initialize plugins and context, and load history if exists
+        LLMEngine.Bot = bot; // Initialize plugins and context, and load history if exists
+        LLMEngine.User = user;
+
         // Start conversation
         var welcome = bot.GetWelcomeLine(user.Name);
         Console.WriteLine($"Einstein: {welcome}");
@@ -790,8 +789,8 @@ class CharacterChat
             await LLMEngine.SendMessageToBot(AuthorRole.User, input);
         }
         
-        // Save history
-        LLMEngine.Bot.EndChat(); // Saves history automatically
+        // Save history and exit program
+        LLMEngine.Bot.EndChat(); 
     }
 }
 ```

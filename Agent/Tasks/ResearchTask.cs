@@ -36,7 +36,7 @@ namespace LetheAISharp.Agent.Plugins
             var lastsession = sessions[^2];
             // Check if the last session already had a search, if so, don't do it again.
             var lastguidtest = cfg.GetSetting<Guid>("LastSessionGuid");
-            if (lastsession.Guid == lastguidtest)
+            if (lastsession.Guid == lastguidtest || lastsession.MetaData.IsRoleplaySession)
                 return false;
             return true;
         }
