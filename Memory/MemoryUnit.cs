@@ -22,6 +22,8 @@ namespace LetheAISharp.Memory
     public enum MemoryType { General, WorldInfo, WebSearch, ChatSession, Journal, Image, File, Location, Event, Person, Goal }
     public enum MemoryInsertion { Trigger, Natural, NaturalForced, None }
 
+    public enum TitleInsertType { None, Simple, Bold, MarkdownH2, MarkdownH3 }
+
 
     /// <summary>
     /// Individual long term and contextual memory entry
@@ -101,6 +103,43 @@ namespace LetheAISharp.Memory
         public List<string> KeyWordsSecondary = [];
         public KeyWordLink WordLink = KeyWordLink.And;
         public bool CaseSensitive = false;
+
+        public virtual string ToSnippet(TitleInsertType includeTitle, bool includeDate, bool includeReason, bool compactContent)
+        {
+            var sb = new StringBuilder();
+            if (includeTitle != TitleInsertType.None && !string.IsNullOrEmpty(Name))
+            {
+                sb.Append(includeTitle switch
+                {
+                    TitleInsertType.Simple => $"{Name}: ",
+                    TitleInsertType.Bold => $"**{Name}:** ",
+                    TitleInsertType.MarkdownH2 => $"## {Name}\n",
+                    TitleInsertType.MarkdownH3 => $"### {Name}\n",
+                    _ => $"{Name}\n"
+                });
+            }
+            var content = compactContent ? Content.RemoveNewLines() : Content;
+            if (includeDate)
+            {
+                if (Added.Date == EndTime.Date)
+                {
+                    sb.AppendLinuxLine($"On {Added.DayOfWeek}, {StringExtensions.DateToHumanString(Added)}: {content}");
+                }
+                else
+                {
+                    sb.AppendLinuxLine($"Between the {Added.DayOfWeek} {StringExtensions.DateToHumanString(Added)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}: {content}");
+                }
+            }
+            else
+            {
+                sb.AppendLinuxLine(content);
+            }
+            if (includeReason && !string.IsNullOrEmpty(Reason))
+            {
+                sb.AppendLinuxLine($"The reason for it was: {Reason}");
+            }
+            return sb.ToString().CleanupAndTrim();
+        }
 
         public void Touch()
         {

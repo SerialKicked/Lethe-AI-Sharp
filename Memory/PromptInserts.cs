@@ -74,7 +74,7 @@ namespace LetheAISharp.Memory
                     AddInsert(
                         new PromptInsert(
                             session.Guid, 
-                            info.GetRawMemory(true, LLMEngine.Bot.DatesInSessionSummaries), 
+                            info.ToSnippet(TitleInsertType.Simple, LLMEngine.Bot.DatesInSessionSummaries, false, true), 
                             LLMEngine.Settings.RAGIndex, 
                             1)
                         );

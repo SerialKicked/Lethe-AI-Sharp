@@ -149,7 +149,7 @@ namespace LetheAISharp.Files
                     continue;
                 sb.Clear();
                 sb.AppendLinuxLine($"{sectionHeader} {session.Name}");
-                sb.AppendLinuxLine(session.GetRawMemory(false, LLMEngine.Bot.DatesInSessionSummaries));
+                sb.AppendLinuxLine(session.ToSnippet(TitleInsertType.None, LLMEngine.Bot.DatesInSessionSummaries, false, true)).AppendLinuxLine();
                 var tks = LLMEngine.GetTokenCount(sb.ToString()) + 1;
                 if (tks <= tokensleft)
                 {
@@ -171,7 +171,7 @@ namespace LetheAISharp.Files
             foreach (var session in SelectedSessions)
             {
                 sb.AppendLinuxLine($"{sectionHeader} {session.Name}");
-                sb.AppendLinuxLine(session.GetRawMemory(false, LLMEngine.Bot.DatesInSessionSummaries));
+                sb.AppendLinuxLine(session.ToSnippet(TitleInsertType.None, LLMEngine.Bot.DatesInSessionSummaries, false, true)).AppendLinuxLine();
             }
 
             return sb.ToString();

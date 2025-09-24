@@ -338,7 +338,7 @@ namespace LetheAISharp.Files
             for (int i = History.Sessions.Count - 2; i >= 0; i--)
             {
                 var session = History.Sessions[i];
-                var details = session.GetRawMemory(true, DatesInSessionSummaries) + LLMEngine.NewLine;
+                var details = session.ToSnippet(TitleInsertType.Bold, DatesInSessionSummaries, false, true) + LLMEngine.NewLine;
                 var size = LLMEngine.GetTokenCount(details);
                 availtks -= size;
                 maxcount--;

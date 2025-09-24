@@ -545,47 +545,6 @@ namespace LetheAISharp.Files
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Generates a formatted string representation of the memory content, optionally including a title and date
-        /// information.
-        /// </summary>
-        /// <remarks>The method formats the memory content based on the specified parameters. If both
-        /// <paramref name="withtitle"/>  and <paramref name="includedates"/> are <see langword="true"/>, the output
-        /// includes the title, the date range  (if applicable), and the content. If <paramref name="includedates"/> is
-        /// <see langword="true"/> and the start  and end dates are the same, only the single date is
-        /// included.</remarks>
-        /// <param name="withtitle">A value indicating whether to include the title in the output.  If <see langword="true"/>, the title is
-        /// included; otherwise, it is omitted.</param>
-        /// <param name="includedates">A value indicating whether to include date information in the output.  If <see langword="true"/>, the start
-        /// and end dates are included; otherwise, they are omitted.</param>
-        /// <returns>A string containing the formatted memory content. The output may include the title and/or date information 
-        /// depending on the values of <paramref name="withtitle"/> and <paramref name="includedates"/>.</returns>
-        public string GetRawMemory(bool withtitle, bool includedates)
-        {
-            var sb = new StringBuilder();
-            if (withtitle)
-            {
-                sb.Append($"{Name.RemoveNewLines()}: ");
-            }
-            if (includedates)
-            {
-                if (StartTime.Date == EndTime.Date)
-                {
-                    sb.AppendLinuxLine($"On {StartTime.DayOfWeek}, {StringExtensions.DateToHumanString(StartTime)}: {Content.RemoveNewLines()}");
-                }
-                else
-                {
-                    sb.AppendLinuxLine($"Between the {StartTime.DayOfWeek} {StringExtensions.DateToHumanString(StartTime)} and the {EndTime.DayOfWeek} {StringExtensions.DateToHumanString(EndTime)}: {Content.RemoveNewLines()}");
-                }
-            }
-            else
-            {
-                sb.AppendLinuxLine($"{Content.RemoveNewLines()}");
-            }
-
-            return sb.ToString();
-        }
-
         public async Task<List<(string Label, float Probability)>> GetSentimentTotalFor(string charID)
         {
             if (!SentimentAnalysis.Enabled)
