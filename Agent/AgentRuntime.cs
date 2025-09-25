@@ -36,6 +36,28 @@ namespace LetheAISharp.Agent
         private static readonly Dictionary<string, Func<IAgentTask>> _pluginRegistry = [];
         private static readonly Dictionary<string, object> _actions = [];
 
+        public string AbilitiesToString()
+        {
+            var list = new List<string>();
+            foreach (var plugin in _plugins)
+            {
+                if (!list.Contains(plugin.Ability))
+                    list.Add(plugin.Ability);
+            }
+            if (list.Count == 0)
+                return string.Empty;
+            var sb = new StringBuilder();
+            foreach (var id in list)
+            {
+                if (sb.Length > 0)
+                {
+                    sb.Append(", ");
+                    sb.Append(id.ToLowerInvariant());
+                }
+            }
+            return sb.Append('.').ToString();
+        }
+
         /// <summary>
         /// Updates the timestamp of the most recent user activity. 
         /// Must be called by the app to notifiy the library of user activity, so the agent knows when not to interrupt

@@ -71,6 +71,9 @@ namespace LetheAISharp.Files
 
         public bool CutInTheMiddleSummaryStrategy = false;
 
+        public bool AntiHallucinationMemoryFormat { get; set; } = true;
+
+
         #endregion
 
         #region *** Sentiment Analysis Module ***

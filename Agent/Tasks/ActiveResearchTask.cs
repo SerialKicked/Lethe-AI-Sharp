@@ -20,6 +20,7 @@ namespace LetheAISharp.Agent.Plugins
     public sealed class ActiveResearchTask : IAgentTask
     {
         public string Id => "ActiveResearchTask";
+        public string Ability => "Do research on the web";
 
         public async Task<bool> Observe(BasePersona owner, AgentTaskSetting cfg, CancellationToken ct)
         {

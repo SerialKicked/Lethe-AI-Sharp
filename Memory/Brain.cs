@@ -508,6 +508,7 @@ namespace LetheAISharp.Memory
                 // One-shot natural memories are consumed
                 Memories.Remove(selected);
             }
+            var eurekacontent = selected.ToEureka();
 
             var tosend = new SingleMessage(
                 AuthorRole.System,

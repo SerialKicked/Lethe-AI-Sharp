@@ -179,31 +179,44 @@ namespace LetheAISharp.Memory
         public string ToEureka()
         {
             var text = new StringBuilder();
-            switch (Category)
+            if (LLMEngine.Settings.AntiHallucinationMemoryFormat)
             {
-                case MemoryType.Person:
-                    text.Append($"Here's relevant information about {Name}.");
-                    break;
-                case MemoryType.Location:
-                    text.Append($"You remember something about this location: {Name}.");
-                    break;
-                case MemoryType.Goal:
-                    text.Append($"{LLMEngine.Bot.Name} remembers they set this goal for themselves: {Name}.");
-                    break;
-                case MemoryType.WebSearch:
-                    text.Append($"{LLMEngine.Bot.Name} remembers something they found on the web about '{Name}'.");
-                    break;
-                default:
-                    text.Append($"This is some information regarding '{Name}'.");
-                    break;
+                text.Append($"<SystemEvent>[{Category.ToString().ToUpperInvariant()}] - Topic: {Name}.");
+            }
+            else
+            {
+                switch (Category)
+                {
+                    case MemoryType.Person:
+                        text.Append($"Here's relevant information about {Name}.");
+                        break;
+                    case MemoryType.Location:
+                        text.Append($"You remember something about this location: {Name}.");
+                        break;
+                    case MemoryType.Goal:
+                        text.Append($"{LLMEngine.Bot.Name} remembers they set this goal for themselves: {Name}.");
+                        break;
+                    case MemoryType.WebSearch:
+                        text.Append($"{LLMEngine.Bot.Name} remembers something they found on the web about '{Name}'.");
+                        break;
+                    default:
+                        text.Append($"This is some information regarding '{Name}'.");
+                        break;
+                }
             }
 
             if (!string.IsNullOrEmpty(Reason))
             {
                 text.AppendLinuxLine($" The reason for it was: {Reason}.");
             }
-            text.AppendLinuxLine().AppendLinuxLine($"{Content}").AppendLinuxLine().Append("Mention this information when there's a lull in the discussion, if {{user}} makes a mention of it, or if you feel like it's a good idea to talk about it.");
-            return text.ToString();
+            text.AppendLinuxLine().AppendLinuxLine($"{Content}");
+            
+            if (!LLMEngine.Settings.AntiHallucinationMemoryFormat)
+            {
+                text.AppendLinuxLine().Append("Mention this information when there's a lull in the discussion, if {{user}} makes a mention of it, or if you feel like it's a good idea to talk about it.");
+            }
+
+            return text.ToString().CleanupAndTrim();
         }
 
         public bool CheckKeywords(string message)
