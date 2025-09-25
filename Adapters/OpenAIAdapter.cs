@@ -43,8 +43,11 @@ namespace LetheAISharp.API
             }
         }
 
-        // Implement the rest of the interface methods...
-        // This would follow the same pattern as the KoboldCppAdapter but use OpenAI API methods
+        public void UpdateSearchProvider()
+        {
+            webSearchClient.SwitchProvider(LLMEngine.Settings.WebSearchAPI, LLMEngine.Settings.WebSearchBraveAPIKey);
+        }
+
 
         public async Task<int> GetMaxContextLength()
         {

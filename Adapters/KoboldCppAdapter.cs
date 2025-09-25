@@ -51,6 +51,11 @@ namespace LetheAISharp.API
 
         public CompletionType CompletionType => CompletionType.Text;
 
+        public void UpdateSearchProvider()
+        {
+            webSearchClient.SwitchProvider(LLMEngine.Settings.WebSearchAPI, LLMEngine.Settings.WebSearchBraveAPIKey);
+        }
+
         public async Task<int> GetMaxContextLength()
         {
             var result = await _client.TrueMaxContextLengthAsync().ConfigureAwait(false);

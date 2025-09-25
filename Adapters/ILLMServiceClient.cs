@@ -67,6 +67,8 @@ namespace LetheAISharp.API
         Task<string> ImageCaption(byte[] imageData);
         Task<string> SchemaToGrammar(Type jsonclass);
 
+        void UpdateSearchProvider();
+
         // KV State management (if supported)
         Task<bool> SaveKVState(int value);
         Task<bool> LoadKVState(int value);

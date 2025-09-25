@@ -45,7 +45,7 @@ namespace LetheAISharp.Files
         /// <summary> Thinking models only, attempt to disable the thinking block </summary>
         public bool DisableThinking { get; set; } = false;
 
-                /// <summary> Allow keyword-activated snippets to be inserted in the prompt (see WorldInfo and BasePersona) </summary>
+        /// <summary> Allow keyword-activated snippets to be inserted in the prompt (see WorldInfo and BasePersona) </summary>
         public bool AllowWorldInfo { get; set; } = true;
 
         /// <summary> 
@@ -115,7 +115,7 @@ namespace LetheAISharp.Files
         public int RAGMValue { get; set; } = 15;
 
         /// <summary> Max distance for an entry to be retrieved (SmallWorld / HNSW.NET implementation) </summary>
-        public float RAGDistanceCutOff { get; set; } = 0.15f;
+        public float RAGDistanceCutOff { get; set; } = 0.1f;
 
         /// <summary> Search method. Simple is the most accurate method (but is very slightly slower). </summary>
         public NeighbourSelectionHeuristic RAGHeuristic { get; set; } = NeighbourSelectionHeuristic.SelectSimple;
