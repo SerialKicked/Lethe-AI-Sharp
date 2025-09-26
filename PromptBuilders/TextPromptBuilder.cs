@@ -35,7 +35,7 @@ namespace LetheAISharp
             return fullprompt.ToString();
         }
 
-        public async Task SetStructuredOutput(object? classToConvert)
+        public async Task SetStructuredOutput(object classToConvert)
         {
             // Highest priority: extractable => let it provide grammar (handles caching/special cases)
             if (classToConvert is ILLMExtractableBase extract)
@@ -62,7 +62,6 @@ namespace LetheAISharp
             grammar = string.Empty;
         }
 
-        // Keep interface compatibility without adding another public method
         public async Task SetStructuredOutput<ClassToConvert>()
         {
             // This blocks intentionally to respect the IPromptBuilder signature
@@ -83,7 +82,6 @@ namespace LetheAISharp
         {
             grammar = string.Empty;
         }
-
 
         public object PromptToQuery(AuthorRole responserole, double tempoverride = -1, int responseoverride = -1, bool? overridePrefill = null)
         {

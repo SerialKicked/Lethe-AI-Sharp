@@ -49,7 +49,6 @@ namespace LetheAISharp
         /// <returns>a string for text completion. a List<Message> for chat completion </returns>
         object GetFullPrompt();
 
-
         /// <summary>
         /// Converts the current prompt to a query object suitable for sending to the LLM backend.
         /// </summary>
@@ -90,9 +89,23 @@ namespace LetheAISharp
         /// <returns>Tokens used</returns>
         int GetResponseTokenCount(BasePersona talker) => LLMEngine.GetTokenCount(LLMEngine.Instruct.GetResponseStart(talker));
 
+        /// <summary>
+        /// Forces the LLM to respond in a structured output fashion that will map to the specified type.
+        /// </summary>
+        /// <typeparam name="ClassToConvert">The type of the class to be used for setting the structured output.</typeparam>
+        /// <returns>A task that represents the asynchronous operation.</returns>
         Task SetStructuredOutput<ClassToConvert>();
+
+        /// <summary>
+        /// Forces the LLM to respond in a structured output fashion that will map to the specified class. 
+        /// </summary>
+        /// <param name="classToConvert">The object to be converted into a structured output format. Cannot be null. Must be a class or record</param>
+        /// <returns>A task that represents the asynchronous operation.</returns>
         Task SetStructuredOutput(object classToConvert);
 
+        /// <summary>
+        /// Tells the prompt builder to stop forcing structured output.
+        /// </summary>
         void UnsetStructuredOutput();
     }
 }
