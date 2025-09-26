@@ -19,22 +19,23 @@ It includes easy-to-use (and easy to build upon) systems to handle most of the o
 - Session-based chatlog with automated summaries for past sessions
 - Streamed (or not) inference / reroll / and impersonate functions
 - Support CoT / "thinking" models out of the box
-- GBNF grammar generation directly from a class's structure for structured output
+- Get structured output from the bot (using GBNF grammar in KoboldAPI, and JsonSchema in OpenAI API)
 - Basic support for VLM (visual language models) depending on the back-end
-- Tools for reliable Web Search (DuckDuckGo and Brave)
+- Tools for reliable Web Search (DuckDuckGo and Brave are supported)
 - Text To Speech support (through the *Kobold API* only)
 - Many useful tools to manipulate text, count tokens, and more
 
 ## 📝 Long Term Memory System
+- Summaries of previous chat sessions into the system prompt
 - Keyword-triggered text insertions (also known as "world info" in many frontends)
 - Customizable RAG System using the Small World implementation
-- Automatic (optional) and configurable insertion of relevant past chat sessions into the context
+- Automatic and configurable insertion of relevant chat summaries into the context
 
 ## 🧠 Agentic and Brain Module for personas
-- Background agent system (bot can run tasks in the background)
+- Background agent system (bot can run tasks while the user is AFK)
 - Analyze past chat sessions, run relevant web searches and mention results in next session
 - Mood tracking + drift system (personality coloring over time)
-- Goal‑driven behaviors (long‑term projects, self‑seeding topics of interest)
+- Write your own tasks easily to boost your bot's abilities
 
 ## 🛠️ Advanced Features (Work in progress / experimental)
 - Group chat functionalities (one user and multiple AI characters)
