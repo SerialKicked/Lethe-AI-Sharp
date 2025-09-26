@@ -52,8 +52,8 @@ namespace LetheAISharp.Agent
                 if (sb.Length > 0)
                 {
                     sb.Append(", ");
-                    sb.Append(id.ToLowerInvariant());
                 }
+                sb.Append(id.ToLowerInvariant());
             }
             return sb.Append('.').ToString();
         }
