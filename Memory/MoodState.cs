@@ -1,8 +1,10 @@
 ﻿using LetheAISharp.LLM;
+using System.Net.Http.Headers;
 using System.Text;
 
 namespace LetheAISharp.Memory
 {
+
     public class MoodState
     {
         private double energy = 0.5;
@@ -76,31 +78,44 @@ namespace LetheAISharp.Memory
             };
         }
 
+        protected virtual List<string> GetAdjectives()
+        {
+            var lst = new List<string>();
+            if (Energy < 0.35)
+                lst.Add("tired");
+            else if (Energy > 0.65)
+                lst.Add("energetic");
+            else
+                lst.Add("rested");
+
+            if (Cheer < 0.15)
+                lst.Add("sad");
+            else if (Cheer < 0.35)
+                lst.Add("moody");
+            else if (Cheer > 0.65)
+                lst.Add("happy");
+            else if (Cheer > 0.85)
+                lst.Add("joyful");
+
+            if (Curiosity < 0.25)
+                lst.Add("disinterested");
+            else if (Curiosity > 0.65)
+                lst.Add("curious");
+            return lst;
+        }
+
         public virtual string Describe()
         {
             var sb = new StringBuilder("{{char}} is currently feeling");
-            if (Energy < 0.35)
-                sb.Append(" tired");
-            else if (Energy > 0.65)
-                sb.Append(" energetic");
-            else
-                sb.Append(" rested");
-
-            if (Cheer < 0.15)
-                sb.Append(", sad");
-            if (Cheer < 0.35)
-                sb.Append(", moody");
-            else if (Cheer > 0.65)
-                sb.Append(", joyful");
-            else if (Cheer > 0.85)
-                sb.Append(", happy");
-
-            if (Curiosity < 0.25)
-                sb.Append(", and disinterested");
-            else if (Curiosity > 0.65)
-                sb.Append(", and curious");
-            sb.Append('.');
-            return sb.ToString();
+            var moods = GetAdjectives();
+            if (moods.Count > 0)
+            {
+                sb.Append(' ');
+                sb.Append(string.Join(", ", moods));
+                sb.Append('.');
+                return sb.ToString();
+            }
+            return string.Empty;
         }
     }
 }

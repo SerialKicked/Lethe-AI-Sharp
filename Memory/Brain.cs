@@ -22,7 +22,7 @@ namespace LetheAISharp.Memory
     /// <param name="basePersona">Owner</param>
     public class Brain(BasePersona basePersona)
     {
-        [JsonIgnore] private BasePersona Owner { get; set; } = basePersona;
+        [JsonIgnore] protected BasePersona Owner { get; set; } = basePersona;
 
         /// <summary>
         /// Minimum time between two automatic memory inserts.
@@ -80,7 +80,6 @@ namespace LetheAISharp.Memory
         {
             Owner = owner;
             RefreshMemories();
-            owner.History.OnNewSession += DoOnNewSession;
         }
 
         /// <summary>
@@ -88,20 +87,17 @@ namespace LetheAISharp.Memory
         /// </summary>
         public virtual void Close()
         {
-            Owner.History.OnNewSession -= DoOnNewSession;
+
         }
 
-        /// <summary>
-        /// Initialization done when a new chat session starts.
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        protected virtual void DoOnNewSession(object? sender, ChatSession e)
+        public virtual async Task ProcessPreviousSession()
         {
+            await Task.Delay(1).ConfigureAwait(false);
             CurrentDelay = 0;
             LastInsertTime = DateTime.Now;
             RefreshMemories();
         }
+
 
         /// <summary>
         /// Move memories to to their proper slot, delete old stuff.

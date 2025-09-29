@@ -383,6 +383,7 @@ namespace LetheAISharp.Files
                 CurrentSession.Messages.Clear();
             }
             OnNewSession?.Invoke(this, CurrentSession);
+            await LLMEngine.Bot.Brain.ProcessPreviousSession().ConfigureAwait(false);
             if (!addDateInfo)
                 return;
             // Generate new system message about the new session
