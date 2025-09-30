@@ -210,11 +210,8 @@ namespace LetheAISharp.Memory
                 text.AppendLinuxLine($" The reason for it was: {Reason}.");
             }
             text.AppendLinuxLine().AppendLinuxLine($"{Content}");
-            
-            if (!LLMEngine.Settings.AntiHallucinationMemoryFormat)
-            {
-                text.AppendLinuxLine().Append("Mention this information when there's a lull in the discussion, if {{user}} makes a mention of it, or if you feel like it's a good idea to talk about it.");
-            }
+
+            text.AppendLinuxLine().Append("Note: Mention this information when there's a lull in the discussion, if {{user}} makes a mention of it, or if you feel like it's a good idea to talk about it. Make sure it fits in the conversation's flow naturally.");
 
             return text.ToString().CleanupAndTrim();
         }

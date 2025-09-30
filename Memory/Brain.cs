@@ -153,10 +153,10 @@ namespace LetheAISharp.Memory
                 InsertEureka(foundunit);
                 return;
             }
-            var iseurekatriggerword = MemoryTriggers.IsEurekaTrigger(message.Message);
-            if (CurrentDelay >= MinMessageDelay && LastInsertTime + MinInsertDelay <= DateTime.Now || iseurekatriggerword)
+            var useraskingfornews = MemoryTriggers.IsEurekaTrigger(message.Message);
+            if (CurrentDelay >= MinMessageDelay && LastInsertTime + MinInsertDelay <= DateTime.Now || useraskingfornews)
             {
-                InsertEureka(null, !iseurekatriggerword);
+                InsertEureka(null, !useraskingfornews);
             }
         }
 

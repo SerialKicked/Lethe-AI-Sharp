@@ -88,7 +88,7 @@ namespace LetheAISharp.Agent.Plugins
                 var mem = new MemoryUnit
                 {
                     Category = MemoryType.WebSearch,
-                    Insertion = MemoryInsertion.NaturalForced,
+                    Insertion = MemoryInsertion.Natural,
                     Name = topic.Topic,
                     Content = merged.CleanupAndTrim(),
                     Reason = topic.Reason,
