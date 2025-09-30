@@ -81,12 +81,14 @@ namespace LetheAISharp.Memory
         protected virtual List<string> GetAdjectives()
         {
             var lst = new List<string>();
-            if (Energy < 0.35)
+            if (Energy < 0.1)
+                lst.Add("exhausted");
+            else if (Energy < 0.35)
                 lst.Add("tired");
             else if (Energy > 0.65)
-                lst.Add("energetic");
-            else
                 lst.Add("rested");
+            else if (Energy > 0.85)
+                lst.Add("energetic");
 
             if (Cheer < 0.15)
                 lst.Add("sad");
@@ -99,7 +101,7 @@ namespace LetheAISharp.Memory
 
             if (Curiosity < 0.25)
                 lst.Add("disinterested");
-            else if (Curiosity > 0.65)
+            else if (Curiosity > 0.75)
                 lst.Add("curious");
             return lst;
         }

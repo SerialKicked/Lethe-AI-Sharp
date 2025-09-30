@@ -6,6 +6,7 @@ using CommunityToolkit.HighPerformance;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
+using System.Text;
 
 namespace LetheAISharp.Memory
 {
@@ -60,6 +61,12 @@ namespace LetheAISharp.Memory
         /// </summary>
         public int MinNoRecallDaysBeforeDeletionPerPrioLevel { get; set; } = 10;
 
+        /// <summary>
+        /// If set to true, the bot will use a basic mood system to adjust its responses based on its mood state. 
+        /// This only has basic functionalities featured as a demo for roleplay characters. 
+        /// The Brain and Mood classes are meant to be overridden for more advanced behavior.
+        /// </summary>
+        public bool MoodHandling { get; set; } = false;
 
         public DateTime LastInsertTime { get; protected set; }
         public int CurrentDelay { get; protected set; } = 0;
@@ -556,11 +563,7 @@ namespace LetheAISharp.Memory
 
         public virtual SingleMessage? BuildAwayMessage()
         {
-            // no previous user message, nothing to do
-            if (!Owner.SenseOfTime && Inserts.Count == 0)
-                return null;
-
-            // no previous user message, nothing to do
+            // no previous user message, nothing to do either, chat just started
             var lastmsg = LLMEngine.History.GetLastMessageFrom(AuthorRole.User);
             if (lastmsg == null)
                 return null;
@@ -569,18 +572,48 @@ namespace LetheAISharp.Memory
             if (LLMEngine.History.CurrentSession.Messages.Count > 1 && LLMEngine.History.CurrentSession.Messages[^2].Role == AuthorRole.System)
                 return null;
 
-            var timeSinceLast = (DateTime.Now - lastmsg.Date);
-            if (timeSinceLast < TimeSpan.FromHours(HoursBeforeAFK))
+            if (!Owner.SenseOfTime && !MoodHandling && Inserts.Count == 0)
                 return null;
 
-            var info = Owner.SenseOfTime ? GetAwayString() + " " + Mood.Describe() : Mood.Describe();
-            foreach (var item in Inserts)
+            var totalmessage = string.Empty;
+
+            if (Owner.SenseOfTime)
             {
-                info += " " + item.Info;
-            };
-            Inserts.Clear();
-            info = Owner.ReplaceMacros(info.CleanupAndTrim());
-            var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, info, Owner.UniqueName, LLMEngine.User.UniqueName, true);
+                var timeSinceLast = (DateTime.Now - lastmsg.Date);
+                if (timeSinceLast >= TimeSpan.FromHours(HoursBeforeAFK))
+                {
+                    var awaystr = GetAwayString();
+                    if (!string.IsNullOrWhiteSpace(awaystr))
+                    {
+                        totalmessage = awaystr;
+                    }
+                }
+            }
+
+            if (MoodHandling)
+            {
+                var moodstr = Mood.Describe();
+                if (!string.IsNullOrWhiteSpace(moodstr))
+                {
+                    if (!string.IsNullOrWhiteSpace(totalmessage))
+                        totalmessage += " ";
+                    totalmessage += moodstr;
+                }
+            }
+
+            if (Inserts.Count > 0)
+            {
+                foreach (var item in Inserts)
+                {
+                    totalmessage += " " + item.Info;
+                }
+                Inserts.Clear();
+            }
+            if (string.IsNullOrWhiteSpace(totalmessage))
+                return null;
+
+            totalmessage = Owner.ReplaceMacros(totalmessage).CleanupAndTrim();
+            var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, totalmessage, Owner.UniqueName, LLMEngine.User.UniqueName, true);
             return tosend;
         }
 
