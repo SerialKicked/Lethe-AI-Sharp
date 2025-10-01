@@ -13,8 +13,10 @@ namespace LetheAISharp
 {
     internal class TextPromptBuilder : IPromptBuilder
     {
+        private List<string> vlm_pictures = [];
         private readonly List<string> _prompt = [];
         private string grammar = string.Empty;
+
         public int Count => _prompt.Count;
 
         public int AddMessage(AuthorRole role, string message)
@@ -106,7 +108,7 @@ namespace LetheAISharp
             genparams.Max_length = responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride;
             genparams.Stop_sequence = LLMEngine.Instruct.GetStoppingStrings(LLMEngine.User, LLMEngine.Bot);
             genparams.Prompt = fullquery;
-            genparams.Images = [.. LLMEngine.vlm_pictures];
+            genparams.Images = [.. vlm_pictures];
             if (!string.IsNullOrWhiteSpace(grammar))
                 genparams.Grammar = grammar;
             return genparams;
@@ -146,5 +148,20 @@ namespace LetheAISharp
 
             return (string)GetFullPrompt();
         }
+
+        public void VLM_ClearImages()
+        {
+            vlm_pictures = [];
+        }
+
+        public void VLM_AddImage(string imagePath, int size = 1024)
+        {
+            var res = ImageUtils.ImageToBase64(imagePath, size);
+            if (!string.IsNullOrEmpty(res))
+                vlm_pictures.Add(res);
+        }
+
+        public int VLM_GetImageCount() => vlm_pictures.Count;
+
     }
 }

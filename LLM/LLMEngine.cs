@@ -162,7 +162,6 @@ namespace LetheAISharp.LLM
         private static BasePersona bot = new() { IsUser = false, Name = "Bot", Bio = "You are an helpful AI assistant whose goal is to answer questions and complete tasks.", UniqueName = string.Empty };
         private static BasePersona user = new() { IsUser = true, Name = "User", UniqueName = string.Empty };
 
-        internal static List<string> vlm_pictures = [];
         internal static PromptInserts dataInserts = [];
         internal static readonly Random RNG = new();
 
@@ -605,23 +604,14 @@ namespace LetheAISharp.LLM
 
         #endregion
 
-        #region *** Visual Language Model Management (for supported API) ***
+        #region *** Visual Language Model Management ***
 
         /// <summary>
         /// Clears the list of images to be sent to the backend.
         /// </summary>
         public static void VLM_ClearImages()
         {
-            vlm_pictures = [];
-        }
-
-        /// <summary>
-        /// Provide a base64 encoded image to be sent to the backend with the next prompt.
-        /// </summary>
-        /// <param name="base64"></param>
-        public static void VLM_AddB64Image(string base64)
-        {
-            vlm_pictures.Add(base64);
+            PromptBuilder?.VLM_ClearImages();
         }
 
         /// <summary>
@@ -629,11 +619,10 @@ namespace LetheAISharp.LLM
         /// </summary>
         /// <param name="image">image</param>
         /// <param name="size">dimension</param>
-        public static void VLM_AddImage(Image image, int size = 1024)
+        public static void VLM_AddImage(string imagepath, int size = 1024)
         {
-            var res = ImageUtils.ImageToBase64(image, size);
-            if (!string.IsNullOrEmpty(res))
-                vlm_pictures.Add(res);
+            if (File.Exists(imagepath))
+                PromptBuilder?.VLM_AddImage(imagepath, size);
         }
 
         #endregion
@@ -937,7 +926,7 @@ namespace LetheAISharp.LLM
             Status = SystemStatus.Busy;
 
             var inputText = userInput;
-            var genparams = await GenerateFullPrompt(MsgSender, inputText, pluginmessage, vlm_pictures.Count > 0 ? vlm_pictures.Count * 1024 : 0).ConfigureAwait(false);
+            var genparams = await GenerateFullPrompt(MsgSender, inputText, pluginmessage, PromptBuilder.VLM_GetImageCount() * 1024).ConfigureAwait(false);
 
             StreamingTextProgress = Instruct.GetThinkPrefill();
             if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))

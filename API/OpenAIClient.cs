@@ -103,6 +103,15 @@ namespace LetheAISharp.API
                     FinishReason = "error"
                 });
             }
+            catch (Exception ex)
+            {
+                LLMEngine.Logger?.LogError(ex, "Error during streaming chat completion: {Message}", ex.Message);
+                RaiseOnStreamingResponse(new OpenTokenResponse
+                {
+                    Token = $"Error during streaming chat completion: {ex.Message}",
+                    FinishReason = "error"
+                });
+            }
 
             // CA2254 fix: Use a constant message template and pass cumulativeDelta as an argument
             LLMEngine.Logger?.LogInformation("[OpenAI API] Final response: {CumulativeDelta}", cumulativeDelta);

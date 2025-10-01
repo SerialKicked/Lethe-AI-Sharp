@@ -176,9 +176,9 @@ namespace LetheAISharp.API
 
         public bool SupportsStreaming => true;
         public bool SupportsTTS => false;  // TODO
-        public bool SupportsVision => false;  // TODO
+        public bool SupportsVision => true;  // TODO
         public bool SupportsWebSearch => true;
         public bool SupportsStateSave => false; // Not Available
-        public bool SupportsSchema => true; // TODO
+        public bool SupportsSchema => true;
     }
 }

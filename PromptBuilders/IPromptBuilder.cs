@@ -60,6 +60,16 @@ namespace LetheAISharp
         object PromptToQuery(AuthorRole responserole, double tempoverride = -1, int responseoverride = -1, bool? overridePrefill = null);
 
         /// <summary>
+        /// Converts the current prompt into its textual representation.
+        /// </summary>
+        /// <returns>A string containing the text representation of the prompt. The returned string will be 
+        /// empty if the prompt has no content.</returns>
+        string PromptToText();
+
+
+        #region *** Token Counting ***
+
+        /// <summary>
         /// Retrieves the total number of tokens used by the current prompt.
         /// </summary>
         /// <returns>The total count of tokens used.</returns>
@@ -76,18 +86,16 @@ namespace LetheAISharp
         int GetTokenCount(AuthorRole role, string message);
 
         /// <summary>
-        /// Converts the current prompt into its textual representation.
-        /// </summary>
-        /// <returns>A string containing the text representation of the prompt. The returned string will be 
-        /// empty if the prompt has no content.</returns>
-        string PromptToText();
-
-        /// <summary>
         /// Only relevant to text completion. Calculates the token overread for the responsse start block / prefill.
         /// </summary>
         /// <param name="talker">the Bot or the User supposed to talk</param>
         /// <returns>Tokens used</returns>
         int GetResponseTokenCount(BasePersona talker) => LLMEngine.GetTokenCount(LLMEngine.Instruct.GetResponseStart(talker));
+
+        #endregion
+
+
+        #region *** Structured Output ***
 
         /// <summary>
         /// Forces the LLM to respond in a structured output fashion that will map to the specified type.
@@ -107,5 +115,26 @@ namespace LetheAISharp
         /// Tells the prompt builder to stop forcing structured output.
         /// </summary>
         void UnsetStructuredOutput();
+
+        #endregion
+
+
+        #region *** Visual Large Language Models (VLM) *** 
+
+        /// <summary>
+        /// Clears the list of images to be sent to the backend.
+        /// </summary>
+        void VLM_ClearImages();
+
+        /// <summary>
+        /// Provide an image to be sent to the backend with the next prompt. The image will be resized to fit within the specified size (default 1024px).
+        /// </summary>
+        /// <param name="image">image</param>
+        /// <param name="size">dimension</param>
+        void VLM_AddImage(string imagePath, int size = 1024);
+
+        int VLM_GetImageCount();
+
+        #endregion
     }
 }

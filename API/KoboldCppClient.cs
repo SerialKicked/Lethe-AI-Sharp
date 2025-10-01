@@ -5,6 +5,7 @@
 #pragma warning disable 8625 // Disable "CS8625 Cannot convert null literal to non-nullable reference type"
 
 using LetheAISharp.LLM;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -710,8 +711,8 @@ namespace LetheAISharp.API
                 }
                 catch (JsonException exception)
                 {
-                    var message = "Could not deserialize the response body string as " + typeof(T).FullName + ".";
-                    throw new ApiException(message, (int)response.StatusCode, responseText, headers, exception);
+                    LLMEngine.Logger?.LogError(exception, "Could not deserialize the response body string as {TypeName}. Response: {ResponseText}", typeof(T).FullName, responseText);
+                    return new ObjectResponseResult<T>(default(T), string.Empty);
                 }
             }
             else
@@ -729,8 +730,8 @@ namespace LetheAISharp.API
                 }
                 catch (JsonException exception)
                 {
-                    var message = "Could not deserialize the response body stream as " + typeof(T).FullName + ".";
-                    throw new ApiException(message, (int)response.StatusCode, string.Empty, headers, exception);
+                    LLMEngine.Logger?.LogError(exception, "Could not deserialize the response body stream as {TypeName}.", typeof(T).FullName);
+                    return new ObjectResponseResult<T>(default(T), string.Empty);
                 }
             }
         }

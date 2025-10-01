@@ -15,6 +15,7 @@ namespace LetheAISharp
     {
         private readonly List<Message> _prompt = [];
         private OpenAI.JsonSchema? _currentSchema = null;
+        private List<string> imagefilepath = [];
 
         public int Count => _prompt.Count;
 
@@ -53,6 +54,30 @@ namespace LetheAISharp
 
         public object PromptToQuery(AuthorRole responserole, double tempoverride = -1, int responseoverride = -1, bool? overridePrefill = null)
         {
+            if (imagefilepath.Count > 0)
+            {
+                var lastusermsg = _prompt.LastOrDefault(m => m.Role == Role.User);
+                if (lastusermsg is not null)
+                {
+                    var message = lastusermsg.Content.ToString();
+
+                    var idx = _prompt.IndexOf(lastusermsg);
+
+                    var ctx = new List<Content>
+                    {
+                        message
+                    };
+                    foreach (var item in imagefilepath)
+                    {
+                        // determine data:image/extension based on file extension
+                        
+                        
+                        ctx.Add(new(ContentType.ImageUrl, $"data:image/gif;base64,{ImageUtils.ImageToBase64(item, 1024)!}"));
+                    }
+                    _prompt[idx] = new Message(lastusermsg.Role, ctx, lastusermsg.Name);
+                }
+            }
+
             var chatrq = new ChatRequest(_prompt,
                 topP: LLMEngine.Sampler.Top_p,
                 frequencyPenalty: LLMEngine.Sampler.Rep_pen - 1,
@@ -61,6 +86,7 @@ namespace LetheAISharp
                 stops: [.. LLMEngine.Instruct.GetStoppingStrings(LLMEngine.User, LLMEngine.Bot)],
                 responseFormat: _currentSchema is not null ? OpenAI.TextResponseFormat.JsonSchema : OpenAI.TextResponseFormat.Auto,
                 jsonSchema: _currentSchema,
+
                 maxTokens: responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride,
                 temperature: tempoverride >= 0 ? tempoverride : (LLMEngine.ForceTemperature >= 0) ? LLMEngine.ForceTemperature : LLMEngine.Sampler.Temperature);
 
@@ -140,5 +166,18 @@ namespace LetheAISharp
         {
             _currentSchema = null;
         }
+
+        public void VLM_ClearImages()
+        {
+            imagefilepath.Clear();
+        }
+
+        public void VLM_AddImage(string imagePath, int size = 1024)
+        {
+            if (File.Exists(imagePath) && !imagefilepath.Contains(imagePath))
+                imagefilepath.Add(imagePath);
+        }
+
+        public int VLM_GetImageCount() => imagefilepath.Count;
     }
 }

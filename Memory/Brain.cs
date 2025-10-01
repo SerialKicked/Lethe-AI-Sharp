@@ -56,6 +56,11 @@ namespace LetheAISharp.Memory
         public HashSet<MemoryType> DecayableMemories { get; set; } = [MemoryType.WebSearch, MemoryType.Goal];
 
         /// <summary>
+        /// Disable RAG usage for these memory types (might be useful if using a different system for some types).
+        /// </summary>
+        public HashSet<MemoryType> DisableRAG { get; set; } = [];
+
+        /// <summary>
         /// Gets or sets the minimum number of days that an item must remain unaccessed  before it is eligible for
         /// deletion, (it's multiplied by its priority level).
         /// </summary>
@@ -425,7 +430,7 @@ namespace LetheAISharp.Memory
 
         internal List<MemoryUnit> GetMemoriesForRAG()
         {
-            return Memories.FindAll(m => m.Insertion == MemoryInsertion.Trigger && m.EmbedSummary.Length > 0);
+            return Memories.FindAll(m => m.Insertion == MemoryInsertion.Trigger && m.EmbedSummary.Length > 0 && !DisableRAG.Contains(m.Category));
         }
 
         #endregion

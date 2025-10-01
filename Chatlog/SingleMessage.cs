@@ -18,7 +18,7 @@ namespace LetheAISharp.Files
     /// <param name="chara"> Character ID associated with the bot persona </param>
     /// <param name="user"> User ID associated with the user persona </param>
     /// <param name="hidden"> Indicates if the message is hidden from standard views </param>
-    public class SingleMessage(AuthorRole role, DateTime date, string mess, string chara, string user, bool hidden = false)
+    public class SingleMessage(AuthorRole role, DateTime date, string mess, string chara, string user, bool hidden = false, string imagePath = "")
     {
         public Guid Guid { get; set; } = Guid.NewGuid();
         public AuthorRole Role = role;
@@ -26,6 +26,7 @@ namespace LetheAISharp.Files
         public DateTime Date = date;
         public string CharID = chara;
         public string UserID = user;
+        public string ImagePath = imagePath;
         public bool Hidden = hidden;
         public string Note = string.Empty;
         [JsonIgnore] public BasePersona User => 
