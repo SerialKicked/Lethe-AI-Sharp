@@ -39,6 +39,7 @@ namespace LetheAISharp
             (@"\bI want\b", "{{user}} wants"),
             (@"\bmy\b", "{{user}}'s"),
             (@"\bme\b", "{{user}}"),
+            (@"\bI\b", "{{user}}"),
 
             // Second-person -> {bot}
             (@"\byou are\b", "{{char}} is"),
@@ -50,6 +51,7 @@ namespace LetheAISharp
             (@"\byou feel\b", "{{char}} feels"),
             (@"\byou think\b", "{{char}} thinks"),
             (@"\byou want\b", "{{char}} wants"),
+            (@"\byou\b", "{{char}}"),
 
             // Optional first-person plural
             (@"\bus\b", "{{user}} and {{char}}"),

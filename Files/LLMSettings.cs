@@ -108,6 +108,12 @@ namespace LetheAISharp.Files
         /// </summary>
         public bool RAGMoveToThinkBlock { get; set; } = false;
 
+        /// <summary>
+        /// Converts user sentences to 3rd person when performing RAG searches. English Only.
+        /// This usually improves the relevance of the retrieved entries, especially chat sessions.
+        /// </summary>
+        public bool RAGConvertTo3rdPerson { get; set; } = true;
+
         /// <summary> Maximum number of entries to be retrieved with RAG </summary>
         public int RAGMaxEntries { get; set; } = 3;
 

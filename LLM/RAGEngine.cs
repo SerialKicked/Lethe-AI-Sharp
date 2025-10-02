@@ -1,8 +1,5 @@
-﻿using HNSW.Net;
-using LLama;
+﻿using LLama;
 using LLama.Common;
-using LLama.Extensions;
-using MessagePack;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
 using LetheAISharp.Files;
@@ -10,53 +7,9 @@ using LetheAISharp.Memory;
 
 namespace LetheAISharp.LLM
 {
-    /// <summary>
-    /// Basic RNG for the SmallWorld implementation (not thread safe)
-    /// </summary>
-    internal class RNGPlus : IProvideRandomValues
-    {
-        private readonly Random RNG = new();
-        public bool IsThreadSafe => false;
-        public float NextFloat() => (float)RNG.NextDouble();
-        public int Next(int minValue, int maxValue) => RNG.Next(minValue, maxValue);
-        public void NextFloats(Span<float> buffer)
-        {
-            for (int i = 0; i < buffer.Length; i++)
-                buffer[i] = (float)RNG.NextDouble();
-        }
-    }
-
-    /// <summary>
-    /// Thread-safe RNG for the SmallWorld implementation
-    /// </summary>
-    internal class ThreadSafeRNG : IProvideRandomValues
-    {
-        private readonly ThreadLocal<Random> threadLocalRandom = new(() => new Random(Interlocked.Increment(ref seed)));
-        private static int seed = Environment.TickCount;
-
-        public bool IsThreadSafe => true;
-        public float NextFloat() => (float)threadLocalRandom.Value!.NextDouble();
-        public int Next(int minValue, int maxValue) => threadLocalRandom.Value!.Next(minValue, maxValue);
-        public void NextFloats(Span<float> buffer)
-        {
-            var rng = threadLocalRandom.Value;
-            for (int i = 0; i < buffer.Length; i++)
-                buffer[i] = (float)rng!.NextDouble();
-        }
-    }
-
-    class VectorSearchResult(Guid id, EmbedType category, float dist)
-    {
-        public Guid ID = id;
-        public EmbedType Category = category;
-        public float Distance = dist;
-    }
-
-    public enum EmbedType { Session, Document, WorldInfo, Brain }
 
     /// <summary>
     /// Retrieval Augmented Generation System
-    /// 
     /// </summary>
     public static class RAGEngine
     {
@@ -76,36 +29,24 @@ namespace LetheAISharp.LLM
                     UnloadEmbedder();
             }
         }
+
         // Embedding model's weights and params
         private static ModelParams? EmbedSettings = null;
         private static LLamaWeights? EmbedWeights = null;
         private static LLamaEmbedder? Embedder = null;
-        private static SmallWorld<float[], float> VectorDB = null!;
-        private static int VectorDBCount => VectorDB?.Items?.Count ?? 0;
-        private static bool IsVectorDBLoaded = false;
-
-        public static Dictionary<int, (Guid ID, EmbedType embedType)> LookupDB { get; private set; } = [];
+        // Memory vault
+        private static MemoryVault? Vault = null;
 
         public static void ApplySettings()
         {
             if (!Enabled)
                 return;
-            ResetVectorDB();
+            Vault = new MemoryVault();
             if (LLMEngine.History != null)
                 VectorizeChatBot(LLMEngine.Bot);
         }
 
-        private static void ResetVectorDB()
-        {
-            var parameters = new SmallWorld<float[], float>.Parameters()
-            {
-                M = LLMEngine.Settings.RAGMValue,
-                LevelLambda = 1 / Math.Log(LLMEngine.Settings.RAGMValue),
-                NeighbourHeuristic = LLMEngine.Settings.RAGHeuristic,
-            };
-            VectorDB = new SmallWorld<float[], float>(Vector.IsHardwareAccelerated ? CosineDistance.SIMDForUnits : CosineDistance.ForUnits, new RNGPlus(), parameters, false);
-            IsVectorDBLoaded = false;
-        }
+        #region *** Embedding Functions ***
 
         /// <summary>
         /// Load the Embedding model in memory
@@ -165,35 +106,37 @@ namespace LetheAISharp.LLM
             return tsk[0].EuclideanNormalization();
         }
 
+        public static void RemoveEmbedEventHandler()
+        {
+            OnEmbedText = null;
+        }
+
+        #endregion
+
+        #region *** SmallWorld's Vector Similarity Functions ***
+
         public static void VectorizeChatBot(BasePersona persona)
         {
             if (!Enabled)
                 return;
-            ResetVectorDB();
+            Vault = new MemoryVault();
             var log = persona.History;
             if (log.Sessions.Count == 0 && persona.MyWorlds.Count == 0)
                 return;
 
-            var vectors = new List<float[]>();
-            LookupDB = [];
-            var currentID = 0;
-
+            var vectors = new List<MemoryUnit>();
             for (int i = 0; i < log.Sessions.Count; i++)
             {
                 var session = log.Sessions[i];
                 if (session.EmbedSummary.Length == 0)
                     continue;
-                vectors.Add(session.EmbedSummary);
-                LookupDB[currentID] = (session.Guid, EmbedType.Session);
-                currentID++;
+                vectors.Add(session);
             }
 
             var brainmemories = LLMEngine.Bot.Brain.GetMemoriesForRAG();
             foreach (var doc in brainmemories)
             {
-                vectors.Add(doc.EmbedSummary);
-                LookupDB[currentID] = (doc.Guid, EmbedType.Brain);
-                currentID++;
+                vectors.Add(doc);
             }
 
             foreach (var world in persona.MyWorlds)
@@ -202,130 +145,87 @@ namespace LetheAISharp.LLM
                     continue;
                 foreach (var entry in world.Entries)
                 {
-                    if (!entry.Enabled || entry.EmbedSummary.Length == 0)
-                        continue;
-                    vectors.Add(entry.EmbedSummary);
-                    LookupDB[currentID] = (entry.Guid, EmbedType.WorldInfo);
-                    currentID++;
+                    if (entry.Enabled && entry.EmbedSummary?.Length > 0)
+                        vectors.Add(entry);
                 }
             }   
 
             try
             {
-                VectorDB.AddItems(vectors);
+                Vault?.AddMemories(vectors);
             }
             catch (Exception e)
             {
                 throw new Exception("Error adding items to the VectorDB", e);
             }
-            IsVectorDBLoaded = true;
         }
 
-        public static async Task<List<(IEmbed session, EmbedType category, float distance)>> Search(string message, int maxRes, float maxDist)
+        public static async Task<List<VaultResult>> Search(string message, int maxRes, float maxDist)
         {
             if (!Enabled)
                 return [];
-            if (!IsVectorDBLoaded || VectorDB == null || VectorDBCount == 0)
+            if (Vault is null || Vault.Count == 0)
             {
                 VectorizeChatBot(LLMEngine.Bot);
             }
+
+            var toretrieve = maxRes * 2 + 5;
+            if (toretrieve < 30)
+                toretrieve = 30;
+
             // Check if message contains the words RP or roleplay
             var requestIsAboutRoleplay = message.Contains(" RP", StringComparison.OrdinalIgnoreCase) || message.Contains(" roleplay", StringComparison.OrdinalIgnoreCase);
 
-            var emb = await EmbeddingText(message.ConvertToThirdPerson()).ConfigureAwait(false);
-            var subcount = maxRes + 1;
-            // If we have both titles and summaries double result count to get a better picture
-            if (LLMEngine.Settings.AllowWorldInfo)
-                subcount += 2;
-            if (subcount < 30)
-                subcount = 30;
+            var found = await Vault!.Search(
+                LLMEngine.Settings.RAGConvertTo3rdPerson ? message.ConvertToThirdPerson() : message, 
+                toretrieve, 
+                maxDist).ConfigureAwait(false);
 
-            var res = Search(emb, subcount);
-
-            foreach (var item in res)
+            foreach (var item in found)
             {
-                if (item.Category == EmbedType.Session)
+                if (item.Memory.Category == MemoryType.ChatSession && item.Memory is Files.ChatSession session)
                 {
-                    var found = LLMEngine.History.GetSessionByID(item.ID);
-                    if (found != null)
+
+                    if (session.MetaData.IsRoleplaySession)
                     {
-                        if (found.MetaData.IsRoleplaySession)
-                        {
-                            if (requestIsAboutRoleplay)
-                                item.Distance -= 0.04f; // Boost RP sessions
-                            else
-                                item.Distance += 0.04f; // Decay RP sessions
-                        }
-                        // Mark sticky as not wanted because they are handled with different insertion method
-                        if (found.Sticky)
-                            item.Distance += 2f;
+                        if (requestIsAboutRoleplay)
+                            item.Distance -= 0.04f; // Boost RP sessions
+                        else
+                            item.Distance += 0.04f; // Decay RP sessions
                     }
+                    // Mark sticky as not wanted because they are handled with different insertion method
+                    if (session.Sticky)
+                        item.Distance += 2f;
                 }
             }
             // Remove entries with distance above limit
-            res.RemoveAll(e => e.Distance > maxDist);
-            res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
+            found.RemoveAll(e => e.Distance > maxDist);
+            found.Sort((a, b) => a.Distance.CompareTo(b.Distance));
             // If we have too many results, trim the list to maxRes
-            if (res.Count > maxRes)
-                res = res.GetRange(0, maxRes);
-
-            var list = new List<(IEmbed session, EmbedType category, float distance)>();
-            foreach (var item in res)
-            {
-                if (item == null)
-                    continue;
-                var found = LLMEngine.Bot.Brain.GetMemoryByID(item.ID);
-                if (found != null)
-                    list.Add((found, item.Category, item.Distance));
-            }
-            return list;
+            if (found.Count > maxRes)
+                found = found.GetRange(0, maxRes);
+            return found;
         }
 
-        public static async Task<List<(IEmbed session, EmbedType category, float distance)>> Search(string message)
+        public static async Task<List<VaultResult>> Search(string message)
         {
             return await Search(message, LLMEngine.Settings.RAGMaxEntries, LLMEngine.Settings.RAGDistanceCutOff).ConfigureAwait(false);
         }
 
-        private static List<VectorSearchResult> Search(float[] message, int count)
+        public static List<VaultResult> Search(float[] embed, int count)
         {
-            LLMEngine.Logger?.LogInformation("LTM Size: {size} out of {logsize}", VectorDBCount.ToString(), LLMEngine.History.Sessions.Count.ToString());
-            if (!IsVectorDBLoaded || VectorDBCount == 0)
-                return [];
-            var found = VectorDB.KNNSearch(message, count);
-            var res = new List<VectorSearchResult>();
-            foreach (var item in found)
+            if (Vault is null || Vault.Count == 0)
             {
-                res.Add(new VectorSearchResult(LookupDB[item.Id].ID, LookupDB[item.Id].embedType, item.Distance));
-                LLMEngine.Logger?.LogInformation("LTM Found: {id} ({distance})", item.Id.ToString(), item.Distance.ToString());
+                VectorizeChatBot(LLMEngine.Bot);
+                if (Vault!.Count == 0)
+                    return [];
             }
-            res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
-            return res;
+            return Vault.Search(embed, count, LLMEngine.Settings.RAGDistanceCutOff);
         }
 
-        public static void ExportVectorDB(string filePath)
-        {
-            var tosave = VectorDB.Items;
-            byte[] bytes = MessagePackSerializer.Serialize(tosave);
-            File.WriteAllBytes(filePath, bytes);
-        }
+        #endregion
 
-        public static void ImportVectorDB(string filePath)
-        {
-            ResetVectorDB();
-            byte[] bytes = File.ReadAllBytes(filePath);
-            var x = MessagePackSerializer.Deserialize<IReadOnlyList<float[]>>(bytes);
-            if (x == null || x.Count == 0)
-                return;
-            VectorDB.AddItems(x);
-            IsVectorDBLoaded = true;
-        }
-
-        public static void RemoveEmbedEventHandler()
-        {
-            OnEmbedText = null;
-        }
-
-        #region Self contained string similarity check
+        #region *** Self contained string similarity check ***
 
         /// <summary>
         /// Compute cosine similarity distance between two strings using the embedding model.

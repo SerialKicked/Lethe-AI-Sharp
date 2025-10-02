@@ -63,28 +63,29 @@ namespace LetheAISharp.Memory
             return LLMEngine.Bot.ReplaceMacros(res.ToString());
         }
 
-        public void AddMemories(List<(IEmbed session, EmbedType category, float distance)> memories)
+        public void AddMemories(List<VaultResult> memories)
         {
             if (memories.Count == 0)
                 return;
-            foreach (var (session, _, _) in memories)
+            foreach (var meminfo in memories)
             {
-                if (session is ChatSession info)
+                var mem = meminfo.Memory;
+                if (mem is ChatSession info)
                 {
                     AddInsert(
                         new PromptInsert(
-                            session.Guid, 
+                            info.Guid, 
                             info.ToSnippet(TitleInsertType.Simple, LLMEngine.Bot.DatesInSessionSummaries, false, true), 
                             LLMEngine.Settings.RAGIndex, 
                             1)
                         );
                 }
-                else if (session is MemoryUnit entry)
+                else
                 {
-                    if (entry.Category == MemoryType.WorldInfo)
-                        AddInsert(new PromptInsert(entry.Guid, entry.Content, entry.PositionIndex, entry.Duration));
+                    if (mem.Category == MemoryType.WorldInfo)
+                        AddInsert(new PromptInsert(mem.Guid, mem.Content, mem.PositionIndex, mem.Duration));
                     else
-                        AddInsert(new PromptInsert(session.Guid, entry.Content, LLMEngine.Settings.RAGIndex, 1));
+                        AddInsert(new PromptInsert(mem.Guid, mem.Content, LLMEngine.Settings.RAGIndex, 1));
                 }
             }
         }
