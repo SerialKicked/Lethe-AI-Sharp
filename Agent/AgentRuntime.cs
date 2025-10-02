@@ -312,7 +312,10 @@ namespace LetheAISharp.Agent
         /// <returns></returns>
         public static IReadOnlyList<string> GetRegisteredPluginIds()
         {
-            return _pluginRegistry.Keys.ToList().AsReadOnly();
+            var lst = _pluginRegistry.Keys.ToList();
+            lst.Add("ResearchTask");
+            lst.Add("ActiveResearchTask");
+            return lst.AsReadOnly();
         }
 
         #endregion
