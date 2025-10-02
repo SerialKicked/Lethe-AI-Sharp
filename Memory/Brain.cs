@@ -325,7 +325,7 @@ namespace LetheAISharp.Memory
         /// <summary>
         /// Move memories to to their proper slot, delete old stuff.
         /// </summary>
-        protected void MemoryDecay()
+        protected virtual void MemoryDecay()
         {
             // Remove old natural memories that haven't been inserted yet are are passed the cutoff
             Memories.RemoveAll(e => (e.Insertion == MemoryInsertion.Natural || e.Insertion == MemoryInsertion.NaturalForced) && (DateTime.Now - e.Added) > EurekaCutOff);
@@ -354,7 +354,7 @@ namespace LetheAISharp.Memory
         /// <param name="skipDuplicateCheck">A boolean value indicating whether to skip the duplicate check.  If <see langword="true"/>, the memory unit
         /// is added directly without checking for duplicates.  Defaults to <see langword="false"/>.</param>
         /// 
-        public void Memorize(MemoryUnit mem, bool skipDuplicateCheck = false)
+        public virtual void Memorize(MemoryUnit mem, bool skipDuplicateCheck = false)
         {
             if (skipDuplicateCheck || mem.EmbedSummary.Length == 0)
             {
@@ -412,7 +412,7 @@ namespace LetheAISharp.Memory
         /// <remarks>If the specified memory unit does not exist in the collection, no action is
         /// taken.</remarks>
         /// <param name="mem">The memory unit to remove. Cannot be <see langword="null"/>.</param>
-        public void Forget(MemoryUnit mem)
+        public virtual void Forget(MemoryUnit mem)
         {
             Memories.Remove(mem);
         }
@@ -581,16 +581,17 @@ namespace LetheAISharp.Memory
 
             var totalmessage = string.Empty;
 
+            var timeSinceLast = (DateTime.Now - lastmsg.Date);
+            if (timeSinceLast < TimeSpan.FromHours(HoursBeforeAFK))
+                return null;
+
+
             if (Owner.SenseOfTime)
             {
-                var timeSinceLast = (DateTime.Now - lastmsg.Date);
-                if (timeSinceLast >= TimeSpan.FromHours(HoursBeforeAFK))
+                var awaystr = GetAwayString();
+                if (!string.IsNullOrWhiteSpace(awaystr))
                 {
-                    var awaystr = GetAwayString();
-                    if (!string.IsNullOrWhiteSpace(awaystr))
-                    {
-                        totalmessage = awaystr;
-                    }
+                    totalmessage = awaystr;
                 }
             }
 
