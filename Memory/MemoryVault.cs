@@ -25,7 +25,6 @@ namespace LetheAISharp.Memory
 
         public int Count => VectorDB?.Items?.Count ?? 0;
 
-
         public MemoryVault()
         {
             VectorDB = new SmallWorld<float[], float>(Vector.IsHardwareAccelerated ? CosineDistance.SIMDForUnits : CosineDistance.ForUnits, new RNGPlus(), GetParams(), false);
@@ -36,8 +35,9 @@ namespace LetheAISharp.Memory
             return new SmallWorld<float[], float>.Parameters()
             {
                 M = LLMEngine.Settings.RAGMValue,
-                LevelLambda = 1 / Math.Log(LLMEngine.Settings.RAGMValue),
-                NeighbourHeuristic = LLMEngine.Settings.RAGHeuristic,
+                LevelLambda = 1.0 / Math.Log(LLMEngine.Settings.RAGMValue),
+                ExpandBestSelection = true,
+                NeighbourHeuristic = LLMEngine.Settings.RAGHeuristic == RAGSelectionHeuristic.SelectHeuristic ? NeighbourSelectionHeuristic.SelectHeuristic : NeighbourSelectionHeuristic.SelectSimple,
             };
         }
 
@@ -65,7 +65,7 @@ namespace LetheAISharp.Memory
             VectorDB.AddItems(vectors);
         }
 
-        public async Task<List<VaultResult>> Search(string search, int maxRes, float? maxDist)
+        public async Task<List<VaultResult>> Search(string search, int maxRes, float? maxDist = null)
         {
             if (Count == 0 || !RAGEngine.Enabled)
                 return [];
@@ -73,23 +73,25 @@ namespace LetheAISharp.Memory
             return Search(emb, maxRes, maxDist);
         }
 
-        public List<VaultResult> Search(float[] search, int maxCount, float? maxDist)
+        public List<VaultResult> Search(float[] search, int maxCount, float? maxDist = null)
         {
             if (Count == 0 || !RAGEngine.Enabled)
                 return [];
 
+            if (LLMEngine.Settings.RAGHeuristic == RAGSelectionHeuristic.SelectExact)
+            {
+                return NativeSearch(search, maxCount, maxDist);
+            }
+
             var found = VectorDB.KNNSearch(search, maxCount);
             var res = new List<VaultResult>();
             foreach (var item in found)
-            {
                 res.Add(new VaultResult(LookupDB[item.Id], item.Distance));
-            }
             if (maxDist is not null)
                 res.RemoveAll(e => e.Distance > maxDist);
             res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
             return res;
         }
-
 
         public void ExportVectorDB(string filePath)
         {
@@ -108,6 +110,21 @@ namespace LetheAISharp.Memory
             VectorDB.AddItems(x);
         }
 
+        private List<VaultResult> NativeSearch(float[] search, int maxCount, float? maxDist = null)
+        {
+            var res = new List<VaultResult>();
+            foreach (var item in LookupDB)
+            {
+                var dist = RAGEngine.GetDistance(search, item.Value.EmbedSummary);
+                if (maxDist is not null && dist > maxDist)
+                    continue;
+                res.Add(new VaultResult(item.Value, dist));
+            }
+            if (res.Count > maxCount)
+                res = res.GetRange(0, maxCount);
+            res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
+            return res;
+        }
     }
 
     /// <summary>

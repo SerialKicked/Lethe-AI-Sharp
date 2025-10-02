@@ -30,6 +30,21 @@ namespace LetheAISharp.Memory
     /// </summary>
     public class MemoryUnit : IEmbed
     {
+        public static Dictionary<MemoryType, List<string>> EmbedHelpers { get; private set; } = new Dictionary<MemoryType, List<string>>
+        {
+            { MemoryType.General, [] },
+            { MemoryType.WorldInfo, [] },
+            { MemoryType.WebSearch, [ "web", "internet", "search", "online" ] },
+            { MemoryType.ChatSession, [ "remember", "that time", "recall", "discussion" ] },
+            { MemoryType.Journal, [ "journal", "diary", "log", "entry" ] },
+            { MemoryType.Image, [ "image", "picture", "photo", "visual" ] },
+            { MemoryType.File, [ "file", "document", "record" ] },
+            { MemoryType.Location, [ "location", "place", "area" ] },
+            { MemoryType.Event, [ "event", "happening", "occasion", "incident" ] },
+            { MemoryType.Person, [ "person", "individual", "character", "friend", "buddy", "people" ] },
+            { MemoryType.Goal, [ "goal", "objective", "aim", "target" ] }
+        };
+
         /// <summary>
         /// Unique Identifier
         /// </summary>

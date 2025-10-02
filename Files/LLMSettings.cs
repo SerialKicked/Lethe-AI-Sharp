@@ -130,7 +130,7 @@ namespace LetheAISharp.Files
         public float RAGDistanceCutOff { get; set; } = 0.1f;
 
         /// <summary> Search method. Simple is the most accurate method (but is very slightly slower). </summary>
-        public NeighbourSelectionHeuristic RAGHeuristic { get; set; } = NeighbourSelectionHeuristic.SelectSimple;
+        public RAGSelectionHeuristic RAGHeuristic { get; set; } = RAGSelectionHeuristic.SelectSimple;
 
         #endregion
 

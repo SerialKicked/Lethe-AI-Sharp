@@ -7,6 +7,25 @@ using LetheAISharp.Memory;
 
 namespace LetheAISharp.LLM
 {
+    /// <summary>
+    /// RAG selection method
+    /// </summary>
+    public enum RAGSelectionHeuristic
+    {
+        /// <summary>
+        /// Uses SmallWorld vector DB simple graph building: fast, but slightly less accurate.
+        /// </summary>
+        SelectSimple,
+        /// <summary>
+        /// Uses SmallWorld vector DB heuristic graph building: better choice for large datasets and varied types of data.
+        /// </summary>
+        SelectHeuristic,
+        /// <summary>
+        /// Uses exact distance calculation for all entries: best accuracy but slightly slower.
+        /// </summary>
+        SelectExact
+    }
+
 
     /// <summary>
     /// Retrieval Augmented Generation System
@@ -174,7 +193,7 @@ namespace LetheAISharp.LLM
                 toretrieve = 30;
 
             // Check if message contains the words RP or roleplay
-            var requestIsAboutRoleplay = message.Contains(" RP", StringComparison.OrdinalIgnoreCase) || message.Contains(" roleplay", StringComparison.OrdinalIgnoreCase);
+            var requestIsAboutRoleplay = message.Contains(" RP", StringComparison.OrdinalIgnoreCase) || message.Contains(" roleplay", StringComparison.OrdinalIgnoreCase) || message.Contains(" role play", StringComparison.OrdinalIgnoreCase);
 
             var found = await Vault!.Search(
                 LLMEngine.Settings.RAGConvertTo3rdPerson ? message.ConvertToThirdPerson() : message, 
@@ -189,13 +208,25 @@ namespace LetheAISharp.LLM
                     if (session.MetaData.IsRoleplaySession)
                     {
                         if (requestIsAboutRoleplay)
-                            item.Distance -= 0.04f; // Boost RP sessions
+                            item.Distance -= 0.015f; // Boost RP sessions
                         else
-                            item.Distance += 0.04f; // Decay RP sessions
+                            item.Distance += 0.015f; // Decay RP sessions
                     }
                     // Mark sticky as not wanted because they are handled with different insertion method
-                    if (session.Sticky)
+                    if (session.Sticky && LLMEngine.Settings.SessionMemorySystem)
                         item.Distance += 2f;
+                }
+                var embedhelpers = MemoryUnit.EmbedHelpers[item.Memory.Category];
+                if (embedhelpers?.Count > 0)
+                {
+                    foreach (var kw in embedhelpers)
+                    {
+                        if (message.ContainsWholeWord(kw, StringComparison.OrdinalIgnoreCase))
+                        {
+                            item.Distance -= 0.015f; // Boost if the message contains one of the embed helpers for this category
+                            break;
+                        }
+                    }
                 }
             }
             // Remove entries with distance above limit
@@ -207,12 +238,7 @@ namespace LetheAISharp.LLM
             return found;
         }
 
-        public static async Task<List<VaultResult>> Search(string message)
-        {
-            return await Search(message, LLMEngine.Settings.RAGMaxEntries, LLMEngine.Settings.RAGDistanceCutOff).ConfigureAwait(false);
-        }
-
-        public static List<VaultResult> Search(float[] embed, int count)
+        public static List<VaultResult> Search(float[] embed, int count, float maxDist)
         {
             if (Vault is null || Vault.Count == 0)
             {
@@ -220,7 +246,7 @@ namespace LetheAISharp.LLM
                 if (Vault!.Count == 0)
                     return [];
             }
-            return Vault.Search(embed, count, LLMEngine.Settings.RAGDistanceCutOff);
+            return Vault.Search(embed, count, maxDist);
         }
 
         #endregion
@@ -272,6 +298,14 @@ namespace LetheAISharp.LLM
                 return 2f;
 
             return ToCosineDistance(CosineSimilarityUnit(a.EmbedSummary, b.EmbedSummary));
+        }
+
+        public static float GetDistance(float[] a, float[] b)
+        {
+            if (a.Length == 0 || b.Length == 0 || a.Length != b.Length)
+                return 2f;
+
+            return ToCosineDistance(CosineSimilarityUnit(a, b));
         }
 
         /// <summary>

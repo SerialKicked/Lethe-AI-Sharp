@@ -26,8 +26,8 @@ namespace LetheAISharp
     public static class StringExtensions
     {
 
-        private static readonly (string pattern, string replacement)[] replacements = new (string, string)[]
-        {
+        private static readonly (string pattern, string replacement)[] replacements =
+        [
             // First-person -> {user}
             (@"\bI am\b", "{{user}} is"),
             (@"\bI'm\b", "{{user}} is"),
@@ -56,7 +56,7 @@ namespace LetheAISharp
             // Optional first-person plural
             (@"\bus\b", "{{user}} and {{char}}"),
             (@"\bour\b", "{{user}} and {{char}}'s")
-        };
+        ];
 
         public static StringBuilder AppendLinuxLine(this StringBuilder sb, string? text = null)
         {
@@ -334,7 +334,6 @@ namespace LetheAISharp
             return workstring;
         }
 
-
         public static string RemoveTitle(this string text)
         {
             var workstring = text.Trim().TrimStart('\n');
@@ -481,6 +480,29 @@ namespace LetheAISharp
                 output = Regex.Replace(output, pattern, replacement, RegexOptions.IgnoreCase);
             }
             return LLMEngine.Bot.ReplaceMacros(output);
+        }
+
+        public static bool ContainsWholeWord(this string text, string word, StringComparison comparison = StringComparison.OrdinalIgnoreCase)
+        {
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(word))
+                return false;
+
+            int index = 0;
+            while (true)
+            {
+                index = text.IndexOf(word, index, comparison);
+                if (index < 0)
+                    return false;
+
+                bool startBoundary = index == 0 || !char.IsLetterOrDigit(text[index - 1]);
+                int after = index + word.Length;
+                bool endBoundary = after == text.Length || !char.IsLetterOrDigit(text[after]);
+
+                if (startBoundary && endBoundary)
+                    return true;
+
+                index += 1; // Continue searching past this position
+            }
         }
 
 
