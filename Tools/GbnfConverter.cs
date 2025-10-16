@@ -120,30 +120,36 @@ namespace LetheAISharp
                 return;
             }
 
+            // Build the main object rule
             _output.Append($"{ruleName} ::= \"{{\" ws ");
 
             var props = properties.ToList();
             for (int i = 0; i < props.Count; i++)
             {
                 var propName = props[i].Key;
-                var propSchema = props[i].Value;
-
                 var propRuleName = $"{ruleName}-{SanitizeRuleName(propName)}";
 
-                // Generate the property rule
-                _output.Append($"\"{propName}\" ws \":\" ws {propRuleName}");
+                // Add quoted property name, colon, and reference to property rule
+                _output.Append($"\"\\\"\" \"{EscapeString(propName)}\" \"\\\"\" ws \":\" ws {propRuleName}");
 
                 // Add comma if not last property
                 if (i < props.Count - 1)
                 {
                     _output.Append(" ws \",\" ws ");
                 }
-
-                // Generate the nested rule for this property's value
-                GenerateRule(propRuleName, propSchema);
             }
 
             _output.AppendLine(" ws \"}\"");
+
+            // Generate the nested rules for each property's value separately
+            foreach (var prop in props)
+            {
+                var propName = prop.Key;
+                var propSchema = prop.Value;
+                var propRuleName = $"{ruleName}-{SanitizeRuleName(propName)}";
+
+                GenerateRule(propRuleName, propSchema);
+            }
         }
 
         private static void GenerateArrayRule(string ruleName, JsonNode? schema)
