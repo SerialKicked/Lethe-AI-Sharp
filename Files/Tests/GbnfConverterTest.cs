@@ -73,11 +73,11 @@ namespace LetheAISharp.Files.Tests
                 throw new Exception("Root rule contains embedded rule definitions");
 
             // Check that property rules are defined on separate lines
-            if (!grammar.Contains("root-Name ::= string"))
+            if (!grammar.Contains("Name ::= string | null"))
                 throw new Exception("Property rule for Name should be defined separately");
 
-            if (!grammar.Contains("root-Age ::= integer"))
-                throw new Exception("Property rule for Age should be defined separately");
+            if (!grammar.Contains("Age-kv ::= \"\\\"Age\\\"\" space \":\" space integer"))
+                throw new Exception("Property key-value rule for Age should be defined separately");
 
             Console.WriteLine("✓ Property rules are defined separately");
         }
@@ -89,12 +89,12 @@ namespace LetheAISharp.Files.Tests
         {
             var grammar = GbnfConverter.Convert(typeof(SimpleObject));
 
-            // Property names should be quoted in the GBNF grammar
-            // The pattern should be: "\"" "PropertyName" "\""
-            if (!grammar.Contains("\"\\\"\" \"Name\" \"\\\"\""))
+            // Property names should be quoted in the GBNF grammar with new format
+            // The pattern should be: "\"PropertyName\""
+            if (!grammar.Contains("\"\\\"Name\\\"\""))
                 throw new Exception("Property name 'Name' should be properly quoted");
 
-            if (!grammar.Contains("\"\\\"\" \"Age\" \"\\\"\""))
+            if (!grammar.Contains("\"\\\"Age\\\"\""))
                 throw new Exception("Property name 'Age' should be properly quoted");
 
             Console.WriteLine("✓ Property names are properly quoted");
@@ -112,17 +112,17 @@ namespace LetheAISharp.Files.Tests
             if (rootLine == null)
                 throw new Exception("Root rule not found");
 
-            // The root rule should start with 'root ::= "{" ws'
-            if (!rootLine.StartsWith("root ::= \"{\" ws"))
+            // The root rule should start with 'root ::= "{" space'
+            if (!rootLine.StartsWith("root ::= \"{\" space"))
                 throw new Exception("Root rule should start with proper object syntax");
 
-            // The root rule should end with 'ws "}"'
-            if (!rootLine.TrimEnd().EndsWith("ws \"}\""))
+            // The root rule should end with '}' space'
+            if (!rootLine.TrimEnd().EndsWith("\"}\" space"))
                 throw new Exception("Root rule should end with proper object syntax");
 
-            // The root rule should contain property references (not definitions)
-            if (!rootLine.Contains("root-Name") || !rootLine.Contains("root-Age"))
-                throw new Exception("Root rule should reference property rules");
+            // The root rule should contain property key-value references (not definitions)
+            if (!rootLine.Contains("Name-kv") || !rootLine.Contains("Age-kv"))
+                throw new Exception("Root rule should reference property key-value rules");
 
             Console.WriteLine("✓ Root rule is well-formed");
         }
@@ -135,11 +135,11 @@ namespace LetheAISharp.Files.Tests
             var grammar = GbnfConverter.Convert(typeof(ObjectWithArray));
 
             // Check that array rule is properly defined
-            if (!grammar.Contains("root-Items ::= \"[\" ws (root-Items-item (ws \",\" ws root-Items-item)*)? ws \"]\""))
+            if (!grammar.Contains("Items ::= \"[\" space (Items-item (space \",\" space Items-item)*)? space \"]\" space"))
                 throw new Exception("Array rule should be properly defined");
 
             // Check that array item rule is defined separately
-            if (!grammar.Contains("root-Items-item ::= string"))
+            if (!grammar.Contains("Items-item ::= string | null"))
                 throw new Exception("Array item rule should be defined separately");
 
             Console.WriteLine("✓ Array rules are properly generated");
@@ -153,15 +153,15 @@ namespace LetheAISharp.Files.Tests
             var grammar = GbnfConverter.Convert(typeof(NestedObject));
 
             // Check that nested object rule is defined
-            if (!grammar.Contains("root-Metadata ::="))
+            if (!grammar.Contains("Metadata ::="))
                 throw new Exception("Nested object rule should be defined");
 
             // Check that nested object properties are defined
-            if (!grammar.Contains("root-Metadata-Name ::= string"))
+            if (!grammar.Contains("Name ::= string | null"))
                 throw new Exception("Nested object property rule should be defined");
 
-            if (!grammar.Contains("root-Metadata-Age ::= integer"))
-                throw new Exception("Nested object property rule should be defined");
+            if (!grammar.Contains("Age-kv ::= \"\\\"Age\\\"\" space \":\" space integer"))
+                throw new Exception("Nested object property key-value rule should be defined");
 
             Console.WriteLine("✓ Nested object rules are properly generated");
         }
@@ -173,8 +173,8 @@ namespace LetheAISharp.Files.Tests
         {
             var grammar = GbnfConverter.Convert(typeof(ObjectWithEnum));
 
-            // Check that enum values are properly listed
-            if (!grammar.Contains("root-CurrentStatus ::= \"Active\" | \"Inactive\" | \"Pending\""))
+            // Check that enum values are properly listed with space suffix
+            if (!grammar.Contains("CurrentStatus ::= \"Active\" | \"Inactive\" | \"Pending\" space"))
                 throw new Exception("Enum rule should list all enum values");
 
             Console.WriteLine("✓ Enum rules are properly generated");
@@ -187,15 +187,21 @@ namespace LetheAISharp.Files.Tests
         {
             var grammar = GbnfConverter.Convert(typeof(SimpleObject));
 
-            // Check that utility rules are present
-            if (!grammar.Contains("ws ::= [ \\t\\n]*"))
-                throw new Exception("Whitespace rule should be defined");
+            // Check that utility rules are present (now using 'space' instead of 'ws')
+            if (!grammar.Contains("space ::= | \" \" | \"\\n\"{1,2} [ \\t]{0,20}"))
+                throw new Exception("Space rule should be defined");
 
             if (!grammar.Contains("string ::="))
                 throw new Exception("String rule should be defined");
 
             if (!grammar.Contains("integer ::="))
                 throw new Exception("Integer rule should be defined");
+
+            if (!grammar.Contains("char ::="))
+                throw new Exception("Char rule should be defined");
+
+            if (!grammar.Contains("null ::="))
+                throw new Exception("Null rule should be defined");
 
             Console.WriteLine("✓ Utility rules are properly appended");
         }
@@ -231,9 +237,9 @@ namespace LetheAISharp.Files.Tests
         {
             var grammar = GbnfConverter.Convert(typeof(ComplexObject));
 
-            // Boolean should be represented as true/false alternatives
-            if (!grammar.Contains("root-IsActive ::= \"true\" | \"false\""))
-                throw new Exception("Boolean rule should list true and false as alternatives");
+            // Boolean should be represented as true/false alternatives with space suffix, inlined in key-value rule
+            if (!grammar.Contains("IsActive-kv ::= \"\\\"IsActive\\\"\" space \":\" space (\"true\" | \"false\") space"))
+                throw new Exception("Boolean rule should list true and false as alternatives with space suffix");
 
             Console.WriteLine("✓ Boolean types are properly handled");
         }
@@ -247,7 +253,7 @@ namespace LetheAISharp.Files.Tests
 
             // All properties (required and optional) should be in the grammar
             // Note: Current implementation includes all properties regardless of Required attribute
-            if (!grammar.Contains("root-Description ::= string"))
+            if (!grammar.Contains("Description ::= string | null"))
                 throw new Exception("Optional property should still be defined in grammar");
 
             Console.WriteLine("✓ Optional properties are properly handled");
