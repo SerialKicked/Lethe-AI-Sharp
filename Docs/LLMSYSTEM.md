@@ -166,6 +166,53 @@ builder.AddMessage(AuthorRole.Assistant, "I apologize, but I don't have access t
 
 **Note**: For 90% of instruction formats, `SysPrompt` and `System` are handled identically. However, the library automatically handles the differences when using models with specific formatting requirements.
 
+### The `SingleMessage` Class
+
+`SingleMessage` is the primary way messages are passed throughout the library — to `SendMessageToBot`, `LogMessage`, prompt builders, `StartGeneration`, and more.
+
+**Constructors:**
+
+```csharp
+// Full constructor — specify all metadata explicitly
+new SingleMessage(AuthorRole role, DateTime date, string mess, string charID, string userID,
+                  bool hidden = false, string imagePath = "")
+
+// Convenience constructor — auto-fills DateTime.Now and current Bot/User identifiers
+new SingleMessage(AuthorRole role, string mess, string img = "")
+```
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Guid` | `Guid` | Unique identifier for the message |
+| `Role` | `AuthorRole` | The author role (User, Assistant, etc.) |
+| `Message` | `string` | The message text |
+| `Date` | `DateTime` | Timestamp of the message |
+| `CharID` | `string` | Character ID of the bot persona |
+| `UserID` | `string` | ID of the user persona |
+| `ImagePath` | `string` | Path to an attached image (VLM) |
+| `Hidden` | `bool` | Whether the message is hidden from standard views |
+| `Note` | `string` | Optional annotation for the message |
+| `User` | `BasePersona` | Resolved user persona from `LLMEngine.LoadedPersonas` |
+| `Bot` | `BasePersona` | Resolved bot persona from `LLMEngine.LoadedPersonas` |
+| `Sender` | `BasePersona?` | The sending persona (`User` or `Bot` based on `Role`) |
+
+**Methods:** `ToTextCompletion()`, `ToChatCompletion()`
+
+**Example usage:**
+
+```csharp
+// Simple message using convenience constructor
+var msg = new SingleMessage(AuthorRole.User, "Hello!");
+
+// Message with an attached image
+var imgMsg = new SingleMessage(AuthorRole.User, "What is in this image?", "path/to/image.png");
+
+// Full constructor for a hidden system note with explicit metadata
+var hidden = new SingleMessage(AuthorRole.System, DateTime.Now, "Internal note", botId, userId, hidden: true);
+```
+
 ## Settings Configuration
 
 For basic text generation without conversation management, use the simple query methods. These methods require using the `IPromptBuilder` interface to construct backend-appropriate prompts.
@@ -229,6 +276,16 @@ var response = await LLMEngine.SimpleQuery(query);
 
 **Note**: Use `AuthorRole.SysPrompt` for system prompts and `AuthorRole.System` for system messages in conversation.
 
+Both `AddMessage` and `InsertMessage` also accept a `SingleMessage` directly, enabling richer metadata such as image paths, custom char/user IDs, timestamps, and hidden flags:
+
+```csharp
+// Add a SingleMessage (preserves all metadata)
+builder.AddMessage(new SingleMessage(AuthorRole.User, "Explain quantum physics."));
+
+// Insert a SingleMessage at a specific index
+builder.InsertMessage(0, new SingleMessage(AuthorRole.SysPrompt, "You are a helpful assistant."));
+```
+
 ## Full Communication Mode
 
 The full communication mode provides complete conversation management with personas, chat history, and context awareness.
@@ -267,7 +324,7 @@ LLMEngine.User = user;
 
 ```csharp
 // Send a user message and get bot response
-await LLMEngine.SendMessageToBot(AuthorRole.User, "What is machine learning?");
+await LLMEngine.SendMessageToBot(new SingleMessage(AuthorRole.User, "What is machine learning?"));
 
 // The response will be streamed through events
 LLMEngine.OnInferenceStreamed += (sender, token) =>
@@ -379,6 +436,9 @@ if (!string.IsNullOrEmpty(welcomeMessage))
     LLMEngine.History.LogMessage(AuthorRole.Assistant, welcomeMessage, 
                                 LLMEngine.User, LLMEngine.Bot);
 }
+
+// Alternatively, log a pre-constructed SingleMessage directly
+// LLMEngine.History.LogMessage(new SingleMessage(AuthorRole.Assistant, welcomeMessage));
 
 // Check session statistics
 var session = LLMEngine.History.CurrentSession;
@@ -702,7 +762,7 @@ if (LLMEngine.SupportsSchema)
     builder.AddMessage(AuthorRole.User, "Hello, what is the weather like today?");
     
     // forces the bot to respond in the specified structured format
-    builder.SetStructuredOutput(structuredAnswer);
+    await builder.SetStructuredOutput(structuredAnswer);
 
     // Convert to query
     var query = builder.PromptToQuery();
@@ -714,7 +774,7 @@ if (LLMEngine.SupportsSchema)
         // Parse the structured response
         structuredAnswer = JsonConvert.DeserializeObject<StructuredAnswer>(response);
     }
-    except
+    catch
     {
         // something went wrong. LLM can be finicky, and it might not respond in the correct format on extremely rare occasions
         // so it should be handled properly.
@@ -764,8 +824,8 @@ class SimpleBot
             Console.Write("Bot: ");
             
             // Build prompt properly
-            builder.AddMessage(AuthorRole.User, input);
             var builder = LLMEngine.GetPromptBuilder();
+            builder.AddMessage(AuthorRole.User, input);
             builder.AddMessage(AuthorRole.SysPrompt, "You are a helpful assistant.");
             var query = builder.PromptToQuery(AuthorRole.Assistant);
             await LLMEngine.SimpleQueryStreaming(query);
@@ -827,7 +887,7 @@ class CharacterChat
             if (input == "quit") break;
             
             Console.Write("Einstein: ");
-            await LLMEngine.SendMessageToBot(AuthorRole.User, input);
+            await LLMEngine.SendMessageToBot(new SingleMessage(AuthorRole.User, input));
         }
         
         // Save history and exit program
