@@ -181,7 +181,7 @@ namespace LetheAISharp.LLM
         private static BasePersona user = new() { IsUser = true, Name = "User", UniqueName = string.Empty };
 #if DEBUG
         public static PromptInserts dataInserts = [];
-#elif RELEASE
+#else
         private static PromptInserts dataInserts = [];
 #endif
         internal static readonly Random RNG = new();
@@ -416,7 +416,6 @@ namespace LetheAISharp.LLM
                 return true;
             try
             {
-                var mparams = new GenkeyData() { };
                 var success = Client.AbortGenerationSync();
                 if (success)
                     Status = SystemStatus.Ready;
@@ -424,7 +423,6 @@ namespace LetheAISharp.LLM
             }
             catch (Exception ex)
             {
-                //MessageBox.Show($"An error occured while counting tokens, estimate used instead. {ex.Message}");
                 logger?.LogError(ex, "Failed to cancel generation");
                 return false;
             }

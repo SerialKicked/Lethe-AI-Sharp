@@ -12,21 +12,18 @@ namespace LetheAISharp
 
     public static class GbnfConverter
     {
-        private static readonly HashSet<string> _definedRules = [];
-        private static readonly StringBuilder _output = new();
-
         public static string Convert(string jsonSchema, string rootRuleName = "root")
         {
-            _definedRules.Clear();
-            _output.Clear();
+            var definedRules = new HashSet<string>();
+            var output = new StringBuilder();
 
             var schema = JsonNode.Parse(jsonSchema) ?? throw new ArgumentException("Invalid JSON schema");
-            GenerateRule(rootRuleName, schema);
+            GenerateRule(rootRuleName, schema, definedRules, output);
 
             // Add common utility rules at the end
-            AppendUtilityRules();
+            AppendUtilityRules(definedRules, output);
 
-            return _output.ToString();
+            return output.ToString();
         }
 
         public static string Convert(Type type, string rootRuleName = "root")
@@ -67,47 +64,47 @@ namespace LetheAISharp
         }
 
 
-        private static void GenerateRule(string ruleName, JsonNode? schema)
+        private static void GenerateRule(string ruleName, JsonNode? schema, HashSet<string> definedRules, StringBuilder output)
         {
-            if (_definedRules.Contains(ruleName))
+            if (definedRules.Contains(ruleName))
                 return;
 
-            _definedRules.Add(ruleName);
+            definedRules.Add(ruleName);
 
             var type = schema?["type"]?.GetValue<string>();
 
             if (type == "object")
             {
-                GenerateObjectRule(ruleName, schema);
+                GenerateObjectRule(ruleName, schema, definedRules, output);
             }
             else if (type == "array")
             {
-                GenerateArrayRule(ruleName, schema);
+                GenerateArrayRule(ruleName, schema, definedRules, output);
             }
             else if (type == "string")
             {
-                GenerateStringRule(ruleName, schema);
+                GenerateStringRule(ruleName, schema, output);
             }
             else if (type == "number" || type == "integer")
             {
-                GenerateNumberRule(ruleName, type == "integer");
+                GenerateNumberRule(ruleName, type == "integer", output);
             }
             else if (type == "boolean")
             {
-                _output.AppendLine($"{ruleName} ::= (\"true\" | \"false\") space");
+                output.AppendLine($"{ruleName} ::= (\"true\" | \"false\") space");
             }
             else if (type == "null")
             {
-                _output.AppendLine($"{ruleName} ::= null");
+                output.AppendLine($"{ruleName} ::= null");
             }
             else
             {
                 // Fallback for unknown types
-                _output.AppendLine($"{ruleName} ::= string");
+                output.AppendLine($"{ruleName} ::= string");
             }
         }
 
-        private static void GenerateObjectRule(string ruleName, JsonNode? schema)
+        private static void GenerateObjectRule(string ruleName, JsonNode? schema, HashSet<string> definedRules, StringBuilder output)
         {
             var properties = schema?["properties"]?.AsObject();
             var required = schema?["required"]?.AsArray()
@@ -116,12 +113,12 @@ namespace LetheAISharp
 
             if (properties == null || properties.Count == 0)
             {
-                _output.AppendLine($"{ruleName} ::= \"{{\" space \"}}\" space");
+                output.AppendLine($"{ruleName} ::= \"{{\" space \"}}\" space");
                 return;
             }
 
             // Build the main object rule
-            _output.Append($"{ruleName} ::= \"{{\" space ");
+            output.Append($"{ruleName} ::= \"{{\" space ");
 
             var props = properties.ToList();
             for (int i = 0; i < props.Count; i++)
@@ -130,16 +127,16 @@ namespace LetheAISharp
                 var kvRuleName = $"{SanitizeRuleName(propName)}-kv";
 
                 // Reference the key-value pair rule
-                _output.Append(kvRuleName);
+                output.Append(kvRuleName);
 
                 // Add comma if not last property
                 if (i < props.Count - 1)
                 {
-                    _output.Append(" \",\" space ");
+                    output.Append(" \",\" space ");
                 }
             }
 
-            _output.AppendLine(" \"}\" space");
+            output.AppendLine(" \"}\" space");
 
             // Generate the key-value rules and value rules for each property separately
             foreach (var prop in props)
@@ -153,30 +150,30 @@ namespace LetheAISharp
                 // For primitive types, inline them directly in the key-value rule
                 if (propType == "integer")
                 {
-                    _output.AppendLine($"{kvRuleName} ::= \"\\\"{EscapeString(propName)}\\\"\" space \":\" space integer");
+                    output.AppendLine($"{kvRuleName} ::= \"\\\"{EscapeString(propName)}\\\"\" space \":\" space integer");
                 }
                 else if (propType == "number")
                 {
-                    _output.AppendLine($"{kvRuleName} ::= \"\\\"{EscapeString(propName)}\\\"\" space \":\" space number");
+                    output.AppendLine($"{kvRuleName} ::= \"\\\"{EscapeString(propName)}\\\"\" space \":\" space number");
                 }
                 else if (propType == "boolean")
                 {
-                    _output.AppendLine($"{kvRuleName} ::= \"\\\"{EscapeString(propName)}\\\"\" space \":\" space (\"true\" | \"false\") space");
+                    output.AppendLine($"{kvRuleName} ::= \"\\\"{EscapeString(propName)}\\\"\" space \":\" space (\"true\" | \"false\") space");
                 }
                 else if (propType == "null")
                 {
-                    _output.AppendLine($"{kvRuleName} ::= \"\\\"{EscapeString(propName)}\\\"\" space \":\" space null");
+                    output.AppendLine($"{kvRuleName} ::= \"\\\"{EscapeString(propName)}\\\"\" space \":\" space null");
                 }
                 else
                 {
                     // For complex types, generate the value rule first and reference it
-                    GenerateRule(valueRuleName, propSchema);
-                    _output.AppendLine($"{kvRuleName} ::= \"\\\"{EscapeString(propName)}\\\"\" space \":\" space {valueRuleName}");
+                    GenerateRule(valueRuleName, propSchema, definedRules, output);
+                    output.AppendLine($"{kvRuleName} ::= \"\\\"{EscapeString(propName)}\\\"\" space \":\" space {valueRuleName}");
                 }
             }
         }
 
-        private static void GenerateArrayRule(string ruleName, JsonNode? schema)
+        private static void GenerateArrayRule(string ruleName, JsonNode? schema, HashSet<string> definedRules, StringBuilder output)
         {
             var items = schema?["items"];
             var minItems = schema?["minItems"]?.GetValue<int>();
@@ -184,12 +181,12 @@ namespace LetheAISharp
 
             if (items == null)
             {
-                _output.AppendLine($"{ruleName} ::= \"[\" space \"]\" space");
+                output.AppendLine($"{ruleName} ::= \"[\" space \"]\" space");
                 return;
             }
 
             var itemRuleName = $"{ruleName}-item";
-            GenerateRule(itemRuleName, items);
+            GenerateRule(itemRuleName, items, definedRules, output);
 
             // Build the array rule with min/max constraints
             if (minItems.HasValue || maxItems.HasValue)
@@ -200,35 +197,35 @@ namespace LetheAISharp
                 if (min == 0 && max == int.MaxValue)
                 {
                     // No constraints - standard rule
-                    _output.AppendLine($"{ruleName} ::= \"[\" space ({itemRuleName} (space \",\" space {itemRuleName})*)? space \"]\" space");
+                    output.AppendLine($"{ruleName} ::= \"[\" space ({itemRuleName} (space \",\" space {itemRuleName})*)? space \"]\" space");
                 }
                 else if (min == max)
                 {
                     // Exact count
-                    _output.Append($"{ruleName} ::= \"[\" space ");
+                    output.Append($"{ruleName} ::= \"[\" space ");
                     for (int i = 0; i < min; i++)
                     {
-                        if (i > 0) _output.Append(" space \",\" space ");
-                        _output.Append(itemRuleName);
+                        if (i > 0) output.Append(" space \",\" space ");
+                        output.Append(itemRuleName);
                     }
-                    _output.AppendLine(" space \"]\" space");
+                    output.AppendLine(" space \"]\" space");
                 }
                 else if (max == int.MaxValue)
                 {
                     // Only minimum
-                    _output.Append($"{ruleName} ::= \"[\" space ");
+                    output.Append($"{ruleName} ::= \"[\" space ");
                     if (min == 0)
                     {
-                        _output.AppendLine($"({itemRuleName} (space \",\" space {itemRuleName})*)? space \"]\" space");
+                        output.AppendLine($"({itemRuleName} (space \",\" space {itemRuleName})*)? space \"]\" space");
                     }
                     else
                     {
                         for (int i = 0; i < min; i++)
                         {
-                            if (i > 0) _output.Append(" space \",\" space ");
-                            _output.Append(itemRuleName);
+                            if (i > 0) output.Append(" space \",\" space ");
+                            output.Append(itemRuleName);
                         }
-                        _output.AppendLine($" (space \",\" space {itemRuleName})* space \"]\" space");
+                        output.AppendLine($" (space \",\" space {itemRuleName})* space \"]\" space");
                     }
                 }
                 else
@@ -256,22 +253,22 @@ namespace LetheAISharp
 
                     if (options.Count == 1 && string.IsNullOrEmpty(options[0]))
                     {
-                        _output.AppendLine($"{ruleName} ::= \"[\" space \"]\" space");
+                        output.AppendLine($"{ruleName} ::= \"[\" space \"]\" space");
                     }
                     else
                     {
-                        _output.AppendLine($"{ruleName} ::= \"[\" space ({string.Join(" | ", options.Where(o => !string.IsNullOrEmpty(o)))}) space \"]\" space");
+                        output.AppendLine($"{ruleName} ::= \"[\" space ({string.Join(" | ", options.Where(o => !string.IsNullOrEmpty(o)))}) space \"]\" space");
                     }
                 }
             }
             else
             {
                 // No constraints - standard rule
-                _output.AppendLine($"{ruleName} ::= \"[\" space ({itemRuleName} (space \",\" space {itemRuleName})*)? space \"]\" space");
+                output.AppendLine($"{ruleName} ::= \"[\" space ({itemRuleName} (space \",\" space {itemRuleName})*)? space \"]\" space");
             }
         }
 
-        private static void GenerateStringRule(string ruleName, JsonNode? schema)
+        private static void GenerateStringRule(string ruleName, JsonNode? schema, StringBuilder output)
         {
             var enumValues = schema?["enum"]?.AsArray();
             var minLength = schema?["minLength"]?.GetValue<int>();
@@ -284,7 +281,7 @@ namespace LetheAISharp
                     .Select(v => $"\"{EscapeString(v!.GetValue<string>())}\"")
                     .ToList();
 
-                _output.AppendLine($"{ruleName} ::= {string.Join(" | ", options)} space");
+                output.AppendLine($"{ruleName} ::= {string.Join(" | ", options)} space");
             }
             else if (minLength.HasValue || maxLength.HasValue)
             {
@@ -299,12 +296,12 @@ namespace LetheAISharp
                     // Only minimum length
                     if (min == 0)
                     {
-                        _output.AppendLine($"{ruleName} ::= string | null");
+                        output.AppendLine($"{ruleName} ::= string | null");
                     }
                     else
                     {
                         string minChars = string.Join(" ", Enumerable.Repeat(charPattern, min));
-                        _output.AppendLine($"{ruleName} ::= \"\\\"\" {minChars} {charPattern}* \"\\\"\" space");
+                        output.AppendLine($"{ruleName} ::= \"\\\"\" {minChars} {charPattern}* \"\\\"\" space");
                     }
                 }
                 else
@@ -313,47 +310,47 @@ namespace LetheAISharp
                     if (min == 0)
                     {
                         // 0 to max - just use standard string (hard to enforce max in GBNF without explosion)
-                        _output.AppendLine($"{ruleName} ::= string | null");
+                        output.AppendLine($"{ruleName} ::= string | null");
                     }
                     else
                     {
                         // At least enforce minimum
                         string minChars = string.Join(" ", Enumerable.Repeat(charPattern, min));
-                        _output.AppendLine($"{ruleName} ::= \"\\\"\" {minChars} {charPattern}* \"\\\"\" space");
+                        output.AppendLine($"{ruleName} ::= \"\\\"\" {minChars} {charPattern}* \"\\\"\" space");
                     }
                 }
             }
             else
             {
                 // Regular string - can be nullable
-                _output.AppendLine($"{ruleName} ::= string | null");
+                output.AppendLine($"{ruleName} ::= string | null");
             }
         }
 
-        private static void GenerateNumberRule(string ruleName, bool isInteger)
+        private static void GenerateNumberRule(string ruleName, bool isInteger, StringBuilder output)
         {
             if (isInteger)
             {
-                _output.AppendLine($"{ruleName} ::= integer");
+                output.AppendLine($"{ruleName} ::= integer");
             }
             else
             {
-                _output.AppendLine($"{ruleName} ::= number");
+                output.AppendLine($"{ruleName} ::= number");
             }
         }
 
-        private static void AppendUtilityRules()
+        private static void AppendUtilityRules(HashSet<string> definedRules, StringBuilder output)
         {
-            if (!_definedRules.Contains("space"))
+            if (!definedRules.Contains("space"))
             {
-                _output.AppendLine();
-                _output.AppendLine("char ::= [^\"\\\\\\x7F\\x00-\\x1F] | [\\\\] ([\"\\\\bfnrt] | \"u\" [0-9a-fA-F]{4})");
-                _output.AppendLine("integer ::= (\"-\"? integral-part) space");
-                _output.AppendLine("integral-part ::= [0] | [1-9] [0-9]{0,15}");
-                _output.AppendLine("null ::= \"null\" space");
-                _output.AppendLine("number ::= (\"-\"? integral-part) (\".\" [0-9]+)? ([eE] [-+]? [0-9]+)? space");
-                _output.AppendLine("space ::= | \" \" | \"\\n\"{1,2} [ \\t]{0,20}");
-                _output.Append("string ::= \"\\\"\" char* \"\\\"\" space");
+                output.AppendLine();
+                output.AppendLine("char ::= [^\"\\\\\\x7F\\x00-\\x1F] | [\\\\] ([\"\\\\bfnrt] | \"u\" [0-9a-fA-F]{4})");
+                output.AppendLine("integer ::= (\"-\"? integral-part) space");
+                output.AppendLine("integral-part ::= [0] | [1-9] [0-9]{0,15}");
+                output.AppendLine("null ::= \"null\" space");
+                output.AppendLine("number ::= (\"-\"? integral-part) (\".\" [0-9]+)? ([eE] [-+]? [0-9]+)? space");
+                output.AppendLine("space ::= | \" \" | \"\\n\"{1,2} [ \\t]{0,20}");
+                output.Append("string ::= \"\\\"\" char* \"\\\"\" space");
             }
         }
 

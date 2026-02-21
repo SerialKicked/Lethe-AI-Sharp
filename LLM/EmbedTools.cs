@@ -40,6 +40,7 @@ namespace LetheAISharp.LLM
                 EmbedSettings = null;
                 LLMEngine.Settings.RAGEnabled = false;
                 LLMEngine.Logger?.LogError("Embedding model not found: {path}", LLMEngine.Settings.RAGModelPath);
+                throw new InvalidOperationException($"Embedding model not found: {LLMEngine.Settings.RAGModelPath}");
             }
             EmbedSettings = new ModelParams(LLMEngine.Settings.RAGModelPath)
             { 
