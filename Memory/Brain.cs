@@ -86,6 +86,12 @@ namespace LetheAISharp.Memory
         [JsonProperty] public List<MemoryUnit> Memories { get; set; } = [];
         [JsonProperty] protected List<UserReturnInsert> Inserts { get; set; } = [];
 
+        /// <summary>
+        /// Extracted facts about the user, used as a lightweight semantic index over session memories.
+        /// Each fact embeds cleanly and points back to the source MemoryUnits via GUIDs for two-hop retrieval.
+        /// </summary>
+        [JsonProperty] public List<ExtractedFact> ExtractedFacts { get; set; } = [];
+
         public List<TopicSearch> RecentSearches { get; set; } = [];
 
 
@@ -334,10 +340,41 @@ namespace LetheAISharp.Memory
             var ragentries = ragResCount == -1 ? LLMEngine.Settings.RAGMaxEntries : ragResCount;
             var wientries = ragResCount == -1 ? LLMEngine.Settings.WorldInfoMaxEntries : ragResCount;
 
+            // Embed the search message once so both standard RAG and fact retrieval can reuse it.
+            float[] searchEmbed = [];
             if (LLMEngine.Settings.RAGEnabled)
             {
-                var search = await Search(searchmessage, ragentries, ragDistance).ConfigureAwait(false);
+                var searchForEmbed = LLMEngine.Settings.RAGConvertTo3rdPerson ? searchmessage.ConvertToThirdPerson() : searchmessage;
+                searchEmbed = await EmbedTools.EmbeddingText(searchForEmbed).ConfigureAwait(false);
+
+                var search = Search(searchEmbed, ragentries, ragDistance);
                 target.AddMemories(search);
+            }
+
+            // Fact-boosted retrieval: compare against short fact embeddings for two-hop memory access.
+            // Facts embed cleanly as single-sentence statements, giving much better recall than comparing
+            // user input directly against long multi-topic session summaries.
+            if (LLMEngine.Settings.RAGEnabled && LLMEngine.Settings.FactRetrievalEnabled &&
+                searchEmbed.Length > 0 && ExtractedFacts.Count > 0)
+            {
+                var factThreshold = LLMEngine.Settings.FactRetrievalThreshold;
+                foreach (var fact in ExtractedFacts)
+                {
+                    if (fact.Superseded || fact.EmbedSummary.Length == 0 || fact.SourceMemories.Count == 0)
+                        continue;
+                    var dist = EmbedTools.GetDistance(searchEmbed, fact.EmbedSummary);
+                    if (dist > factThreshold)
+                        continue;
+                    // Fact matched — pull in its source MemoryUnits directly by GUID
+                    foreach (var sourceGuid in fact.SourceMemories)
+                    {
+                        if (target.Contains(sourceGuid))
+                            continue;
+                        var mem = GetMemoryByID(sourceGuid);
+                        if (mem != null)
+                            target.AddInsert(mem);
+                    }
+                }
             }
 
             // add sticky
@@ -585,6 +622,129 @@ namespace LetheAISharp.Memory
         public virtual void Forget(MemoryUnit mem)
         {
             Memories.Remove(mem);
+        }
+
+        /// <summary>
+        /// Adds a new extracted fact or updates an existing one via deduplication or supersession.
+        /// </summary>
+        /// <remarks>
+        /// <para>Three outcomes are possible based on the embedding distance to the closest existing fact:</para>
+        /// <list type="bullet">
+        ///   <item><b>Deduplication</b> (distance &lt; <see cref="LLMSettings.FactDeduplicationThreshold"/>):
+        ///     The existing fact's <c>LastSeen</c> and <c>ReferenceCount</c> are updated and
+        ///     <paramref name="sourceSessionGuid"/> is added to its <c>SourceMemories</c>.</item>
+        ///   <item><b>Supersession</b> (<see cref="LLMSettings.FactDeduplicationThreshold"/> ≤ distance &lt;
+        ///     <see cref="LLMSettings.FactSupersessionThreshold"/>): The existing fact is marked
+        ///     <c>Superseded</c>, the new fact carries forward the existing fact's <c>SourceMemories</c>,
+        ///     and both facts are stored.</item>
+        ///   <item><b>New fact</b> (distance ≥ <see cref="LLMSettings.FactSupersessionThreshold"/>):
+        ///     The fact is added to <see cref="ExtractedFacts"/> as a fresh entry.</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="fact">The concise, single-sentence fact text to store.</param>
+        /// <param name="sourceSessionGuid">GUID of the session this fact was extracted from. Pass <see langword="null"/> if there is no associated session.</param>
+        /// <returns>The <see cref="ExtractedFact"/> that was added or updated, or <see langword="null"/> if <paramref name="fact"/> is null or whitespace.</returns>
+        public virtual async Task<ExtractedFact?> AddOrUpdateFact(string fact, Guid? sourceSessionGuid = null)
+        {
+            if (string.IsNullOrWhiteSpace(fact))
+                return null;
+
+            var newFact = new ExtractedFact { Fact = fact };
+            if (sourceSessionGuid.HasValue)
+                newFact.SourceMemories.Add(sourceSessionGuid.Value);
+
+            await newFact.EmbedText().ConfigureAwait(false);
+
+            // No embedding available (RAG disabled) — just store the fact without dedup
+            if (newFact.EmbedSummary.Length == 0)
+            {
+                ExtractedFacts.Add(newFact);
+                return newFact;
+            }
+
+            var dedupThreshold = LLMEngine.Settings.FactDeduplicationThreshold;
+            var supersessionThreshold = LLMEngine.Settings.FactSupersessionThreshold;
+
+            var minDist = float.MaxValue;
+            ExtractedFact? closest = null;
+
+            foreach (var existing in ExtractedFacts)
+            {
+                if (existing.Superseded || existing.EmbedSummary.Length == 0)
+                    continue;
+                var dist = EmbedTools.GetDistance(existing, newFact);
+                if (dist < minDist)
+                {
+                    minDist = dist;
+                    closest = existing;
+                }
+            }
+
+            if (closest != null && minDist < dedupThreshold)
+            {
+                // Same fact — update metadata only
+                closest.LastSeen = DateTime.Now;
+                closest.ReferenceCount++;
+                if (sourceSessionGuid.HasValue && !closest.SourceMemories.Contains(sourceSessionGuid.Value))
+                    closest.SourceMemories.Add(sourceSessionGuid.Value);
+                return closest;
+            }
+
+            if (closest != null && minDist < supersessionThreshold)
+            {
+                // Related but different — supersede the old fact
+                closest.Superseded = true;
+                closest.SupersededBy = newFact.Guid;
+
+                // Carry forward source memories from the superseded fact
+                foreach (var guid in closest.SourceMemories)
+                {
+                    if (!newFact.SourceMemories.Contains(guid))
+                        newFact.SourceMemories.Add(guid);
+                }
+            }
+
+            ExtractedFacts.Add(newFact);
+            return newFact;
+        }
+
+        /// <summary>
+        /// Returns the highest-importance non-superseded facts that fit within the specified token budget,
+        /// formatted as a bullet list for inclusion in the system prompt.
+        /// </summary>
+        /// <remarks>
+        /// Facts are ranked by importance score (<see cref="ExtractedFact.GetImportanceScore"/>),
+        /// which combines reference count and recency. Facts are added in descending importance order
+        /// until the token budget is exhausted.
+        /// </remarks>
+        /// <param name="tokenBudget">Maximum number of tokens the returned string may consume.</param>
+        /// <returns>A formatted bullet list of core facts, or an empty string if there are no facts or the
+        /// budget is zero.</returns>
+        public virtual string GetCoreFacts(int tokenBudget)
+        {
+            if (tokenBudget <= 0 || ExtractedFacts.Count == 0)
+                return string.Empty;
+
+            var active = ExtractedFacts.FindAll(f => !f.Superseded && !string.IsNullOrWhiteSpace(f.Fact));
+            if (active.Count == 0)
+                return string.Empty;
+
+            active.Sort((a, b) => b.GetImportanceScore().CompareTo(a.GetImportanceScore()));
+
+            var sb = new System.Text.StringBuilder();
+            var remaining = tokenBudget;
+
+            foreach (var f in active)
+            {
+                var line = $"- {f.Fact}";
+                var tokens = LLMEngine.GetTokenCount(line);
+                if (tokens > remaining)
+                    break;
+                sb.AppendLinuxLine(line);
+                remaining -= tokens;
+            }
+
+            return sb.ToString().CleanupAndTrim();
         }
 
         /// <summary>

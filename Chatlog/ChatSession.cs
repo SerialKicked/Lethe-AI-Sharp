@@ -99,6 +99,16 @@ namespace LetheAISharp.Files
                     if (sum.Length > MetaData.Summary.Length)
                         MetaData.Summary = sum;
                 }
+
+                // Extract and store facts about the user for the fact-based retrieval layer
+                if (LLMEngine.Settings.FactRetrievalEnabled && meta.ExtractedFacts.Count > 0)
+                {
+                    foreach (var fact in meta.ExtractedFacts)
+                    {
+                        if (!string.IsNullOrWhiteSpace(fact))
+                            await LLMEngine.Bot.Brain.AddOrUpdateFact(fact, Guid).ConfigureAwait(false);
+                    }
+                }
             }
             else
             {

@@ -735,6 +735,18 @@ namespace LetheAISharp.LLM
                     rawprompt.AppendLinuxLine(shistory);
                 }
             }
+
+            // Core facts section: top-ranked extracted facts about the user, inserted before session history
+            // so the bot has durable user knowledge that doesn't depend on RAG similarity alone.
+            if (Settings.FactRetrievalEnabled && Settings.CoreFactsTokenBudget > 0 && !string.IsNullOrEmpty(SystemPrompt.CoreFactsTitle))
+            {
+                var coreFacts = Bot.Brain.GetCoreFacts(Settings.CoreFactsTokenBudget);
+                if (!string.IsNullOrEmpty(coreFacts))
+                {
+                    rawprompt.AppendLinuxLine(NewLine + Bot.ReplaceMacros(SystemPrompt.CoreFactsTitle) + NewLine);
+                    rawprompt.AppendLinuxLine(coreFacts);
+                }
+            }
             
             if (Settings.AntiHallucinationMemoryFormat && !Bot.Brain.DisableEurekas)
             { 

@@ -31,6 +31,9 @@ namespace LetheAISharp.GBNF
         [Required][MinLength(4)][MaxLength(6)][Description("A list of 4 to 6 keywords for this chat session, used for filtering and searching.")]
         public List<string> Keywords { get; set; } = [];
 
+        [MaxLength(10)][Description("An optional list of concise, single-sentence facts about {{user}} learned or confirmed during this session. Each fact should be self-contained and specific (e.g. 'The user works as a night-shift nurse', 'The user dislikes crowded places'). Include 0 to 10 facts, or an empty list if no new personal facts were established.")]
+        public List<string> ExtractedFacts { get; set; } = [];
+
         // Note: Due to LLM bias, relevance will be converted to 1-5 value
         [Required][Description("A value between 1 and 10 determining how important and meaningful this session is to {{mchar}}. Ranging from 1 (not important) to 10 (critical importance). Make your judgement based on {{mchar}}'s personality and the session's overal tone.")]
         public int Relevance { get; set; } = 1;

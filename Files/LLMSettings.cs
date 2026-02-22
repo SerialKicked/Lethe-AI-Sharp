@@ -143,6 +143,49 @@ namespace LetheAISharp.Files
         /// <summary> Toggle RAG functionalities on/off </summary>
         public bool RAGEnabled { get; set; } = true;
 
+        /// <summary>
+        /// Enables the extracted-facts retrieval layer.
+        /// When enabled, short extracted facts are used as a semantic index: user input is compared against
+        /// fact embeddings, and matching facts pull in their source MemoryUnits directly by GUID,
+        /// bypassing the embedding distance check that can miss multi-topic session summaries.
+        /// </summary>
+        public bool FactRetrievalEnabled { get; set; } = true;
+
+        /// <summary>
+        /// Token budget reserved for the core facts section of the system prompt.
+        /// The top-ranked facts (by importance score) that fit within this budget are included.
+        /// Set to 0 to disable system prompt inclusion of facts (retrieval still works).
+        /// </summary>
+        public int CoreFactsTokenBudget { get; set; } = 512;
+
+        /// <summary>
+        /// Cosine distance threshold for fact deduplication.
+        /// If a new fact's embedding is within this distance of an existing fact, it is treated as the same fact:
+        /// LastSeen and ReferenceCount are updated and the new session GUID is added to SourceMemories.
+        /// Cosine distance scale: 0 = identical vectors, 1 = orthogonal, 2 = opposite.
+        /// Lower = stricter deduplication. Recommended range: 0.05–0.08.
+        /// </summary>
+        public float FactDeduplicationThreshold { get; set; } = 0.07f;
+
+        /// <summary>
+        /// Cosine distance threshold for fact retrieval via user input similarity.
+        /// Facts within this distance of the embedded user input trigger source memory retrieval.
+        /// Cosine distance scale: 0 = identical vectors, 1 = orthogonal, 2 = opposite.
+        /// Higher = more permissive retrieval. Recommended range: 0.10–0.15.
+        /// </summary>
+        public float FactRetrievalThreshold { get; set; } = 0.12f;
+
+        /// <summary>
+        /// Cosine distance threshold for fact supersession.
+        /// If a new fact's embedding falls between FactDeduplicationThreshold and this value,
+        /// the existing fact is marked as superseded and the new fact carries forward its SourceMemories.
+        /// This handles cases where a related but meaningfully different fact replaces an older one
+        /// (e.g., "User is a nurse" → "User is a teacher").
+        /// Cosine distance scale: 0 = identical vectors, 1 = orthogonal, 2 = opposite.
+        /// Recommended range: 0.12–0.18.
+        /// </summary>
+        public float FactSupersessionThreshold { get; set; } = 0.15f;
+
         /// <summary> 
         /// Path to embeddding model. RAG functionalities won't be available if this file is not present. 
         /// The model must be in the GGUF format. Default can be downloaded here:
