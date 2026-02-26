@@ -662,20 +662,56 @@ This macro system ensures dynamic, contextual content that adapts to your curren
 
 The LLMEngine provides several events for real-time updates:
 
+### Structured Streaming Events (Recommended)
+
+The new channel-aware events provide richer information and cleanly separate different types of inference content:
+
 ```csharp
-// Full prompt generation
-LLMEngine.OnFullPromptReady += (sender, prompt) =>
+// Channel-aware streaming — receives typed segments (Text, Thinking, ToolCall, etc.)
+LLMEngine.OnInferenceSegment += (sender, segment) =>
 {
-    Console.WriteLine($"Generated prompt: {prompt}");
+    switch (segment.Channel)
+    {
+        case InferenceChannel.Text:
+            Console.Write(segment.Text); // Normal visible response text
+            break;
+        case InferenceChannel.Thinking:
+            // Chain-of-thought / thinking block content (hidden from users)
+            break;
+        case InferenceChannel.ToolCall when segment.IsComplete:
+            Console.WriteLine("LLM requested a tool call");
+            break;
+    }
 };
 
-// Streaming text generation
+// Structured completion — receives the full result with separated channels
+LLMEngine.OnInferenceCompleted += (sender, result) =>
+{
+    Console.WriteLine($"\nResponse: {result.Response}");
+
+    if (result.ThinkingContent != null)
+        Console.WriteLine($"[Thinking: {result.ThinkingContent}]");
+
+    Console.WriteLine($"Finish reason: {result.FinishReason}");
+
+    // Log only the visible response to history
+    LLMEngine.History.LogMessage(AuthorRole.Assistant, result.Response,
+                                LLMEngine.User, LLMEngine.Bot);
+};
+```
+
+### Legacy Streaming Events
+
+The following events are still supported for backward compatibility but are deprecated. Migrate to the structured events above for new code.
+
+```csharp
+// [Obsolete] Streaming text generation — fires for every token
 LLMEngine.OnInferenceStreamed += (sender, token) =>
 {
     Console.Write(token); // Real-time text output
 };
 
-// Generation completion
+// [Obsolete] Generation completion — returns the full raw response string
 LLMEngine.OnInferenceEnded += (sender, fullResponse) =>
 {
     Console.WriteLine($"\nGeneration complete: {fullResponse}");
@@ -683,6 +719,16 @@ LLMEngine.OnInferenceEnded += (sender, fullResponse) =>
     // Log the response to history if needed
     LLMEngine.History.LogMessage(AuthorRole.Assistant, fullResponse, 
                                 LLMEngine.User, LLMEngine.Bot);
+};
+```
+
+### Other Events
+
+```csharp
+// Full prompt generation
+LLMEngine.OnFullPromptReady += (sender, prompt) =>
+{
+    Console.WriteLine($"Generated prompt: {prompt}");
 };
 
 // Quick inference (non-streaming) completion

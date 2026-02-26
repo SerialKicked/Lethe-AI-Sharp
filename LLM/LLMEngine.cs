@@ -73,13 +73,20 @@ namespace LetheAISharp.LLM
         /// <summary> Called when this library has generated the full prompt, returns full prompt </summary>
         public static event EventHandler<string>? OnFullPromptReady;
         /// <summary> Called during inference each time the LLM outputs a new token, returns the generated token </summary>
+        [Obsolete("Use OnInferenceSegment for channel-aware streaming. This event only receives Text channel content.")]
         public static event EventHandler<string>? OnInferenceStreamed;
         /// <summary> Called once the inference has ended, returns the full string </summary>
+        [Obsolete("Use OnInferenceCompleted for structured results including thinking content and tool calls.")]
         public static event EventHandler<string>? OnInferenceEnded;
         /// <summary> Called when the system changes states (no init, busy, ready) </summary>
         public static event EventHandler<SystemStatus>? OnStatusChanged;
         /// <summary> Called when the bot persona is changed, returns the new bot (sender is always null) </summary>
         public static event EventHandler<BasePersona>? OnBotChanged;
+
+        /// <summary> Called during inference with typed, channel-tagged segments. Provides richer information than OnInferenceStreamed. </summary>
+        public static event EventHandler<InferenceSegment>? OnInferenceSegment;
+        /// <summary> Called when a complete inference cycle finishes. Provides structured results including thinking content and tool call records. </summary>
+        public static event EventHandler<InferenceResult>? OnInferenceCompleted;
 
         /// <summary> Set to true if the backend supports text-to-speech </summary>
         public static bool SupportsTTS => Client?.SupportsTTS ?? false;
@@ -97,9 +104,13 @@ namespace LetheAISharp.LLM
 
         private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(Bot, fullprompt);
         private static void RaiseOnStatusChange(SystemStatus newStatus) => OnStatusChanged?.Invoke(Bot, newStatus);
+#pragma warning disable CS0618 // backward-compat raise helpers for obsolete events
         private static void RaiseOnInferenceStreamed(string addedString) => OnInferenceStreamed?.Invoke(Bot, addedString);
         private static void RaiseOnInferenceEnded(string fullString) => OnInferenceEnded?.Invoke(Bot, fullString);
+#pragma warning restore CS0618
         private static void RaiseOnQuickInferenceEnded(string fullprompt) => OnQuickInferenceEnded?.Invoke(Bot, fullprompt);
+        private static void RaiseInferenceSegment(InferenceSegment segment) => OnInferenceSegment?.Invoke(Bot, segment);
+        private static void RaiseInferenceCompleted(InferenceResult result) => OnInferenceCompleted?.Invoke(Bot, result);
 
         /// <summary> List of loaded plugins </summary>
         public static List<IContextPlugin> ContextPlugins { get; set; } = [];
@@ -161,6 +172,9 @@ namespace LetheAISharp.LLM
 
         private static SystemStatus status = SystemStatus.NotInit;
         private static string StreamingTextProgress = string.Empty;
+        private static InferenceChannel _currentChannel = InferenceChannel.Text;
+        private static readonly StringBuilder _thinkingBuffer = new();
+        private static readonly StringBuilder _textBuffer = new();
         private static InstructFormat instruct = new() 
         { 
             AddNamesToPrompt = false,
@@ -396,6 +410,7 @@ namespace LetheAISharp.LLM
                 if (Status == SystemStatus.Busy)
                     return;
                 Status = SystemStatus.Busy;
+                ResetStreamingState();
                 StreamingTextProgress = Instruct.GetThinkPrefill();
                 if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
                 {
@@ -474,6 +489,7 @@ namespace LetheAISharp.LLM
 
             using var _ = await AcquireModelSlotAsync(ctx).ConfigureAwait(false);
             Status = SystemStatus.Busy;
+            ResetStreamingState();
             await Client.GenerateTextStreaming(chatlog).ConfigureAwait(false);
         }
 
@@ -660,12 +676,55 @@ namespace LetheAISharp.LLM
                 }
                 Status = SystemStatus.Ready;
                 RaiseOnInferenceEnded(response);
+
+                // Build structured result for new event
+                var thinkingContent = _thinkingBuffer.Length > 0 ? _thinkingBuffer.ToString().Trim() : null;
+                var textResponse = Instruct.IsThinkFormat ? response.RemoveThinkingBlocks() : response;
+                var inferenceResult = new InferenceResult
+                {
+                    Response = textResponse,
+                    ThinkingContent = thinkingContent,
+                    ToolCalls = [],
+                    FinishReason = e.FinishReason
+                };
+                if (e.FinishReason == "tool_calls")
+                {
+                    RaiseInferenceSegment(new InferenceSegment { Channel = InferenceChannel.ToolCall, IsComplete = true });
+                }
+                RaiseInferenceCompleted(inferenceResult);
             }
             else
             {
                 StreamingTextProgress += e.Token;
+
+                // Detect channel transitions based on thinking delimiters
+                if (Instruct.IsThinkFormat)
+                {
+                    _currentChannel = Instruct.IsThinkingPrompt(StreamingTextProgress)
+                        ? InferenceChannel.Thinking
+                        : InferenceChannel.Text;
+                }
+
+                // Route token to the appropriate content buffer
+                if (_currentChannel == InferenceChannel.Thinking)
+                    _thinkingBuffer.Append(e.Token);
+                else
+                    _textBuffer.Append(e.Token);
+
+                RaiseInferenceSegment(new InferenceSegment { Channel = _currentChannel, Text = e.Token, IsComplete = false });
                 RaiseOnInferenceStreamed(e.Token);
             }
+        }
+
+        /// <summary>
+        /// Resets all per-generation streaming state. Must be called before each new generation.
+        /// </summary>
+        private static void ResetStreamingState()
+        {
+            _currentChannel = InferenceChannel.Text;
+            _thinkingBuffer.Clear();
+            _textBuffer.Clear();
+            StreamingTextProgress = string.Empty;
         }
 
         /// <summary>
@@ -887,6 +946,7 @@ namespace LetheAISharp.LLM
 
             var genparams = await GenerateFullPrompt(message, pluginmessage).ConfigureAwait(false);
 
+            ResetStreamingState();
             StreamingTextProgress = Instruct.GetThinkPrefill();
             if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
             {
