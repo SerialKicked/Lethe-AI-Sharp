@@ -108,11 +108,14 @@ namespace LetheAISharp.LLM
         /// <summary> Raw JSON arguments string. </summary>
         public string ArgumentsJson { get; init; } = string.Empty;
 
-        /// <summary> Raw JSON result string. </summary>
+        /// <summary> Raw JSON result string (empty if <see cref="Success"/> is false). </summary>
         public string ResultJson { get; init; } = string.Empty;
 
         /// <summary> Whether the tool execution succeeded. </summary>
         public bool Success { get; init; }
+
+        /// <summary> Error message if <see cref="Success"/> is false; null otherwise. </summary>
+        public string? Error { get; init; }
 
         /// <summary> How long the tool execution took. </summary>
         public System.TimeSpan Duration { get; init; }

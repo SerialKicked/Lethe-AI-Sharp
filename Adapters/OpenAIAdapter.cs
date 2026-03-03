@@ -31,7 +31,7 @@ namespace LetheAISharp.API
             //Hook into the OpenAI streaming event and adapt it to our interface's event
             _client.StreamingMessageReceived += (sender, e) =>
             {
-                TokenReceived?.Invoke(this, new LLMTokenStreamingEventArgs(e.Token, e.FinishReason));
+                TokenReceived?.Invoke(this, new LLMTokenStreamingEventArgs(e.Token, e.FinishReason, e.ToolCallRecords));
             };
 }
 

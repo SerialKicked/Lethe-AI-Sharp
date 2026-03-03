@@ -694,6 +694,38 @@ namespace LetheAISharp.LLM
                 Status = SystemStatus.Ready;
                 RaiseOnInferenceEnded(response);
 
+                // Emit tool call and tool result segments for each recorded tool invocation
+                if (e.ToolCallRecords != null)
+                {
+                    foreach (var record in e.ToolCallRecords)
+                    {
+                        RaiseInferenceSegment(new InferenceSegment
+                        {
+                            Channel = InferenceChannel.ToolCall,
+                            ToolCall = new ToolCallInfo
+                            {
+                                CallId = record.CallId,
+                                FunctionName = record.FunctionName,
+                                ArgumentsJson = record.ArgumentsJson
+                            },
+                            IsComplete = true
+                        });
+                        RaiseInferenceSegment(new InferenceSegment
+                        {
+                            Channel = InferenceChannel.ToolResult,
+                            ToolResult = new ToolResultInfo
+                            {
+                                CallId = record.CallId,
+                                FunctionName = record.FunctionName,
+                                Success = record.Success,
+                                ResultJson = record.ResultJson,
+                                Error = record.Error
+                            },
+                            IsComplete = true
+                        });
+                    }
+                }
+
                 // Build structured result for new event
                 var thinkingContent = _thinkingBuffer.Length > 0 ? _thinkingBuffer.ToString().Trim() : null;
                 var textResponse = Instruct.IsThinkFormat ? response.RemoveThinkingBlocks() : response;
@@ -701,13 +733,9 @@ namespace LetheAISharp.LLM
                 {
                     Response = textResponse,
                     ThinkingContent = thinkingContent,
-                    ToolCalls = [],
+                    ToolCalls = e.ToolCallRecords ?? [],
                     FinishReason = e.FinishReason
                 };
-                if (e.FinishReason == "tool_calls")
-                {
-                    RaiseInferenceSegment(new InferenceSegment { Channel = InferenceChannel.ToolCall, IsComplete = true });
-                }
                 RaiseInferenceCompleted(inferenceResult);
             }
             else

@@ -8,6 +8,7 @@ using OpenAI.Responses;
 using OpenAI.Threads;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -19,6 +20,11 @@ namespace LetheAISharp.API
     {
         public string Token { get; set; } = string.Empty;
         public string? FinishReason { get; set; } = string.Empty;
+        /// <summary>
+        /// Tool call records accumulated during any tool-calling rounds that preceded this completion.
+        /// Populated only on the final completion event (when FinishReason is non-empty).
+        /// </summary>
+        public List<ToolCallRecord>? ToolCallRecords { get; set; }
     }   
 
     public class OpenAI_APIClient
@@ -70,47 +76,114 @@ namespace LetheAISharp.API
         {
             var cumulativeDelta = string.Empty;
             var nostopfix = true; // some backends don't return "stop" at the end of completion. It handles this case.
+            var toolCallRecords = new List<ToolCallRecord>();
+            var toolRound = 0;
+            const int maxToolRounds = 10;
+            var currentRequest = request;
             try
             {
-                await foreach (var partialResponse in API.ChatEndpoint.StreamCompletionEnumerableAsync(request, cancellationToken: cancellationToken))
+                bool continueLoop;
+                do
                 {
-                    // Handle tool_calls
-                    if (partialResponse.FirstChoice.FinishReason == "tool_calls" && partialResponse.FirstChoice.Message?.ToolCalls != null)
+                    continueLoop = false;
+                    await foreach (var partialResponse in API.ChatEndpoint.StreamCompletionEnumerableAsync(currentRequest, cancellationToken: cancellationToken))
                     {
-                        nostopfix = false;
-                        var toolmsgs = new List<OpenAI.Chat.Message>();
-                        // call the tools
-                        foreach (var toolcall in partialResponse.FirstChoice.Message.ToolCalls)
-                        {
-                            var functionResult = await toolcall.InvokeFunctionAsync<string>(cancellationToken);
-                            // log the results
-                            toolmsgs.Add(new OpenAI.Chat.Message(toolcall, functionResult));
-                        }
-                        // Welp I probably should do something here but I'm not sure why
-                        // probably rebuild the ChatRequest "request" with the results and resend that thing to this very function?
-                    }
-                    else if (partialResponse.FirstChoice.Delta?.Content != null)
-                    {
-                        // handle message stuff
-                        cumulativeDelta += partialResponse.FirstChoice.Delta.Content;
-                        if (!string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason))
+                        // Handle tool_calls
+                        if (partialResponse.FirstChoice.FinishReason == "tool_calls" && partialResponse.FirstChoice.Message?.ToolCalls != null)
                         {
                             nostopfix = false;
+                            if (toolRound < maxToolRounds)
+                            {
+                                var toolmsgs = new List<OpenAI.Chat.Message>();
+                                foreach (var toolcall in partialResponse.FirstChoice.Message.ToolCalls)
+                                {
+                                    string functionResult;
+                                    bool success;
+                                    var sw = Stopwatch.StartNew();
+                                    try
+                                    {
+                                        functionResult = (await toolcall.InvokeFunctionAsync<string>(cancellationToken)) ?? string.Empty;
+                                        success = true;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        functionResult = $"Error: {ex.Message}";
+                                        success = false;
+                                    }
+                                    sw.Stop();
+                                    toolCallRecords.Add(new ToolCallRecord
+                                    {
+                                        CallId = toolcall.Id ?? string.Empty,
+                                        FunctionName = toolcall.Function?.Name ?? string.Empty,
+                                        ArgumentsJson = toolcall.Function?.Arguments?.ToJsonString() ?? string.Empty,
+                                        ResultJson = success ? functionResult : string.Empty,
+                                        Error = success ? null : functionResult,
+                                        Success = success,
+                                        Duration = sw.Elapsed
+                                    });
+                                    toolmsgs.Add(new OpenAI.Chat.Message(toolcall, functionResult));
+                                }
+
+                                // Build updated message list: original messages + assistant tool-call message + tool results.
+                                // The assistant message is included as-is (thinking/CoT content, if any, is preserved
+                                // since Message properties are not publicly mutable in this library version).
+                                var updatedMessages = new List<OpenAI.Chat.Message>(currentRequest.Messages)
+                                {
+                                    partialResponse.FirstChoice.Message
+                                };
+                                updatedMessages.AddRange(toolmsgs);
+
+                                // Create a new request preserving all original parameters
+#pragma warning disable CS0618 // ChatRequest.MaxTokens is obsolete since OpenAI-DotNet 8.x (use MaxCompletionTokens); preserved here to match what ChatPromptBuilder sets
+                                currentRequest = new ChatRequest(
+                                    messages: updatedMessages,
+                                    tools: currentRequest.Tools,
+                                    toolChoice: "auto",
+                                    model: currentRequest.Model,
+                                    frequencyPenalty: currentRequest.FrequencyPenalty,
+                                    maxTokens: currentRequest.MaxTokens,
+                                    presencePenalty: currentRequest.PresencePenalty,
+                                    responseFormat: currentRequest.ResponseFormat,
+                                    seed: currentRequest.Seed,
+                                    stops: currentRequest.Stops,
+                                    temperature: currentRequest.Temperature,
+                                    topP: currentRequest.TopP,
+                                    jsonSchema: currentRequest.ResponseFormatObject?.JsonSchema,
+                                    user: currentRequest.User
+                                );
+#pragma warning restore CS0618
+
+                                toolRound++;
+                                continueLoop = true;
+                            }
+                            break; // exit foreach — re-enter while loop (or stop if limit reached)
                         }
-                        RaiseOnStreamingResponse(new OpenTokenResponse
+                        else if (partialResponse.FirstChoice.Delta?.Content != null)
                         {
-                            Token = partialResponse.FirstChoice.Delta.Content,
-                            FinishReason = partialResponse.FirstChoice.FinishReason
-                        });
+                            // handle message stuff
+                            cumulativeDelta += partialResponse.FirstChoice.Delta.Content;
+                            var hasFinishReason = !string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason);
+                            if (hasFinishReason)
+                            {
+                                nostopfix = false;
+                            }
+                            RaiseOnStreamingResponse(new OpenTokenResponse
+                            {
+                                Token = partialResponse.FirstChoice.Delta.Content,
+                                FinishReason = partialResponse.FirstChoice.FinishReason,
+                                ToolCallRecords = hasFinishReason && toolCallRecords.Count > 0 ? toolCallRecords : null
+                            });
+                        }
                     }
-                }
+                } while (continueLoop);
+
                 if (nostopfix)
                 {
-
                     RaiseOnStreamingResponse(new OpenTokenResponse
                     {
                         Token = "",
-                        FinishReason = "stop"
+                        FinishReason = "stop",
+                        ToolCallRecords = toolCallRecords.Count > 0 ? toolCallRecords : null
                     });
                 }
             }

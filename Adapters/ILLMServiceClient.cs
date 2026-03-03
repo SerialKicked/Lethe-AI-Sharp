@@ -1,4 +1,5 @@
-﻿using System;
+﻿using LetheAISharp.LLM;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -13,7 +14,7 @@ namespace LetheAISharp.API
     /// <summary>
     /// Arguments for text token streaming events
     /// </summary>
-    public class LLMTokenStreamingEventArgs(string token, string? finishReason) : EventArgs
+    public class LLMTokenStreamingEventArgs(string token, string? finishReason, List<ToolCallRecord>? toolCallRecords = null) : EventArgs
     {
         /// <summary>
         /// The token text that was generated
@@ -24,6 +25,12 @@ namespace LetheAISharp.API
         /// Reason why generation finished (null/empty during streaming, "stop"/"length" when complete)
         /// </summary>
         public string? FinishReason { get; } = finishReason;
+
+        /// <summary>
+        /// Tool call records accumulated during any tool-calling rounds that preceded this completion.
+        /// Populated only on the final completion event (when <see cref="IsComplete"/> is true).
+        /// </summary>
+        public List<ToolCallRecord>? ToolCallRecords { get; } = toolCallRecords;
 
         /// <summary>
         /// Whether this is the final streaming event
