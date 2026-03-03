@@ -7,7 +7,7 @@
         Assistant,
         Unknown,
         SysPrompt,
-        Tool
+        ToolResult
     }
 
 }

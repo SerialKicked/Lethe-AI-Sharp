@@ -12,6 +12,8 @@ namespace LetheAISharp.API
     public class OpenAIAdapter : ILLMServiceClient, IDisposable
     {
         public event EventHandler<LLMTokenStreamingEventArgs>? TokenReceived;
+        public event EventHandler<ToolCallRecord>? ToolCallStarted;
+        public event EventHandler<ToolCallRecord>? ToolCallCompleted;
 
         private readonly OpenAI_APIClient _client;
         private readonly HttpClient _httpClient;
@@ -33,6 +35,10 @@ namespace LetheAISharp.API
             {
                 TokenReceived?.Invoke(this, new LLMTokenStreamingEventArgs(e.Token, e.FinishReason, e.ToolCallRecords));
             };
+
+            // Forward real-time tool call events from the underlying executor
+            _client.ToolExecutor.ToolCallStarted += (sender, record) => ToolCallStarted?.Invoke(this, record);
+            _client.ToolExecutor.ToolCallCompleted += (sender, record) => ToolCallCompleted?.Invoke(this, record);
 }
 
         public string BaseUrl

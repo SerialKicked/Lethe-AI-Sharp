@@ -46,6 +46,10 @@ namespace LetheAISharp.API
         // Event for streaming tokens
         event EventHandler<LLMTokenStreamingEventArgs> TokenReceived;
 
+        // Events for real-time tool call notifications
+        event EventHandler<ToolCallRecord>? ToolCallStarted;
+        event EventHandler<ToolCallRecord>? ToolCallCompleted;
+
         // Connection properties
         string BaseUrl { get; set; }
 

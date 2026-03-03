@@ -52,6 +52,8 @@ namespace LetheAISharp.API
         public bool SupportsSchema => true;
 
         public event EventHandler<LLMTokenStreamingEventArgs>? TokenReceived;
+        public event EventHandler<ToolCallRecord>? ToolCallStarted;
+        public event EventHandler<ToolCallRecord>? ToolCallCompleted;
 
         public LlamaSharpAdapter(string filepath)
         {

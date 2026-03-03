@@ -33,6 +33,8 @@ namespace LetheAISharp.API
         private OpenAIClient API { get; set; }
         private HttpClient _httpClient { get; set; }
 
+        public ToolExecutor ToolExecutor { get; } = new ToolExecutor();
+
         public event EventHandler<OpenTokenResponse>? StreamingMessageReceived;
         private void RaiseOnStreamingResponse(OpenTokenResponse e) => StreamingMessageReceived?.Invoke(this, e);
 
@@ -76,12 +78,10 @@ namespace LetheAISharp.API
         public virtual async Task StreamChatCompletion(ChatRequest request, CancellationToken cancellationToken = default)
         {
             var cumulativeDelta = string.Empty;
-            //var nostopfix = true; // some backends don't return "stop" at the end of completion. It handles this case.
             var toolCallRecords = new List<ToolCallRecord>();
             var toolRound = 0;
             const int maxToolRounds = 10;
             var currentRequest = request;
-            var isYappingOver = false;
             try
             {
                 bool continueLoop = true;
@@ -95,62 +95,9 @@ namespace LetheAISharp.API
                         {
                             if (toolRound < maxToolRounds)
                             {
-                                var toolmsgs = new List<OpenAI.Chat.Message>();
-                                foreach (var toolcall in partialResponse.FirstChoice.Message.ToolCalls)
-                                {
-                                    string functionResult;
-                                    bool success;
-                                    var sw = Stopwatch.StartNew();
-                                    try
-                                    {
-                                        functionResult = (await toolcall.InvokeFunctionAsync<string>(cancellationToken)) ?? string.Empty;
-                                        success = true;
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        functionResult = $"Error: {ex.Message}";
-                                        success = false;
-                                    }
-                                    sw.Stop();
-                                    toolCallRecords.Add(new ToolCallRecord
-                                    {
-                                        CallId = toolcall.Id ?? string.Empty,
-                                        FunctionName = toolcall.Function?.Name ?? string.Empty,
-                                        ArgumentsJson = toolcall.Function?.Arguments?.ToJsonString() ?? string.Empty,
-                                        ResultJson = success ? functionResult : string.Empty,
-                                        Error = success ? null : functionResult,
-                                        Success = success,
-                                        Duration = sw.Elapsed
-                                    });
-                                    toolmsgs.Add(new OpenAI.Chat.Message(toolcall, functionResult));
-                                }
-
-                                // Build updated message list: original messages + assistant tool-call message + tool results.
-                                // The assistant message is included as-is (thinking/CoT content, if any, is preserved
-                                // since Message properties are not publicly mutable in this library version).
-                                var updatedMessages = new List<OpenAI.Chat.Message>(currentRequest.Messages)
-                                {
-                                    partialResponse.FirstChoice.Message
-                                };
-                                updatedMessages.AddRange(toolmsgs);
-
-                                // Create a new request preserving all original parameters
-                                currentRequest = new ChatRequest(
-                                    messages: updatedMessages,
-                                    tools: currentRequest.Tools,
-                                    toolChoice: "auto",
-                                    model: currentRequest.Model,
-                                    frequencyPenalty: currentRequest.FrequencyPenalty,
-                                    maxTokens: currentRequest.MaxCompletionTokens,
-                                    presencePenalty: currentRequest.PresencePenalty,
-                                    responseFormat: currentRequest.ResponseFormat,
-                                    seed: currentRequest.Seed,
-                                    stops: currentRequest.Stops,
-                                    temperature: currentRequest.Temperature,
-                                    topP: currentRequest.TopP,
-                                    jsonSchema: currentRequest.ResponseFormatObject?.JsonSchema,
-                                    user: currentRequest.User
-                                );
+                                var (toolmsgs, records) = await ToolExecutor.ExecuteToolCalls(partialResponse.FirstChoice.Message.ToolCalls, cancellationToken).ConfigureAwait(false);
+                                toolCallRecords.AddRange(records);
+                                currentRequest = ToolExecutor.RebuildRequest(currentRequest, partialResponse.FirstChoice.Message, toolmsgs);
                                 toolRound++;
                                 continueLoop = true;
                             }
@@ -158,13 +105,8 @@ namespace LetheAISharp.API
                         }
                         else if (partialResponse.FirstChoice.Delta?.Content != null)
                         {
-                            // handle message stuff
                             cumulativeDelta += partialResponse.FirstChoice.Delta.Content;
                             var hasFinishReason = !string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason);
-                            if (hasFinishReason && partialResponse.FirstChoice.FinishReason == "stop")
-                            {
-                                isYappingOver = true;
-                            }
                             RaiseOnStreamingResponse(new OpenTokenResponse
                             {
                                 Token = partialResponse.FirstChoice.Delta.Content,
@@ -172,7 +114,7 @@ namespace LetheAISharp.API
                                 ToolCallRecords = hasFinishReason && toolCallRecords.Count > 0 ? toolCallRecords : null
                             });
                         }
-                        else if (!string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason) && partialResponse.FirstChoice.FinishReason != "null" && !isYappingOver)
+                        else if (!string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason) && partialResponse.FirstChoice.FinishReason != "null")
                         {
                             RaiseOnStreamingResponse(new OpenTokenResponse
                             {

@@ -52,6 +52,21 @@ namespace LetheAISharp.Files
 
         public Message ToChatCompletion()
         {
+            // Tool result messages need the tool_call_id for the API to correlate results.
+            // Each ToolResult message corresponds to exactly one tool call (one record per message).
+            if (Role == AuthorRole.ToolResult && ToolCalls.Count > 0)
+            {
+                var record = ToolCalls[0];
+                return new Message(record.CallId, record.FunctionName, new List<OpenAI.Content> { Message });
+            }
+
+            // Assistant messages that contain tool call records (i.e. were a tool-call request).
+            // Each such message is logged with exactly one tool call record for history reconstruction.
+            if (Role == AuthorRole.Assistant && ToolCalls.Count > 0)
+            {
+                return new Message(OpenAI.Role.Assistant, string.Empty);
+            }
+
             var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt;
             if (Role == AuthorRole.System || Role == AuthorRole.SysPrompt)
             {

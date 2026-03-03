@@ -21,6 +21,8 @@ namespace LetheAISharp.API
         private bool koboldDDGAvailable = false;
 
         public event EventHandler<LLMTokenStreamingEventArgs>? TokenReceived;
+        public event EventHandler<ToolCallRecord>? ToolCallStarted;
+        public event EventHandler<ToolCallRecord>? ToolCallCompleted;
 
         public KoboldCppAdapter(HttpClient httpClient)
         {

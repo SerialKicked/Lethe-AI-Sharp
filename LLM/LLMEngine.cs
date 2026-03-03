@@ -178,6 +178,7 @@ namespace LetheAISharp.LLM
         private static InferenceChannel _currentChannel = InferenceChannel.Text;
         private static readonly StringBuilder _thinkingBuffer = new();
         private static readonly StringBuilder _textBuffer = new();
+        private static bool _isSimpleQuery = false;
         private static InstructFormat instruct = new() 
         { 
             AddNamesToPrompt = false,
@@ -246,6 +247,17 @@ namespace LetheAISharp.LLM
             // Subscribe to the TokenReceived event
             Client.BaseUrl = Settings.BackendUrl;
             Client.TokenReceived += Client_StreamingMessageReceived;
+            Client.ToolCallStarted += (sender, record) => RaiseInferenceSegment(new InferenceSegment
+            {
+                Channel = InferenceChannel.ToolCall,
+                ToolCall = new ToolCallInfo
+                {
+                    CallId = record.CallId,
+                    FunctionName = record.FunctionName,
+                    ArgumentsJson = record.ArgumentsJson
+                },
+                IsComplete = false
+            });
 
             PromptBuilder = GetPromptBuilder();
             AgentRuntime.LoadDefaultActions();
@@ -489,7 +501,15 @@ namespace LetheAISharp.LLM
             using var _ = await AcquireModelSlotAsync(ctx).ConfigureAwait(false);
             Status = SystemStatus.Busy;
             ResetStreamingState();
-            await Client.GenerateTextStreaming(chatlog).ConfigureAwait(false);
+            _isSimpleQuery = true;
+            try
+            {
+                await Client.GenerateTextStreaming(chatlog).ConfigureAwait(false);
+            }
+            finally
+            {
+                _isSimpleQuery = false;
+            }
         }
 
         #endregion
@@ -737,6 +757,21 @@ namespace LetheAISharp.LLM
                             },
                             IsComplete = true
                         });
+                    }
+                }
+
+                // Log tool call exchanges to history so full chat mode can reconstruct the message sequence
+                if (!_isSimpleQuery && e.ToolCallRecords != null && e.ToolCallRecords.Count > 0)
+                {
+                    foreach (var record in e.ToolCallRecords)
+                    {
+                        // Log the assistant's tool call request as an Assistant message with ToolCalls
+                        var toolCallMsg = new SingleMessage(AuthorRole.Assistant, string.Empty, toolCalls: [record]);
+                        Bot.History.LogMessage(toolCallMsg);
+
+                        // Log the tool result as a ToolResult message
+                        var toolResultMsg = new SingleMessage(AuthorRole.ToolResult, record.Success ? record.ResultJson : (record.Error ?? "Tool execution failed"), toolCalls: [record]);
+                        Bot.History.LogMessage(toolResultMsg);
                     }
                 }
 

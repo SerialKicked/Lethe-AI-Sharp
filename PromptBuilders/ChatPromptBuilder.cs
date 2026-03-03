@@ -246,6 +246,21 @@ namespace LetheAISharp
 
         private static Message FormatSingleMessage(SingleMessage message)
         {
+            // Tool result messages need the tool_call_id for the API to correlate results.
+            // Each ToolResult message corresponds to exactly one tool call (one record per message).
+            if (message.Role == AuthorRole.ToolResult && message.ToolCalls.Count > 0)
+            {
+                var record = message.ToolCalls[0];
+                return new Message(record.CallId, record.FunctionName, new List<Content> { message.Message });
+            }
+
+            // Assistant messages that contain tool call records (i.e. were a tool-call request).
+            // Each such message is logged with exactly one tool call record for history reconstruction.
+            if (message.Role == AuthorRole.Assistant && message.ToolCalls.Count > 0)
+            {
+                return new Message(OpenAI.Role.Assistant, string.Empty);
+            }
+
             var realprompt = message.Message;
             var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt;
 
