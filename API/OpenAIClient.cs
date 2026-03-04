@@ -139,6 +139,8 @@ namespace LetheAISharp.API
                                 FinishReason = partialResponse.FirstChoice.FinishReason,
                                 ToolCallRecords = recordsSnapshot
                             });
+                            if (partialResponse.FirstChoice.FinishReason == "stop")
+                                break;
                         }
                     }
                 }
