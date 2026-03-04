@@ -193,6 +193,7 @@ namespace LetheAISharp.LLM
             StopStrings = [ "### Instruction:", "### Input:", "### Response:" ],
         };
 
+        private static bool _isSimpleQuery = false;
         private static ILogger? logger = null;
         private static BasePersona bot = new() { IsUser = false, Name = "Bot", Bio = "You are a helpful AI assistant whose goal is to answer questions and complete tasks.", UniqueName = string.Empty };
         private static BasePersona user = new() { IsUser = true, Name = "User", UniqueName = string.Empty };
@@ -471,7 +472,16 @@ namespace LetheAISharp.LLM
             using var _ = await AcquireModelSlotAsync(ctx).ConfigureAwait(false);
             var oldst = status;
             Status = SystemStatus.Busy;
-            var result = await Client.GenerateText(chatlog).ConfigureAwait(false);
+            _isSimpleQuery = true;
+            string result;
+            try
+            {
+                result = await Client.GenerateText(chatlog).ConfigureAwait(false);
+            }
+            finally
+            {
+                _isSimpleQuery = false;
+            }
             Status = oldst;
             RaiseOnQuickInferenceEnded(result);
             return string.IsNullOrEmpty(result) ? string.Empty : result;
@@ -489,7 +499,15 @@ namespace LetheAISharp.LLM
             using var _ = await AcquireModelSlotAsync(ctx).ConfigureAwait(false);
             Status = SystemStatus.Busy;
             ResetStreamingState();
-            await Client.GenerateTextStreaming(chatlog).ConfigureAwait(false);
+            _isSimpleQuery = true;
+            try
+            {
+                await Client.GenerateTextStreaming(chatlog).ConfigureAwait(false);
+            }
+            finally
+            {
+                _isSimpleQuery = false;
+            }
         }
 
         #endregion
@@ -705,10 +723,8 @@ namespace LetheAISharp.LLM
                     if (ctxplug.Enabled && ctxplug.ReplaceOutput(Bot.ReplaceMacros(response), History, out var editedresponse))
                         response = editedresponse;
                 }
-                Status = SystemStatus.Ready;
-                RaiseOnInferenceEnded(response);
 
-                // Emit tool call and tool result segments for each recorded tool invocation
+                // Emit tool call and tool result segments for each recorded tool invocation (BEFORE final response)
                 if (e.ToolCallRecords != null)
                 {
                     foreach (var record in e.ToolCallRecords)
@@ -739,6 +755,26 @@ namespace LetheAISharp.LLM
                         });
                     }
                 }
+
+                // Log tool calls to history only in full-chat mode (not simple queries)
+                if (!_isSimpleQuery && e.ToolCallRecords != null && e.ToolCallRecords.Count > 0)
+                {
+                    // ONE assistant message with ALL tool calls from this inference
+                    var assistantToolMsg = new SingleMessage(AuthorRole.Assistant, string.Empty, toolCalls: e.ToolCallRecords.ToList());
+                    Bot.History.LogMessage(assistantToolMsg);
+
+                    // One ToolResult message per tool call
+                    foreach (var record in e.ToolCallRecords)
+                    {
+                        var resultMsg = new SingleMessage(AuthorRole.Tool,
+                            record.Success ? record.ResultJson : (record.Error ?? "Error"),
+                            toolCalls: new List<ToolCallRecord> { record });
+                        Bot.History.LogMessage(resultMsg);
+                    }
+                }
+
+                Status = SystemStatus.Ready;
+                RaiseOnInferenceEnded(response);
 
                 // Build structured result for new event
                 var thinkingContent = _thinkingBuffer.Length > 0 ? _thinkingBuffer.ToString().Trim() : null;
@@ -980,6 +1016,7 @@ namespace LetheAISharp.LLM
         /// <returns></returns>
         private static async Task StartGeneration(SingleMessage message)
         {
+            _isSimpleQuery = false;
             if (Client == null || PromptBuilder == null)
                 return;
 

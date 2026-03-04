@@ -52,6 +52,18 @@ namespace LetheAISharp.Files
 
         public Message ToChatCompletion()
         {
+            // Case 1: Assistant message with tool calls (the LLM requested tools)
+            if (Role == AuthorRole.Assistant && ToolCalls.Count > 0 && string.IsNullOrEmpty(Message))
+            {
+                return new Message(OpenAI.Role.Assistant, "");
+            }
+
+            // Case 2: Tool result message
+            if (Role == AuthorRole.Tool && ToolCalls.Count > 0)
+            {
+                return new Message(OpenAI.Role.Tool, Message);
+            }
+
             var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt;
             if (Role == AuthorRole.System || Role == AuthorRole.SysPrompt)
             {

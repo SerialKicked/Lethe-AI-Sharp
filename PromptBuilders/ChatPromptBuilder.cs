@@ -246,6 +246,18 @@ namespace LetheAISharp
 
         private static Message FormatSingleMessage(SingleMessage message)
         {
+            // Tool result messages: skip all name/image logic
+            if (message.Role == AuthorRole.Tool && message.ToolCalls.Count > 0)
+            {
+                return new Message(OpenAI.Role.Tool, message.Message);
+            }
+
+            // Assistant tool-call-only messages: skip all name/image logic
+            if (message.Role == AuthorRole.Assistant && message.ToolCalls.Count > 0 && string.IsNullOrEmpty(message.Message))
+            {
+                return new Message(OpenAI.Role.Assistant, "");
+            }
+
             var realprompt = message.Message;
             var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt;
 
