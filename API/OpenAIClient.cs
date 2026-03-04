@@ -112,20 +112,32 @@ namespace LetheAISharp.API
                             {
                                 isYappingOver = true;
                             }
+                            List<ToolCallRecord>? recordsSnapshot = null;
+                            if (hasFinishReason && toolCallRecords.Count > 0)
+                            {
+                                recordsSnapshot = new List<ToolCallRecord>(toolCallRecords);
+                                toolCallRecords.Clear();
+                            }
                             RaiseOnStreamingResponse(new OpenTokenResponse
                             {
                                 Token = partialResponse.FirstChoice.Delta.Content,
                                 FinishReason = partialResponse.FirstChoice.FinishReason,
-                                ToolCallRecords = hasFinishReason && toolCallRecords.Count > 0 ? toolCallRecords : null
+                                ToolCallRecords = recordsSnapshot
                             });
                         }
                         else if (!string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason) && partialResponse.FirstChoice.FinishReason != "null" && !isYappingOver)
                         {
+                            List<ToolCallRecord>? recordsSnapshot = null;
+                            if (toolCallRecords.Count > 0)
+                            {
+                                recordsSnapshot = new List<ToolCallRecord>(toolCallRecords);
+                                toolCallRecords.Clear();
+                            }
                             RaiseOnStreamingResponse(new OpenTokenResponse
                             {
                                 Token = "",
                                 FinishReason = partialResponse.FirstChoice.FinishReason,
-                                ToolCallRecords = toolCallRecords.Count > 0 ? toolCallRecords : null
+                                ToolCallRecords = recordsSnapshot
                             });
                         }
                     }
