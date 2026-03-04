@@ -82,6 +82,7 @@ namespace LetheAISharp.API
             var toolRound = 0;
             const int maxToolRounds = 10;
             var currentRequest = request;
+            var isYappingOver = false;
             try
             {
                 bool continueLoop = true;
@@ -107,6 +108,10 @@ namespace LetheAISharp.API
                         {
                             cumulativeDelta += partialResponse.FirstChoice.Delta.Content;
                             var hasFinishReason = !string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason);
+                            if (hasFinishReason && partialResponse.FirstChoice.FinishReason == "stop")
+                            {
+                                isYappingOver = true;
+                            }
                             RaiseOnStreamingResponse(new OpenTokenResponse
                             {
                                 Token = partialResponse.FirstChoice.Delta.Content,
@@ -114,7 +119,7 @@ namespace LetheAISharp.API
                                 ToolCallRecords = hasFinishReason && toolCallRecords.Count > 0 ? toolCallRecords : null
                             });
                         }
-                        else if (!string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason) && partialResponse.FirstChoice.FinishReason != "null")
+                        else if (!string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason) && partialResponse.FirstChoice.FinishReason != "null" && !isYappingOver)
                         {
                             RaiseOnStreamingResponse(new OpenTokenResponse
                             {
