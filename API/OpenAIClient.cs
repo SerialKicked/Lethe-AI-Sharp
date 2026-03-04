@@ -174,12 +174,15 @@ namespace LetheAISharp.API
                         }
                         else if (!string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason) && partialResponse.FirstChoice.FinishReason != "null" && !isYappingOver)
                         {
-                            RaiseOnStreamingResponse(new OpenTokenResponse
-                            {
-                                Token = "",
-                                FinishReason = partialResponse.FirstChoice.FinishReason,
-                                ToolCallRecords = toolCallRecords.Count > 0 ? toolCallRecords : null
-                            });
+                            if (partialResponse.FirstChoice.FinishReason != "tool_calls" || toolCallRecords?.Count >0)
+                                RaiseOnStreamingResponse(new OpenTokenResponse
+                                {
+                                    Token = "",
+                                    FinishReason = partialResponse.FirstChoice.FinishReason,
+                                    ToolCallRecords = toolCallRecords?.Count > 0 ? toolCallRecords : null
+                                });
+                            if (partialResponse.FirstChoice.FinishReason == "stop" || partialResponse.FirstChoice.FinishReason == "length")
+                                break;
                         }
                     }
                 }

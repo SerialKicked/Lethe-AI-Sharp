@@ -340,6 +340,8 @@ namespace LetheAISharp.Files
         {
             if (Sessions.Count == 0)
                 Sessions.Add(CreateChatSession());
+            if (single.ToolCalls?.Count > 0)
+                single.Hidden = true;
             OnBeforeMessageAdded?.Invoke(this, single);
             CurrentSession.Messages.Add(single);
             OnMessageAdded?.Invoke(this, single);
@@ -445,7 +447,7 @@ namespace LetheAISharp.Files
                 else
                     msgtxt += " The last chat was " + ((int)timespan.TotalMinutes).ToString() + " minutes ago.";
             }
-            LogMessage(AuthorRole.System, LLMEngine.Bot.ReplaceMacros(msgtxt), LLMEngine.User, LLMEngine.Bot);
+            LogMessage(new SingleMessage(AuthorRole.System, LLMEngine.Bot.ReplaceMacros(msgtxt));
         }
 
         /// <summary>
