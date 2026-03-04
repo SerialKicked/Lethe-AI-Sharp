@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using System;
 using System.Drawing;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using static LetheAISharp.SearchAPI.WebSearchAPI;
 
@@ -761,17 +762,23 @@ namespace LetheAISharp.LLM
                 }
 
                 // Log tool call exchanges to history so full chat mode can reconstruct the message sequence
+                // Group by round: one assistant message per round with all tool calls, then individual ToolResult messages
                 if (!_isSimpleQuery && e.ToolCallRecords != null && e.ToolCallRecords.Count > 0)
                 {
-                    foreach (var record in e.ToolCallRecords)
+                    foreach (var roundGroup in e.ToolCallRecords.GroupBy(r => r.Round).OrderBy(g => g.Key))
                     {
-                        // Log the assistant's tool call request as an Assistant message with ToolCalls
-                        var toolCallMsg = new SingleMessage(AuthorRole.Assistant, string.Empty, toolCalls: [record]);
+                        var roundRecords = roundGroup.ToList();
+
+                        // Log one assistant message for this round containing ALL tool calls
+                        var toolCallMsg = new SingleMessage(AuthorRole.Assistant, string.Empty, toolCalls: roundRecords);
                         Bot.History.LogMessage(toolCallMsg);
 
-                        // Log the tool result as a ToolResult message
-                        var toolResultMsg = new SingleMessage(AuthorRole.ToolResult, record.Success ? record.ResultJson : (record.Error ?? "Tool execution failed"), toolCalls: [record]);
-                        Bot.History.LogMessage(toolResultMsg);
+                        // Log one ToolResult message per individual tool call result
+                        foreach (var record in roundRecords)
+                        {
+                            var toolResultMsg = new SingleMessage(AuthorRole.ToolResult, record.Success ? record.ResultJson : (record.Error ?? "Tool execution failed"), toolCalls: [record]);
+                            Bot.History.LogMessage(toolResultMsg);
+                        }
                     }
                 }
 

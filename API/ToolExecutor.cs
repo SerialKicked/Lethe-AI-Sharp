@@ -24,10 +24,12 @@ namespace LetheAISharp.API
         /// Executes all tool calls from a completed streaming response.
         /// </summary>
         /// <param name="toolCalls">The tool calls requested by the model.</param>
+        /// <param name="round">Zero-based tool-calling round index.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>A tuple of tool response messages and their corresponding records.</returns>
         public async Task<(List<OpenAI.Chat.Message> toolMessages, List<ToolCallRecord> records)> ExecuteToolCalls(
             IReadOnlyList<OpenAI.ToolCall> toolCalls,
+            int round,
             CancellationToken ct)
         {
             var toolMessages = new List<OpenAI.Chat.Message>();
@@ -66,7 +68,8 @@ namespace LetheAISharp.API
                     ResultJson = success ? functionResult : string.Empty,
                     Error = success ? null : functionResult,
                     Success = success,
-                    Duration = sw.Elapsed
+                    Duration = sw.Elapsed,
+                    Round = round
                 };
                 ToolCallCompleted?.Invoke(this, completedRecord);
                 records.Add(completedRecord);

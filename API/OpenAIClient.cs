@@ -96,7 +96,7 @@ namespace LetheAISharp.API
                         {
                             if (toolRound < maxToolRounds)
                             {
-                                var (toolmsgs, records) = await ToolExecutor.ExecuteToolCalls(partialResponse.FirstChoice.Message.ToolCalls, cancellationToken).ConfigureAwait(false);
+                                var (toolmsgs, records) = await ToolExecutor.ExecuteToolCalls(partialResponse.FirstChoice.Message.ToolCalls, toolRound, cancellationToken).ConfigureAwait(false);
                                 toolCallRecords.AddRange(records);
                                 currentRequest = ToolExecutor.RebuildRequest(currentRequest, partialResponse.FirstChoice.Message, toolmsgs);
                                 toolRound++;
