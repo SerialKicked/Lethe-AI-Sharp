@@ -38,7 +38,19 @@ These examples are provided as reference code. To run them:
 
 **Good for**: Building chatbots and conversational applications
 
-### 3. InteractiveChatExample.cs
+### 3. PluginDllExample.cs
+**Purpose**: Shows the complete pattern for building a plugin DLL that contributes custom tasks and actions
+
+**Features shown**:
+- Implementing `IPluginEntry` for optional custom registration logic
+- Implementing `IAgentTask` (with `Observe` / `Execute` / `GetDefaultSettings`)
+- Implementing `IAgentAction<TResult, TParam>`
+- Loading a plugins folder at startup with `RegisterPluginsFromDirectory`
+- Loading a single DLL directly with `RegisterDll`
+
+**Good for**: Building external plugin DLLs that extend the agent system without modifying host-app code
+
+### 4. InteractiveChatExample.cs
 **Purpose**: A complete interactive console chat application
 
 **Features shown**:
