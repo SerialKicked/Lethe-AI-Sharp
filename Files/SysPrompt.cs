@@ -67,7 +67,7 @@ namespace LetheAISharp.Files
         /// </summary>
         public string SubCategorySeparator { get; set; } = "##";
 
-        internal string GetSystemPromptRaw(BasePersona character)
+        public string GetSystemPromptRaw(BasePersona character)
         {
             var selprompt = !string.IsNullOrEmpty(character.SystemPrompt) ? character.SystemPrompt : Prompt;
             var res = new StringBuilder(selprompt.CleanupAndTrim());
