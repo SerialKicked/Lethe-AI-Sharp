@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -321,6 +322,89 @@ namespace LetheAISharp.Agent
             lst.Add("ResearchTask");
             lst.Add("ActiveResearchTask");
             return lst.AsReadOnly();
+        }
+
+        /// <summary>
+        /// Loads a plugin DLL and auto-discovers and registers all
+        /// <see cref="IAgentTask"/> and <see cref="IAgentAction{TResult,TParam}"/> implementations.
+        /// Any class implementing <see cref="IPluginEntry"/> is invoked first so the plugin
+        /// can perform its own registration logic before automatic discovery runs.
+        /// </summary>
+        /// <param name="dllPath">Absolute path to the plugin DLL.</param>
+        /// <exception cref="FileNotFoundException">Thrown when the DLL file does not exist.</exception>
+        public static void RegisterDll(string dllPath)
+        {
+            if (!File.Exists(dllPath))
+                throw new FileNotFoundException($"Plugin DLL not found: {dllPath}", dllPath);
+
+            var assembly = Assembly.LoadFrom(dllPath);
+            var dllName = Path.GetFileName(dllPath);
+
+            // 1) Invoke any explicit entry points first (gives plugin authors full control)
+            foreach (var type in assembly.GetTypes()
+                         .Where(t => typeof(IPluginEntry).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
+            {
+                try
+                {
+                    var entry = (IPluginEntry)Activator.CreateInstance(type)!;
+                    entry.Register();
+                }
+                catch (Exception ex)
+                {
+                    LLMEngine.Logger?.LogError(ex, "Failed to invoke IPluginEntry on type {type} from {dll}", type.FullName, dllName);
+                }
+            }
+
+            // 2) Auto-discover IAgentTask implementations
+            foreach (var type in assembly.GetTypes()
+                         .Where(t => typeof(IAgentTask).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
+            {
+                var instance = (IAgentTask)Activator.CreateInstance(type)!;
+                if (_pluginRegistry.ContainsKey(instance.Id))
+                    continue;
+                var capturedType = type;
+                _pluginRegistry[instance.Id] = () => (IAgentTask)Activator.CreateInstance(capturedType)!;
+                LLMEngine.Logger?.LogInformation("Auto-registered task plugin: {id} from {dll}", instance.Id, dllName);
+            }
+
+            // 3) Auto-discover IAgentAction<,> implementations
+            foreach (var type in assembly.GetTypes()
+                         .Where(t => !t.IsAbstract && !t.IsInterface
+                                     && t.GetInterfaces().Any(i => i.IsGenericType
+                                                                    && i.GetGenericTypeDefinition() == typeof(IAgentAction<,>))))
+            {
+                var instance = Activator.CreateInstance(type)!;
+                var id = type.GetProperty("Id")?.GetValue(instance) as string;
+                if (string.IsNullOrEmpty(id) || _actions.ContainsKey(id))
+                    continue;
+                _actions[id] = instance;
+                LLMEngine.Logger?.LogInformation("Auto-registered action plugin: {id} from {dll}", id, dllName);
+            }
+        }
+
+        /// <summary>
+        /// Loads all plugin DLLs from a directory, calling <see cref="RegisterDll"/> for each match.
+        /// Returns silently if the directory does not exist. Errors for individual DLLs are logged
+        /// and do not prevent other DLLs from loading.
+        /// </summary>
+        /// <param name="directoryPath">Path to the plugins folder.</param>
+        /// <param name="searchPattern">File search pattern; defaults to <c>*.dll</c>.</param>
+        public static void RegisterPluginsFromDirectory(string directoryPath, string searchPattern = "*.dll")
+        {
+            if (!Directory.Exists(directoryPath))
+                return;
+
+            foreach (var dll in Directory.GetFiles(directoryPath, searchPattern))
+            {
+                try
+                {
+                    RegisterDll(dll);
+                }
+                catch (Exception ex)
+                {
+                    LLMEngine.Logger?.LogError(ex, "Failed to load plugin DLL: {dll}", Path.GetFileName(dll));
+                }
+            }
         }
 
         #endregion
