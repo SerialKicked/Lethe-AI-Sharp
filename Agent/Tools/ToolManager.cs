@@ -1,0 +1,69 @@
+﻿using OpenAI;
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace LetheAISharp.Agent.Tools
+{
+    public class ToolManager
+    {
+
+        private readonly Dictionary<string, IToolList> _toolLists = new();
+
+        public List<Tool> GetToolList() => _toolLists.Count == 0 ? [] : [.. _toolLists.Values.SelectMany(tl => tl.GetToolList())];
+
+        public void RegisterToolList(IToolList toolList)
+        {
+            if (toolList == null || string.IsNullOrWhiteSpace(toolList.Id))
+                throw new ArgumentException("Tool list must have a valid ID.");
+            _toolLists[toolList.Id] = toolList;
+            toolList.LoadTools();
+        }
+
+        public bool UnregisterToolList(string id)
+        {
+            if (_toolLists.ContainsKey(id))
+            {
+                _toolLists[id].UnloadTools();
+                _toolLists.Remove(id);
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        public IReadOnlyList<Tool> GetToolsForIds(params string[] ids)
+        {
+            var tools = new List<Tool>();
+            foreach (var id in ids)
+            {
+                if (_toolLists.TryGetValue(id, out var toolList))
+                {
+                    tools.AddRange(toolList.GetToolList());
+                }
+                else
+                {
+                    throw new KeyNotFoundException($"No tool list found with ID: {id}");
+                }
+            }
+            return tools;
+        }
+
+        public bool RequiresConfirmation(string functionName)
+        {
+            return _toolLists.Values.Any(tl => tl.RequiresConfirmation(functionName));
+        }
+
+        public bool HasTools()
+        {
+            return _toolLists.Count > 0;
+        }
+
+        public int EstimatedTokenCost()
+        {
+            return _toolLists.Values.Sum(tl => tl.EstimatedTokenCost) * 2;
+        }
+    }
+}
