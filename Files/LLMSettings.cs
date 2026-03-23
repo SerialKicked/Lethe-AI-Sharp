@@ -106,7 +106,16 @@ namespace LetheAISharp.Files
         /// </summary>
         public int ToolCallLimit { get; set; } = 10;
 
+        /// <summary>
+        /// TODO: Keep the last "ToolCallMemoryLimit" tool calls and results only, instead of all the tool calls performed during the generation. 
+        /// This can help reduce the context length and improve performance when many tool calls are made. Set to 0 to keep all tool calls in memory.
+        /// </summary>
         public int ToolCallMemoryLimit { get; set; } = 15;
+
+        /// <summary>
+        /// List of the toolsets that are allowed to be called by the agent. The toolsets must be registered in the ToolManager with their respective ID.
+        /// </summary>
+        public HashSet<string> AllowedToolsets { get; set; } = [];
 
         #endregion
 

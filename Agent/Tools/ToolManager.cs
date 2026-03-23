@@ -1,4 +1,5 @@
-﻿using OpenAI;
+﻿using LetheAISharp.LLM;
+using OpenAI;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -8,9 +9,11 @@ namespace LetheAISharp.Agent.Tools
     public class ToolManager
     {
 
-        private readonly Dictionary<string, IToolList> _toolLists = new();
+        private readonly Dictionary<string, IToolList> _toolLists = [];
 
-        public List<Tool> GetToolList() => _toolLists.Count == 0 ? [] : [.. _toolLists.Values.SelectMany(tl => tl.GetToolList())];
+        public HashSet<string> AllowedToolSets => LLMEngine.Settings.AllowedToolsets;
+
+        public List<Tool> GetToolList() => _toolLists.Count == 0 ? [] : [.. _toolLists.Values.SelectMany(tl => tl.GetToolList()).Where(e => AllowedToolSets.Contains(e.Id))];
 
         public void RegisterToolList(IToolList toolList)
         {
@@ -19,6 +22,8 @@ namespace LetheAISharp.Agent.Tools
             _toolLists[toolList.Id] = toolList;
             toolList.LoadTools();
         }
+
+        public List<string> GetRegisteredToolListIds() => [.. _toolLists.Keys];
 
         public bool UnregisterToolList(string id)
         {
@@ -58,12 +63,12 @@ namespace LetheAISharp.Agent.Tools
 
         public bool HasTools()
         {
-            return _toolLists.Count > 0;
+            return _toolLists.Values.FirstOrDefault(e => AllowedToolSets.Contains(e.Id)) is not null;
         }
 
         public int EstimatedTokenCost()
         {
-            return _toolLists.Values.Sum(tl => tl.EstimatedTokenCost) * 2;
+            return _toolLists.Values.Where(e => AllowedToolSets.Contains(e.Id)).Sum(tl => tl.EstimatedTokenCost) * 2;
         }
     }
 }
