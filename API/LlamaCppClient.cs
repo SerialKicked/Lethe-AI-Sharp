@@ -78,7 +78,7 @@ namespace LetheAISharp.API
             var cumulativeDelta = string.Empty;
             var toolCallRecords = new List<ToolCallRecord>();
             var toolRound = 0;
-            int maxToolRounds = LLMEngine.Settings.ToolCallLimit;
+            int maxToolRounds = LLMEngine.Settings.ToolCallLimit == 0 ? int.MaxValue : LLMEngine.Settings.ToolCallLimit;
             var currentRequest = request;
             var ChatMessageLog = new List<OpenAI.Chat.Message>();
 
