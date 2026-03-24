@@ -23,7 +23,7 @@ namespace LetheAISharp.LLM
         {
             _streamBuffer.Append(token);
             // Handle case where there's no thinking tags at all — just flush directly to talking
-            if (string.IsNullOrEmpty(LLMEngine.Instruct.ThinkingStart) || string.IsNullOrEmpty(LLMEngine.Instruct.ThinkingEnd))
+            if (string.IsNullOrEmpty(LLMEngine.Instruct.ThinkingStart) || string.IsNullOrEmpty(LLMEngine.Instruct.ThinkingEnd) || LLMEngine.Settings.DisableThinking)
             {
                 talkingBuffer.Append(token);
                 _streamBuffer.Clear();

@@ -867,7 +867,7 @@ namespace LetheAISharp.LLM
                 if (CompletionAPIType == CompletionType.Chat && 
                     string.IsNullOrEmpty(StreamingTextProgress) && 
                     Client!.ThinkTagBehavior == BackendChatCompletionThinkTagBehavior.Silent && 
-                    Instruct.IsThinkFormat && 
+                    Instruct.IsThinkFormat && !LLMEngine.Settings.DisableThinking &&
                     e.Token != Instruct.ThinkingStart.Replace("\n", ""))
                 {
                     StreamingTextProgress = Instruct.ThinkingStart;

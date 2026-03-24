@@ -464,7 +464,7 @@ namespace OpenAI.Chat
 
         [JsonPropertyName("chat_template_kwargs")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-        public Dictionary<string, string>? chat_template_kwargs { get; set; } = null;
+        public Dictionary<string, object>? chat_template_kwargs { get; set; } = null;
         /// <inheritdoc />
         public override string ToString() => JsonSerializer.Serialize(this, OpenAIClient.JsonSerializationOptions);
     }

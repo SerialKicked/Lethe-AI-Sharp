@@ -185,7 +185,7 @@ namespace LetheAISharp
 
             if (LLMEngine.ToolCallsLoaded && _currentSchema is null)
             {
-                return new ChatRequest(finalprompt,
+                var req = new ChatRequest(finalprompt,
                     tools: LLMEngine.ToolManager.GetToolList(),
                     toolChoice: "auto",
                     topP: dooverride ? null : LLMEngine.Sampler.Top_p,
@@ -197,10 +197,16 @@ namespace LetheAISharp
                     parallelToolCalls: LLMEngine.Client?.SupportParallelToolCall ?? false,
                     maxTokens: responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride,
                     temperature: temp);
+
+                req.chat_template_kwargs = new Dictionary<string, object>()
+                    {
+                        { "enable_thinking", !LLMEngine.Settings.DisableThinking }
+                    };
+                return req;
             }
             else
             {
-                return new ChatRequest(finalprompt,
+                var req = new ChatRequest(finalprompt,
                     topP: dooverride ? null : LLMEngine.Sampler.Top_p,
                     frequencyPenalty: dooverride ? null : LLMEngine.Sampler.Rep_pen - 1,
                     seed: setseed,
@@ -211,6 +217,11 @@ namespace LetheAISharp
                     parallelToolCalls: LLMEngine.Client?.SupportParallelToolCall ?? false,
                     maxTokens: responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride,
                     temperature: temp);
+                req.chat_template_kwargs = new Dictionary<string, object>()
+                    {
+                        { "enable_thinking", !LLMEngine.Settings.DisableThinking }
+                    };
+                return req;
             }
 
         }
