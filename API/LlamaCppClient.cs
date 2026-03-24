@@ -171,7 +171,7 @@ namespace LetheAISharp.API
                                 // Create a new request preserving all original parameters
                                 currentRequest = new ChatRequest(
                                     messages: updatedMessages,
-                                    tools: currentRequest.Tools,
+                                    tools: currentRequest.Tools ?? [],
                                     toolChoice: toolRound < maxToolRounds ? "auto" : "none",
                                     model: currentRequest.Model,
                                     maxTokens: currentRequest.MaxCompletionTokens,
