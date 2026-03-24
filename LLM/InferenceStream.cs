@@ -1,4 +1,6 @@
+using OpenAI;
 using System.Collections.Generic;
+using System.Text.Json.Nodes;
 
 namespace LetheAISharp.LLM
 {
@@ -123,6 +125,11 @@ namespace LetheAISharp.LLM
         public override string ToString()
         {
             return $"[Function: {FunctionName} (CallId: {CallId})]\nArguments: {ArgumentsJson}";
+        }
+
+        public ToolCall ToToolcall()
+        {
+            return new ToolCall(CallId, FunctionName, JsonNode.Parse(ArgumentsJson));
         }
     }
 }

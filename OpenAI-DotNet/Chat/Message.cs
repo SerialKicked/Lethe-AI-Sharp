@@ -41,7 +41,7 @@ namespace OpenAI.Chat
         /// The contents of the message.
         /// </param>
         /// <param name="name"></param>
-        public Message(Role role, string content, string name = null)
+        public Message(Role role, string content, string? name = null)
         {
             Role = role;
             Content = content;

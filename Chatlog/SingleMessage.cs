@@ -80,8 +80,11 @@ namespace LetheAISharp.Files
             // Assistant tool-call-only messages: skip all name/image logic
             if (Role == AuthorRole.Assistant && ToolCalls?.Count > 0 && string.IsNullOrEmpty(Message))
             {
-                var tc = new ToolCall(ToolCalls[0].CallId, ToolCalls[0].FunctionName, JsonNode.Parse(ToolCalls[0].ArgumentsJson));
-                return new Message(tc, ToolCallToString());
+                var calls = new List<ToolCall>();
+                foreach (var toolCallRecord in ToolCalls)
+                    calls.Add(toolCallRecord.ToToolcall());
+                // new system
+                return new Message(OpenAI.Role.Assistant, calls, Message);
             }
 
             var realprompt = Message;

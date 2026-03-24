@@ -14,7 +14,7 @@ namespace OpenAI.Chat
         /// <inheritdoc />
         public ChatRequest(
             IEnumerable<Message> messages,
-            IEnumerable<Tool> tools,
+            IEnumerable<Tool>? tools,
             string? toolChoice = null,
             string? model = null,
             double? frequencyPenalty = null,

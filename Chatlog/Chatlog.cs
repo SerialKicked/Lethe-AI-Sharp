@@ -645,7 +645,7 @@ namespace LetheAISharp.Files
 
         public virtual void SaveToFile(string pPath) 
         {
-            var content = JsonConvert.SerializeObject(this, new JsonSerializerSettings { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore });
+            var content = JsonConvert.SerializeObject(this, new JsonSerializerSettings { Formatting = Formatting.Indented, NullValueHandling = NullValueHandling.Ignore, ReferenceLoopHandling = ReferenceLoopHandling.Ignore });
             // create directory if it doesn't exist
             var dir = Path.GetDirectoryName(pPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))

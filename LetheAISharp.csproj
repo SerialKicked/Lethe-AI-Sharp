@@ -14,7 +14,7 @@
      <PackageReadmeFile>README.md</PackageReadmeFile>
      <PackageIcon>Sarah.png</PackageIcon>
   </PropertyGroup>
-  
+
   <ItemGroup>
     <PackageReference Include="HNSW" Version="26.1.63669" />
     <PackageReference Include="LLamaSharp" Version="0.26.0" />

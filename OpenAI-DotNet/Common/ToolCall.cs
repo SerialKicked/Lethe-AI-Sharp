@@ -12,7 +12,7 @@ namespace OpenAI
     {
         public ToolCall() { }
 
-        public ToolCall(string toolCallId, string functionName, JsonNode functionArguments = null)
+        public ToolCall(string toolCallId, string functionName, JsonNode? functionArguments = null)
         {
             Id = toolCallId;
             Function = new Function(functionName, arguments: functionArguments);
