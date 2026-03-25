@@ -208,8 +208,7 @@ namespace LetheAISharp.LLM
         public static readonly string NewLine = "\n";
 
         private static SystemStatus status = SystemStatus.NotInit;
-        private static string StreamingTextProgress = string.Empty;
-        private static string UntouchedText = string.Empty;
+        private static StringBuilder StreamingTextProgress = new();
         private static InferenceChannel _currentChannel = InferenceChannel.Text;
         private static InstructFormat instruct = new() 
         { 
@@ -508,10 +507,10 @@ namespace LetheAISharp.LLM
                 Status = SystemStatus.Busy;
                 ResetStreamingState();
                 if (!ToolCallsLoaded)
-                    StreamingTextProgress = Instruct.GetThinkPrefill();
+                    StreamingTextProgress = new StringBuilder(Instruct.GetThinkPrefill());
                 if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
                 {
-                    RaiseOnInferenceStreamed(StreamingTextProgress);
+                    RaiseOnInferenceStreamed(StreamingTextProgress.ToString());
                 }
                 RaiseOnFullPromptReady(PromptBuilder.PromptToText());
                 await Client.GenerateTextStreaming(PromptBuilder.PromptToQuery(AuthorRole.Assistant, forceAltRoles: IsGroupConversation && Settings.GroupInstructFormatAdapter)).ConfigureAwait(false);
@@ -760,13 +759,11 @@ namespace LetheAISharp.LLM
         {
             // "null", "stop", "length"
 
-            UntouchedText += e.Token;
-
             if (e.IsComplete)
             {
                 if (!string.IsNullOrEmpty(e.Token))
                 {
-                    StreamingTextProgress += e.Token;
+                    StreamingTextProgress.Append(e.Token);
                     _currentChannel = textStreamReceiver.FeedToken(e.Token);
                 }
                 var response = textStreamReceiver.GetFormattedText();
@@ -862,26 +859,26 @@ namespace LetheAISharp.LLM
                     RaiseInferenceCompleted(inferenceResult);
                 }
                 // reset StreamingTextProgress to get it ready for next message (if any)
-                if (!string.IsNullOrEmpty(StreamingTextProgress))
+                if (!string.IsNullOrEmpty(StreamingTextProgress.ToString()))
                 {
-                    Logger?.LogInformation("[Message] {message}", StreamingTextProgress.RemoveNewLines());
+                    Logger?.LogInformation("[Message] {message}", StreamingTextProgress.ToString().RemoveNewLines());
                 }
-                StreamingTextProgress = string.Empty;
+                StreamingTextProgress.Clear();
             }
             else
             {
                 var token = e.Token;
                 if (CompletionAPIType == CompletionType.Chat 
-                    && string.IsNullOrEmpty(StreamingTextProgress) 
+                    && string.IsNullOrEmpty(StreamingTextProgress.ToString()) 
                     && Client!.ThinkTagBehavior == BackendChatCompletionThinkTagBehavior.Silent 
                     && Instruct.IsThinkFormat 
                     && !Settings.DisableThinking 
                     && e.Token != Instruct.ThinkingStart.Replace("\n", ""))
                 {
-                    StreamingTextProgress = Instruct.ThinkingStart;
+                    StreamingTextProgress = new StringBuilder(Instruct.ThinkingStart);
                     token = Instruct.ThinkingStart + token;
                 }
-                StreamingTextProgress += e.Token;
+                StreamingTextProgress.Append(e.Token);
                 _currentChannel = textStreamReceiver.FeedToken(token);
                 RaiseInferenceSegment(new InferenceSegment { Channel = _currentChannel, Text = token, IsComplete = false });
                 RaiseOnInferenceStreamed(token);
@@ -893,8 +890,7 @@ namespace LetheAISharp.LLM
         /// </summary>
         private static void ResetStreamingState()
         {
-            StreamingTextProgress = string.Empty;
-            UntouchedText = string.Empty;
+            StreamingTextProgress.Clear();
             textStreamReceiver.Reset();
         }
 
@@ -1121,10 +1117,13 @@ namespace LetheAISharp.LLM
 
             ResetStreamingState();
             if (!ToolCallsLoaded)
-                StreamingTextProgress = Instruct.GetThinkPrefill();
+            {
+                StreamingTextProgress.Clear();
+                StreamingTextProgress.Append(Instruct.GetThinkPrefill());
+            }
             if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
             {
-                RaiseOnInferenceStreamed(StreamingTextProgress);
+                RaiseOnInferenceStreamed(StreamingTextProgress.ToString());
             }
 
             if (!string.IsNullOrEmpty(message.Message))

@@ -30,18 +30,23 @@ namespace LetheAISharp.LLM
                 return InferenceChannel.Text;            
             }
 
-            // local function to determine how much of the buffer is safe to flush without risking cutting a tag in half
-            var buf = _streamBuffer.ToString();
+            // Cache once — each property access calls Replace() which allocates a new string
+            ReadOnlySpan<char> startTag = StartThinkingToken;
+            ReadOnlySpan<char> endTag = EndThinkingToken;
+
+            // Materialize _streamBuffer once (it holds at most tag.Length-1 chars between calls).
+            // All subsequent slicing operates on ReadOnlySpan<char> — zero heap allocations.
+            ReadOnlySpan<char> buf = _streamBuffer.ToString();
             while (true)
             {
                 if (currentState == InferenceChannel.Thinking)
                 {
-                    var closeIdx = buf.IndexOf(EndThinkingToken, StringComparison.Ordinal);
+                    var closeIdx = buf.IndexOf(endTag, StringComparison.Ordinal);
                     if (closeIdx >= 0)
                     {
                         // Dump everything before the close tag into thinking
                         thinkingBuffer.Append(buf[..closeIdx]);
-                        buf = buf[(closeIdx + EndThinkingToken.Length)..];
+                        buf = buf[(closeIdx + endTag.Length)..];
                         currentState = InferenceChannel.Text;
                         // Don't break — there might be more to process in the remainder
                     }
@@ -49,7 +54,7 @@ namespace LetheAISharp.LLM
                     {
                         // No close tag yet — safe to flush everything except
                         // a tail that could be a partial close tag
-                        var safeLen = SafeFlushLength(buf, EndThinkingToken);
+                        var safeLen = SafeFlushLength(buf, endTag);
                         if (safeLen > 0)
                             thinkingBuffer.Append(buf[..safeLen]);
                         buf = buf[safeLen..];
@@ -58,16 +63,16 @@ namespace LetheAISharp.LLM
                 }
                 else
                 {
-                    var openIdx = buf.IndexOf(StartThinkingToken, StringComparison.Ordinal);
+                    var openIdx = buf.IndexOf(startTag, StringComparison.Ordinal);
                     if (openIdx >= 0)
                     {
                         talkingBuffer.Append(buf[..openIdx]);
-                        buf = buf[(openIdx + StartThinkingToken.Length)..];
+                        buf = buf[(openIdx + startTag.Length)..];
                         currentState = InferenceChannel.Thinking;
                     }
                     else
                     {
-                        var safeLen = SafeFlushLength(buf, StartThinkingToken);
+                        var safeLen = SafeFlushLength(buf, startTag);
                         if (safeLen > 0)
                             talkingBuffer.Append(buf[..safeLen]);
                         buf = buf[safeLen..];
@@ -88,7 +93,7 @@ namespace LetheAISharp.LLM
 
         // Returns how many chars from the start of buf can be safely flushed
         // without risking cutting off a partial match of tag at the end
-        private static int SafeFlushLength(string buf, string tag)
+        private static int SafeFlushLength(ReadOnlySpan<char> buf, ReadOnlySpan<char> tag)
         {
             // Walk back from the end to find the longest suffix that is a prefix of tag
             for (int suffixLen = Math.Min(tag.Length - 1, buf.Length); suffixLen > 0; suffixLen--)
