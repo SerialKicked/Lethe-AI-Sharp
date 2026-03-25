@@ -100,6 +100,15 @@ namespace LetheAISharp.API
             var param = input;
             try
             {
+                if (LLMEngine.Settings.BackendLLamaCppAllowAllSamplers)
+                {
+                    var serverState = await _client.GetServerStateAsync(token).ConfigureAwait(false);
+                    if (serverState?.default_generation_settings != null)
+                    {
+                        serverState.default_generation_settings.Params.ImportSamplers(LLMEngine.Sampler);
+                        await _client.SetServerStateAsync(serverState, token).ConfigureAwait(false);
+                    }
+                }
                 var result = await _client.ChatCompletion(param, token).ConfigureAwait(false);
                 var res = result?.Message.Content.ToString();
                 return res ?? string.Empty;
@@ -122,6 +131,17 @@ namespace LetheAISharp.API
                 cts = new CancellationTokenSource();
                 token = cts.Token;
             }
+
+            if (LLMEngine.Settings.BackendLLamaCppAllowAllSamplers)
+            {
+                var serverState = await _client.GetServerStateAsync(token).ConfigureAwait(false);
+                if (serverState?.default_generation_settings != null)
+                {
+                    serverState.default_generation_settings.Params.ImportSamplers(LLMEngine.Sampler);
+                    await _client.SetServerStateAsync(serverState, token).ConfigureAwait(false);
+                }
+            }
+
             await _client.StreamChatCompletion(input, token).ConfigureAwait(false);
         }
 

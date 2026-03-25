@@ -139,23 +139,5 @@ namespace LetheAISharp
 
         #endregion
 
-
-        #region *** Visual Large Language Models (VLM) *** 
-
-        /// <summary>
-        /// Clears the list of images to be sent to the backend.
-        /// </summary>
-        void VLM_ClearImages();
-
-        /// <summary>
-        /// Provide an image to be sent to the backend with the next prompt. The image will be resized to fit within the specified size (default 1024px).
-        /// </summary>
-        /// <param name="image">image</param>
-        /// <param name="size">dimension</param>
-        void VLM_AddImage(string imagePath, int size = 1024);
-
-        int VLM_GetImageCount();
-
-        #endregion
     }
 }

@@ -139,6 +139,9 @@ namespace LetheAISharp.Files
         /// <summary> Image embedding size (depends on the embedding model, but 768 is the most common one) </summary>
         public int ImageEmbeddingSize { get; set; } = 768;
 
+        /// <summary> Images larger than this resolution will be resized (depends on the model, but 1024 is, by far, the most common one) </summary>
+        public int ImageResolution { get; set; } = 1024;
+
         /// <summary> Maximum number of images to be sent in the prompt, this will save tokens when sending many images. Set to 0 for no limit. </summary>
         public int MaxImageCount { get; set; } = 4;
 

@@ -277,18 +277,5 @@ namespace LetheAISharp
         {
             _currentSchema = null;
         }
-
-        public void VLM_ClearImages()
-        {
-            imagefilepath.Clear();
-        }
-
-        public void VLM_AddImage(string imagePath, int size = 1024)
-        {
-            if (File.Exists(imagePath) && !imagefilepath.Contains(imagePath))
-                imagefilepath.Add(imagePath);
-        }
-
-        public int VLM_GetImageCount() => imagefilepath.Count;
     }
 }

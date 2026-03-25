@@ -2,6 +2,7 @@
 using LetheAISharp.API;
 using LetheAISharp.Files;
 using LetheAISharp.LLM;
+using LLama.Native;
 using Microsoft.Extensions.Logging;
 using OpenAI;
 using System;
@@ -147,6 +148,23 @@ namespace LetheAISharp
             }
             fullquery = fullquery.TrimEnd();
 
+            vlm_pictures = [];
+            var left = LLMEngine.Settings.MaxImageCount == 0 ? int.MaxValue : LLMEngine.Settings.MaxImageCount;
+            for (int i = _prompt.Count - 1; i >= 0; i--)
+            {
+                if (_prompt[i].Role == AuthorRole.User && !string.IsNullOrEmpty(_prompt[i].ImagePath) && File.Exists(_prompt[i].ImagePath))
+                {
+                    var res = ImageUtils.ImageToBase64(_prompt[i].ImagePath, LLMEngine.Settings.ImageResolution);
+                    if (res is not null)
+                    {
+                        vlm_pictures.Insert(0, res);
+                        left--;
+                        if (left <= 0)
+                            break;
+                    }
+                }
+            }
+
             GenerationInput genparams = LLMEngine.Sampler.GetCopy();
             if (tempoverride >= 0)
                 genparams.Temperature = tempoverride;
@@ -215,20 +233,5 @@ namespace LetheAISharp
         {
             return (string)GetFullPrompt();
         }
-
-        public void VLM_ClearImages()
-        {
-            vlm_pictures = [];
-        }
-
-        public void VLM_AddImage(string imagePath, int size = 1024)
-        {
-            var res = ImageUtils.ImageToBase64(imagePath, size);
-            if (!string.IsNullOrEmpty(res))
-                vlm_pictures.Add(res);
-        }
-
-        public int VLM_GetImageCount() => vlm_pictures.Count;
-
     }
 }

@@ -121,25 +121,25 @@ namespace LetheAISharp.Files
             {
                 case ".jpg":
                 case ".jpeg":
-                    content.Add(new(ContentType.ImageUrl, $"data:image/jpeg;base64,{ImageUtils.ImageToBase64(ImagePath, 1024)!}"));
+                    content.Add(new(ContentType.ImageUrl, $"data:image/jpeg;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
                     break;
                 case ".png":
-                    content.Add(new(ContentType.ImageUrl, $"data:image/png;base64,{ImageUtils.ImageToBase64(ImagePath, 1024)!}"));
+                    content.Add(new(ContentType.ImageUrl, $"data:image/png;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
                     break;
                 case ".gif":
-                    content.Add(new(ContentType.ImageUrl, $"data:image/gif;base64,{ImageUtils.ImageToBase64(ImagePath, 1024)!}"));
+                    content.Add(new(ContentType.ImageUrl, $"data:image/gif;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
                     break;
                 case ".bmp":
-                    content.Add(new(ContentType.ImageUrl, $"data:image/bmp;base64,{ImageUtils.ImageToBase64(ImagePath, 1024)!}"));
+                    content.Add(new(ContentType.ImageUrl, $"data:image/bmp;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
                     break;
                 case ".webp":
-                    content.Add(new(ContentType.ImageUrl, $"data:image/webp;base64,{ImageUtils.ImageToBase64(ImagePath, 1024)!}"));
+                    content.Add(new(ContentType.ImageUrl, $"data:image/webp;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
                     break;
                 case ".tiff ":
-                    content.Add(new(ContentType.ImageUrl, $"data:image/tiff;base64,{ImageUtils.ImageToBase64(ImagePath, 1024)!}"));
+                    content.Add(new(ContentType.ImageUrl, $"data:image/tiff;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
                     break;
                 default:
-                    content.Add(new(ContentType.ImageUrl, $"data:image/gif;base64,{ImageUtils.ImageToBase64(ImagePath, 1024)!}"));
+                    content.Add(new(ContentType.ImageUrl, $"data:image/gif;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
                     break;
             }
             content.Add(Bot.ReplaceMacros(realprompt, User));

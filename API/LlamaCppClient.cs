@@ -81,16 +81,6 @@ namespace LetheAISharp.API
             int maxToolRounds = LLMEngine.Settings.ToolCallLimit == 0 ? int.MaxValue : LLMEngine.Settings.ToolCallLimit;
             var currentRequest = request;
 
-            if (LLMEngine.Settings.BackendLLamaCppAllowAllSamplers)
-            {
-                var serverState = await GetServerStateAsync(cancellationToken).ConfigureAwait(false);
-                if (serverState?.default_generation_settings != null)
-                {
-                    serverState.default_generation_settings.Params.ImportSamplers(LLMEngine.Sampler);
-                    await SetServerStateAsync(serverState, cancellationToken).ConfigureAwait(false);
-                }
-            }
-
             try
             {
                 bool continueLoop = true;
@@ -176,11 +166,14 @@ namespace LetheAISharp.API
                                     stops: currentRequest.Stops,
                                     frequencyPenalty: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.FrequencyPenalty,
                                     presencePenalty: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.PresencePenalty,
-                                    temperature: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.Temperature,
+                                    temperature: currentRequest.Temperature,
                                     topP: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.TopP,
                                     jsonSchema: currentRequest.ResponseFormatObject?.JsonSchema,
                                     user: currentRequest.User
-                                );
+                                )
+                                {
+                                    chat_template_kwargs = request.chat_template_kwargs
+                                };
                             }
                             else
                             {
@@ -193,11 +186,14 @@ namespace LetheAISharp.API
                                     stops: currentRequest.Stops,
                                     frequencyPenalty: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.FrequencyPenalty,
                                     presencePenalty: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.PresencePenalty,
-                                    temperature: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.Temperature,
+                                    temperature: currentRequest.Temperature,
                                     topP: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.TopP,
                                     jsonSchema: currentRequest.ResponseFormatObject?.JsonSchema,
                                     user: currentRequest.User
-                                );
+                                )
+                                {
+                                    chat_template_kwargs = request.chat_template_kwargs
+                                };
                             }
                             // keep this here, otherwise the model doesn't receive a warning that tool calls have ended, and it'll imagine them instead.
                             toolRound++;

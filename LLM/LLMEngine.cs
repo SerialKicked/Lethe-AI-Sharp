@@ -719,28 +719,6 @@ namespace LetheAISharp.LLM
 
         #endregion
 
-        #region *** Visual Language Model Management ***
-
-        /// <summary>
-        /// Clears the list of images to be sent to the backend.
-        /// </summary>
-        public static void VLM_ClearImages()
-        {
-            PromptBuilder?.VLM_ClearImages();
-        }
-
-        /// <summary>
-        /// Provide an image to be sent to the backend with the next prompt. The image will be resized to fit within the specified size (default 1024px).
-        /// </summary>
-        /// <param name="image">image</param>
-        /// <param name="size">dimension</param>
-        public static void VLM_AddImage(string imagepath, int size = 1024)
-        {
-            if (File.Exists(imagepath))
-                PromptBuilder?.VLM_AddImage(imagepath, size);
-        }
-
-        #endregion
 
         #region *** Private and Internal Methods ***
 
