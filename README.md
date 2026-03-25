@@ -101,8 +101,8 @@ Alternatively, if running an external backend is too much, **Lethe AI** also com
 - Fact-based discovery: the bot learns about the user over time, helping with the recall of other memory units.
 
 ## 🧠 Agentic System
-- Extensible tool-calling functionalities, make custom toolsets that can be mixed and matched, example tools included
-- Customizable tasks can run in the background (while the user is AFK for instance)
+- Extensible tool-calling functionalities, make custom toolsets that can be mixed and matched, or imported from dll
+- Customizable tasks can run in the background while the user is AFK, can also be imported from dll
 - Includes 2 default tasks that run relevant web searches and mention results in following chat session
 - Write your own tasks easily to boost your bot's abilities
 
