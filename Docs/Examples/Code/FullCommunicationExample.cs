@@ -86,13 +86,16 @@ namespace LetheAISharp.Examples
                 Console.WriteLine($"Bot persona: {bot.Name} - {bot.Bio}");
                 Console.WriteLine($"User persona: {user.Name} - {user.Bio}");
                 Console.WriteLine();
-                
+
                 // Step 3: Setup event handlers
+                
+                // note: this one is the "old school" version, use LLMEngine.OnInferenceSegment for the new "thinking"-aware token output
                 LLMEngine.OnInferenceStreamed += (sender, token) =>
                 {
                     Console.Write(token);
                 };
-                
+
+                // note: this one is the "old school" version, use LLMEngine.OnInferenceCompleted for the new "thinking"-aware token output
                 LLMEngine.OnInferenceEnded += (sender, response) =>
                 {
                     // it's the app's responsibility to save the received message (or not)

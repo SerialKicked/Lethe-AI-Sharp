@@ -18,10 +18,9 @@ namespace OpenAI.Chat
     /// Given a chat conversation, the model will return a chat completion response.<br/>
     /// <see href="https://platform.openai.com/docs/api-reference/chat"/>
     /// </summary>
-    public sealed class ChatEndpoint : OpenAIBaseEndpoint
+    /// <inheritdoc />
+    public sealed class ChatEndpoint(OpenAIClient client) : OpenAIBaseEndpoint(client)
     {
-        /// <inheritdoc />
-        public ChatEndpoint(OpenAIClient client) : base(client) { }
 
         /// <inheritdoc />
         protected override string Root => "chat";
@@ -53,7 +52,7 @@ namespace OpenAI.Chat
             chatRequest.ResponseFormatObject = new TextResponseFormatConfiguration(typeof(T));
             var response = await GetCompletionAsync(chatRequest, cancellationToken).ConfigureAwait(false);
             var output = JsonSerializer.Deserialize<T>(response.FirstChoice, OpenAIClient.JsonSerializationOptions);
-            return (output, response);
+            return (output, response)!;
         }
 
         /// <summary>
@@ -95,7 +94,7 @@ namespace OpenAI.Chat
             {
                 resultHandler(response);
                 return Task.CompletedTask;
-            }, streamUsage, cancellationToken);
+            }, streamUsage, cancellationToken)!;
 
         /// <summary>
         /// Created a completion for the chat message and stream the results to the <paramref name="resultHandler"/> as they come in.
@@ -116,7 +115,7 @@ namespace OpenAI.Chat
             chatRequest.ResponseFormatObject = new TextResponseFormatConfiguration(typeof(T));
             var response = await StreamCompletionAsync(chatRequest, resultHandler, streamUsage, cancellationToken).ConfigureAwait(false);
             var output = JsonSerializer.Deserialize<T>(response.FirstChoice, OpenAIClient.JsonSerializationOptions);
-            return (output, response);
+            return (output, response)!;
         }
 
         /// <summary>
@@ -134,8 +133,8 @@ namespace OpenAI.Chat
         /// <returns><see cref="ChatResponse"/>.</returns>
         public async Task<ChatResponse> StreamCompletionAsync(ChatRequest chatRequest, Func<ChatResponse, Task> resultHandler, bool streamUsage = false, CancellationToken cancellationToken = default)
         {
-            if (chatRequest == null) { throw new ArgumentNullException(nameof(chatRequest)); }
-            if (resultHandler == null) { throw new ArgumentNullException(nameof(resultHandler)); }
+            ArgumentNullException.ThrowIfNull(chatRequest);
+            ArgumentNullException.ThrowIfNull(resultHandler);
             chatRequest.Stream = true;
             chatRequest.StreamOptions = streamUsage ? new StreamOptions() : null;
             ChatResponse chatResponse = null;

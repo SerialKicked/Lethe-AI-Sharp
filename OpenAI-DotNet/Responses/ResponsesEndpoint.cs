@@ -18,10 +18,8 @@ namespace OpenAI.Responses
     /// Extend the model's capabilities with built-in tools for file search, web search, computer use, and more.
     /// Allow the model access to external systems and data using function calling.
     /// </summary>
-    public sealed class ResponsesEndpoint : OpenAIBaseEndpoint
+    public sealed class ResponsesEndpoint(OpenAIClient client) : OpenAIBaseEndpoint(client)
     {
-        public ResponsesEndpoint(OpenAIClient client) : base(client) { }
-
         protected override string Root => "responses";
 
         /// <summary>
@@ -114,7 +112,7 @@ namespace OpenAI.Responses
                 output = JsonSerializer.Deserialize<T>(messageItem.ToString(), OpenAIClient.JsonSerializationOptions);
             }
 
-            return (output, response);
+            return (output, response)!;
         }
 
         private async Task<Response> StreamResponseAsync(string endpoint, StringContent payload, Func<string, IServerSentEvent, Task> streamEventHandler, CancellationToken cancellationToken)

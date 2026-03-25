@@ -83,6 +83,7 @@ namespace LetheAISharp.Examples
                 
                 // Setup event handlers for streaming
                 string fullResponse = "";
+                // note: this one is the "old school" version, use LLMEngine.OnInferenceSegment for the new "thinking"-aware token output
                 LLMEngine.OnInferenceStreamed += (sender, token) =>
                 {
                     Console.Write(token);
@@ -90,6 +91,7 @@ namespace LetheAISharp.Examples
                 };
                 
                 bool responseComplete = false;
+                // note: this one is the "old school" version, use LLMEngine.OnInferenceCompleted for the new "thinking"-aware token output
                 LLMEngine.OnInferenceEnded += (sender, complete) =>
                 {
                     Console.WriteLine();

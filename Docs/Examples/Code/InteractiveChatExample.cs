@@ -74,7 +74,10 @@ namespace LetheAISharp.Examples
                 LLMEngine.Settings.SessionHandling = SessionHandling.CurrentOnly;
 
                 // Setup event handlers for real-time response display
+
+                // note: this one is the "old school" version, use LLMEngine.OnInferenceSegment for the new "thinking"-aware token output
                 LLMEngine.OnInferenceStreamed += (sender, token) => Console.Write(token);
+                // note: this one is the "old school" version, use LLMEngine.OnInferenceCompleted for the new "thinking"-aware token output
                 LLMEngine.OnInferenceEnded += (sender, response) =>
                 {
                     // It's the app's responsibility to log the complete response to the chatlog
