@@ -133,6 +133,7 @@ namespace LetheAISharp.LLM
         {
             if (string.IsNullOrEmpty(StartThinkingToken))
                 return talkingBuffer.ToString();
+
             var think = thinkingBuffer.ToString();
             if (think.Length > 0)
                 think = think.Replace(StartThinkingToken, string.Empty);

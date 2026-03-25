@@ -209,6 +209,7 @@ namespace LetheAISharp.LLM
 
         private static SystemStatus status = SystemStatus.NotInit;
         private static string StreamingTextProgress = string.Empty;
+        private static string UntouchedText = string.Empty;
         private static InferenceChannel _currentChannel = InferenceChannel.Text;
         private static InstructFormat instruct = new() 
         { 
@@ -222,7 +223,7 @@ namespace LetheAISharp.LLM
             BotStart = "### Response:" + NewLine,
             BotEnd = "",
             NewLinesBetweenMessages = true,
-            StopStrings = [ "### Instruction:", "### Input:", "### Response:" ],
+            StopStrings = [ "### Instruct", "### Input", "### Response" ],
         };
         private static TextStreamReceiver textStreamReceiver = new();
 
@@ -758,6 +759,9 @@ namespace LetheAISharp.LLM
         private static void Client_StreamingMessageReceived(object? sender, LLMTokenStreamingEventArgs e)
         {
             // "null", "stop", "length"
+
+            UntouchedText += e.Token;
+
             if (e.IsComplete)
             {
                 if (!string.IsNullOrEmpty(e.Token))
@@ -766,6 +770,7 @@ namespace LetheAISharp.LLM
                     _currentChannel = textStreamReceiver.FeedToken(e.Token);
                 }
                 var response = textStreamReceiver.GetFormattedText();
+                // We went over the max response length (or reached stop string on some backends) and the backend had to cut the response
                 if (e.FinishReason == "length")
                 {
                     var removelist = Instruct.GetStoppingStrings(User, Bot);
@@ -779,6 +784,8 @@ namespace LetheAISharp.LLM
                         }
                     }
                 }
+
+                // if the finish reason is NOT a "tool_calls", we can execute the context plugin replacement.
                 if (e.FinishReason != "tool_calls")
                     foreach (var ctxplug in ContextPlugins)
                     {
@@ -864,11 +871,12 @@ namespace LetheAISharp.LLM
             else
             {
                 var token = e.Token;
-                if (CompletionAPIType == CompletionType.Chat && 
-                    string.IsNullOrEmpty(StreamingTextProgress) && 
-                    Client!.ThinkTagBehavior == BackendChatCompletionThinkTagBehavior.Silent && 
-                    Instruct.IsThinkFormat && !LLMEngine.Settings.DisableThinking &&
-                    e.Token != Instruct.ThinkingStart.Replace("\n", ""))
+                if (CompletionAPIType == CompletionType.Chat 
+                    && string.IsNullOrEmpty(StreamingTextProgress) 
+                    && Client!.ThinkTagBehavior == BackendChatCompletionThinkTagBehavior.Silent 
+                    && Instruct.IsThinkFormat 
+                    && !Settings.DisableThinking 
+                    && e.Token != Instruct.ThinkingStart.Replace("\n", ""))
                 {
                     StreamingTextProgress = Instruct.ThinkingStart;
                     token = Instruct.ThinkingStart + token;
@@ -886,6 +894,7 @@ namespace LetheAISharp.LLM
         private static void ResetStreamingState()
         {
             StreamingTextProgress = string.Empty;
+            UntouchedText = string.Empty;
             textStreamReceiver.Reset();
         }
 

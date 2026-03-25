@@ -33,7 +33,6 @@ namespace LetheAISharp.Files
         public string ImagePath = imagePath;
         public bool Hidden = hidden;
         public string Note = string.Empty;
-        public Message? OriginalMessage { get; set; } = null;
         public List<ToolCallRecord> ToolCalls { get; set; } = toolCalls ?? [];
         [JsonIgnore] public BasePersona User => 
             !string.IsNullOrEmpty(UserID) && LLMEngine.LoadedPersonas.TryGetValue(UserID, out var u) ? u : LLMEngine.User;
