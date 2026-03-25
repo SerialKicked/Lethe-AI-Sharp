@@ -106,7 +106,7 @@ namespace LetheAISharp.API
                                 try
                                 {
                                     var allowed = true;
-                                    if (LLMEngine.ToolCallConfirmation != null)
+                                    if (LLMEngine.ToolCallConfirmation != null && (LLMEngine.ToolManager.RequiresConfirmation(toolcall.Function?.Name ?? string.Empty) || LLMEngine.Settings.ToolCallsAlwaysManualConfirm))
                                     {
                                         // that's an UI call, so no ConfigureAwait(false) here, otherwise we might crash things at the UI level
                                         allowed = await LLMEngine.ToolCallConfirmation(toolcall.Function?.Name ?? string.Empty, toolcall.Function?.Arguments?.ToJsonString() ?? string.Empty);

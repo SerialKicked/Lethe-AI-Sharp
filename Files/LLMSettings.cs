@@ -117,6 +117,14 @@ namespace LetheAISharp.Files
         /// </summary>
         public HashSet<string> AllowedToolsets { get; set; } = [];
 
+        /// <summary>
+        /// Gets or sets a value indicating whether all tool calls require manual confirmation before execution independantly of what the toolsets say.
+        /// </summary>
+        /// <remarks>Set this property to <see langword="true"/> to enforce manual confirmation for every tool call, regardless of other settings. 
+        /// This can be used to increase safety or oversight in environments where automated execution is not permitted.</remarks>
+        public bool ToolCallsAlwaysManualConfirm { get; set; } = false;
+
+
         #endregion
 
 
