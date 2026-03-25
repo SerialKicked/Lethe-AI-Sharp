@@ -26,6 +26,7 @@ namespace LetheAISharp.Files
     {
         public Guid Guid { get; set; } = Guid.NewGuid();
         public AuthorRole Role = role;
+        public string ThinkBlock = string.Empty;
         public string Message = mess;
         public DateTime Date = date;
         public string CharID = charID;
