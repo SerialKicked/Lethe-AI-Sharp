@@ -14,7 +14,7 @@ namespace LetheAISharp.Agent.Tools
     /// </summary>
     public class LetheBasicTools : IToolList
     {
-        public string Id => "BasicToolset";
+        public string Id => "Web Search";
         private List<Tool> toolList = [];
 
         public IReadOnlyList<Tool> GetToolList() => toolList;
@@ -48,7 +48,6 @@ namespace LetheAISharp.Agent.Tools
 
         public async Task<string> WebSearch(string query)
         {
-            await Task.Delay(5).ConfigureAwait(false);
             var searchaction = new WebSearchAction();
             var param = new TopicSearch()
             {

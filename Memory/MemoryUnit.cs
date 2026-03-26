@@ -254,7 +254,7 @@ namespace LetheAISharp.Memory
             {
                 sb.AppendLinuxLine($"The reason for it was: {Reason}");
             }
-            return sb.ToString().CleanupAndTrim();
+            return LLMEngine.Bot.ReplaceMacros(sb.ToString()).CleanupAndTrim();
         }
 
         /// <summary>
