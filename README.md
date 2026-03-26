@@ -62,18 +62,18 @@ Alternatively, if running an external backend is too much, **Lethe AI** also com
 
 | Capability | Kobold API | Llama.cpp | OpenAI API | Internal |
 |------------|------------|-----------|------------|----------|
-| Text generation | ✅ Text | ✅ Chat | ✅ Chat | ✅ Text |
+| Text generation mode | ✅ Text | ✅ Chat / Text | ✅ Chat | ✅ Text |
 | Streaming | ✅ | ✅ | ✅ | ✅ |
 | Structured output | ✅ GBNF | ✅ Schema | ✅ Schema | ✅ GBNF |
-| Chain of Thoughts | ✅ | ✅ | ✅ | ✅ |
+| Chain of thoughts | ✅ | ✅ | ✅ | ✅ |
 | Personas & chat sessions | ✅ | ✅ | ✅ | ✅ |
 | Memory integration | ✅ | ✅ | ✅ | ✅ |
 | Samplers | ✅ Advanced  | ✅ Advanced |  ✅ Basics  | ✅ Advanced |
-| Token Management | ✅ Exact | ✅ Exact | ⚠️ Estimated  | ✅ Exact |
+| Token management | ✅ Exact | ✅ Exact | ⚠️ Estimated  | ✅ Exact |
 | Web search | ✅ | ✅ | ✅ | ✅ |
-| Function Calling *(1)* | ❌ | ✅ | ✅  | ❌ |
-| Text To Speech | ✅ (if loaded) | ❌ | ❌ | ❌ |
-| Image Input *(2)* | ⚠️ In theory | ✅ | ✅ | ❌ |
+| Tool-calling *(1)* | ❌ | ✅ | ✅  | ❌ |
+| Text-to-speech | ✅ (if loaded) | ❌ | ❌ | ❌ |
+| Image input *(2)* | ⚠️ In theory | ✅ | ✅ | ❌ |
 
 1) Function calling support depends largely on the LLM's capabilities.
 2) VLM support depends entirely on underlying server and LLM capabilities. KoboldCpp has notoriously bad image input support, so if you need image support, load it as a OpenAI-compatible backend instead and make sure it's in Jinja template mode, then it will behave properly.
