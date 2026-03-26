@@ -63,7 +63,29 @@ namespace LetheAISharp.API
         // Connection properties
         string BaseUrl { get; set; }
 
-        CompletionType CompletionType { get; } // Text or Chat completion
+        // The type of completion this backend supports (text or chat)
+        CompletionType CompletionType { get; protected set;  } // Text or Chat completion
+        List<CompletionType> AvailCompletionTypes { get; }
+
+        // Information about capabilities
+        bool SupportsStreaming { get; }
+        bool SupportsTTS { get; }
+        bool SupportsVision { get; }
+        bool SupportsWebSearch { get; }
+        bool SupportsStateSave { get; }
+        bool SupportsSchema { get; }
+        bool SupportsToolCalls { get; }
+        BackendChatCompletionThinkTagBehavior ThinkTagBehavior { get; }
+        bool SupportParallelToolCall { get; }
+        bool AllowPrefill { get; }
+
+        bool SelectCompletionType(CompletionType type)
+        {
+            if (!AvailCompletionTypes.Contains(type))
+                return false;
+            CompletionType = type;
+            return true;
+        }
 
         // Core operations every backend needs to support
         Task<bool> CheckBackend();
@@ -95,18 +117,5 @@ namespace LetheAISharp.API
         Task<bool> SaveKVState(int value);
         Task<bool> LoadKVState(int value);
         Task<bool> ClearKVStates();
-
-        // Information about capabilities
-        bool SupportsStreaming { get; }
-        bool SupportsTTS { get; }
-        bool SupportsVision { get; }
-        bool SupportsWebSearch { get; }
-        bool SupportsStateSave { get; }
-        bool SupportsSchema { get; }
-        bool SupportsToolCalls { get; }
-        BackendChatCompletionThinkTagBehavior ThinkTagBehavior { get; }
-        bool SupportParallelToolCall { get; }
-        bool AllowPrefill { get; }
-
     }
 }

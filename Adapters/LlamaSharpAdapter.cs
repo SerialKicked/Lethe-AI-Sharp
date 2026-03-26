@@ -36,26 +36,18 @@ namespace LetheAISharp.API
             }
         }
 
-        public CompletionType CompletionType => CompletionType.Text;
+        public CompletionType CompletionType { get; set; } = CompletionType.Text;
+        public List<CompletionType> AvailCompletionTypes => [ CompletionType.Text ];
 
         public bool SupportsStreaming => true;
-
         public bool SupportsTTS => false;
-
         public bool SupportsVision => false;
-
         public bool SupportsWebSearch => true;
-
         public bool SupportsStateSave => false;
-
         public bool SupportsToolCalls => false;
-
         public bool SupportsSchema => true;
-
         public BackendChatCompletionThinkTagBehavior ThinkTagBehavior => LLMEngine.Settings.BackendStartThinkTagBehavior ?? BackendChatCompletionThinkTagBehavior.Emitted;
-
         public bool SupportParallelToolCall => false;
-
         public bool AllowPrefill => true;
 
         public event EventHandler<LLMTokenStreamingEventArgs>? TokenReceived;

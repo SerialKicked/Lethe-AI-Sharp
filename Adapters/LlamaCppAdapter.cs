@@ -21,7 +21,19 @@ namespace LetheAISharp.API
         private CancellationTokenSource? cts;
         private readonly Lock _ctsLock = new();
 
-        public CompletionType CompletionType => CompletionType.Chat;
+        public CompletionType CompletionType { get; set; } = CompletionType.Chat;
+        public List<CompletionType> AvailCompletionTypes => [ CompletionType.Chat ];
+
+        public bool SupportsStreaming => true;
+        public bool SupportsTTS => false;
+        public bool SupportsVision { get; private set; } = false;
+        public bool SupportsWebSearch => true;
+        public bool SupportsStateSave { get; private set; } = false;
+        public bool SupportsSchema { get; private set; } = true;
+        public bool SupportsToolCalls { get; private set; } = true;
+        public bool SupportParallelToolCall { get; private set; } = false;
+        public bool AllowPrefill { get; private set; } = LLMEngine.Settings.BackendChatAllowPrefill ?? false;
+        public BackendChatCompletionThinkTagBehavior ThinkTagBehavior => LLMEngine.Settings.BackendStartThinkTagBehavior ?? BackendChatCompletionThinkTagBehavior.Silent;
 
         public LlamaCppAdapter(HttpClient httpClient)
         {
@@ -88,61 +100,23 @@ namespace LetheAISharp.API
 
         public async Task<string> GenerateText(object parameters)
         {
-            if (parameters is not ChatRequest input)
-                throw new ArgumentException("Parameters must be of type ChatRequest");
-            CancellationToken token;
-            lock (_ctsLock)
+            if (CompletionType == CompletionType.Chat)
             {
-                cts?.Dispose(); // Dispose old token source
-                cts = new CancellationTokenSource();
-                token = cts.Token;
+                return await GenerateTextChatCompletion(parameters).ConfigureAwait(false);
             }
-            var param = input;
-            try
-            {
-                if (LLMEngine.Settings.BackendLLamaCppAllowAllSamplers)
-                {
-                    var serverState = await _client.GetServerStateAsync(token).ConfigureAwait(false);
-                    if (serverState?.default_generation_settings != null)
-                    {
-                        serverState.default_generation_settings.Params.ImportSamplers(LLMEngine.Sampler);
-                        await _client.SetServerStateAsync(serverState, token).ConfigureAwait(false);
-                    }
-                }
-                var result = await _client.ChatCompletion(param, token).ConfigureAwait(false);
-                var res = result?.Message.Content.ToString();
-                return res ?? string.Empty;
-            }
-            catch (Exception ex)
-            {
-                LLMEngine.Logger?.LogError(ex, "[OpenAI API] Error during GenerateText: {Message}", ex.Message);
-                return string.Empty;
-            }
+            throw new NotImplementedException("Only chat completion is supported.");
         }
 
         public async Task GenerateTextStreaming(object parameters)
         {
-            if (parameters is not ChatRequest input)
-                throw new ArgumentException("Parameters must be of type ChatRequest");
-            CancellationToken token;
-            lock (_ctsLock)
+            if (CompletionType == CompletionType.Chat)
             {
-                cts?.Dispose(); // Dispose old token source
-                cts = new CancellationTokenSource();
-                token = cts.Token;
+                await GenerateChatCompletionStreaming(parameters).ConfigureAwait(false);
             }
-
-            if (LLMEngine.Settings.BackendLLamaCppAllowAllSamplers)
+            else
             {
-                var serverState = await _client.GetServerStateAsync(token).ConfigureAwait(false);
-                if (serverState?.default_generation_settings != null)
-                {
-                    serverState.default_generation_settings.Params.ImportSamplers(LLMEngine.Sampler);
-                    await _client.SetServerStateAsync(serverState, token).ConfigureAwait(false);
-                }
+                throw new NotImplementedException("Only chat completion is supported.");
             }
-
-            await _client.StreamChatCompletion(input, token).ConfigureAwait(false);
         }
 
         public IPromptBuilder GetPromptBuilder()
@@ -269,16 +243,63 @@ namespace LetheAISharp.API
             return token.input_tokens;
         }
 
+        private async Task GenerateChatCompletionStreaming(object parameters)
+        {
+            if (parameters is not ChatRequest input)
+                throw new ArgumentException("Parameters must be of type ChatRequest");
+            CancellationToken token;
+            lock (_ctsLock)
+            {
+                cts?.Dispose(); // Dispose old token source
+                cts = new CancellationTokenSource();
+                token = cts.Token;
+            }
 
-        public bool SupportsStreaming => true;
-        public bool SupportsTTS => false;
-        public bool SupportsVision { get; private set; } = false;
-        public bool SupportsWebSearch => true;
-        public bool SupportsStateSave { get; private set; } = false;
-        public bool SupportsSchema { get; private set; } = true;
-        public bool SupportsToolCalls { get; private set; } = true;
-        public bool SupportParallelToolCall { get; private set; } = false;
-        public bool AllowPrefill { get; private set; } = LLMEngine.Settings.BackendChatAllowPrefill ?? false;
-        public BackendChatCompletionThinkTagBehavior ThinkTagBehavior => LLMEngine.Settings.BackendStartThinkTagBehavior ?? BackendChatCompletionThinkTagBehavior.Silent;
+            if (LLMEngine.Settings.BackendLLamaCppAllowAllSamplers)
+            {
+                var serverState = await _client.GetServerStateAsync(token).ConfigureAwait(false);
+                if (serverState?.default_generation_settings != null)
+                {
+                    serverState.default_generation_settings.Params.ImportSamplers(LLMEngine.Sampler);
+                    await _client.SetServerStateAsync(serverState, token).ConfigureAwait(false);
+                }
+            }
+
+            await _client.StreamChatCompletion(input, token).ConfigureAwait(false);
+        }
+
+        private async Task<string> GenerateTextChatCompletion(object parameters)
+        {
+            if (parameters is not ChatRequest input)
+                throw new ArgumentException("Parameters must be of type ChatRequest");
+            CancellationToken token;
+            lock (_ctsLock)
+            {
+                cts?.Dispose(); // Dispose old token source
+                cts = new CancellationTokenSource();
+                token = cts.Token;
+            }
+            var param = input;
+            try
+            {
+                if (LLMEngine.Settings.BackendLLamaCppAllowAllSamplers)
+                {
+                    var serverState = await _client.GetServerStateAsync(token).ConfigureAwait(false);
+                    if (serverState?.default_generation_settings != null)
+                    {
+                        serverState.default_generation_settings.Params.ImportSamplers(LLMEngine.Sampler);
+                        await _client.SetServerStateAsync(serverState, token).ConfigureAwait(false);
+                    }
+                }
+                var result = await _client.ChatCompletion(param, token).ConfigureAwait(false);
+                var res = result?.Message.Content.ToString();
+                return res ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                LLMEngine.Logger?.LogError(ex, "[OpenAI API] Error during GenerateText: {Message}", ex.Message);
+                return string.Empty;
+            }
+        }
     }
 }

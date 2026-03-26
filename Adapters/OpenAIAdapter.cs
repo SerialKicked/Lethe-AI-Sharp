@@ -21,7 +21,19 @@ namespace LetheAISharp.API
         private CancellationTokenSource? cts;
         private readonly Lock _ctsLock = new();
 
-        public CompletionType CompletionType => CompletionType.Chat;
+        public CompletionType CompletionType { get; set; } = CompletionType.Chat;
+        public List<CompletionType> AvailCompletionTypes => [ CompletionType.Chat ];
+
+        public bool SupportsStreaming => true;
+        public bool SupportsTTS => false;
+        public bool SupportsVision => true;
+        public bool SupportsWebSearch => true;
+        public bool SupportsStateSave => false;
+        public bool SupportsSchema => true;
+        public bool SupportsToolCalls { get; private set; } = true;
+        public bool SupportParallelToolCall => LLMEngine.Settings.BackendParallelToolCalls ?? false;
+        public BackendChatCompletionThinkTagBehavior ThinkTagBehavior => LLMEngine.Settings.BackendStartThinkTagBehavior ?? BackendChatCompletionThinkTagBehavior.Emitted;
+        public bool AllowPrefill => LLMEngine.Settings.BackendChatAllowPrefill ?? false;
 
         public OpenAIAdapter(HttpClient httpClient)
         {
@@ -158,7 +170,6 @@ namespace LetheAISharp.API
             return string.IsNullOrEmpty(full) ? 0 : CountTokensSync(full) + (messages.Count * 8);
         }
 
-
         public async Task<byte[]> TextToSpeech(string text, string voice)
         {
             // OpenAI does not support TTS directly
@@ -216,19 +227,5 @@ namespace LetheAISharp.API
             cts?.Dispose();
             GC.SuppressFinalize(this);
         }
-
-        public bool SupportsStreaming => true;
-        public bool SupportsTTS => false;  // TODO
-        public bool SupportsVision => true;
-        public bool SupportsWebSearch => true;
-        public bool SupportsStateSave => false; // Not Available
-        public bool SupportsSchema => true;
-        public bool SupportsToolCalls { get; private set; } = true;
-
-        public BackendChatCompletionThinkTagBehavior ThinkTagBehavior => LLMEngine.Settings.BackendStartThinkTagBehavior ?? BackendChatCompletionThinkTagBehavior.Emitted;
-
-        public bool SupportParallelToolCall => LLMEngine.Settings.BackendParallelToolCalls ?? false;
-
-        public bool AllowPrefill => LLMEngine.Settings.BackendChatAllowPrefill ?? false;
     }
 }
