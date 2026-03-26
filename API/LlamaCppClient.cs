@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -33,6 +34,96 @@ namespace LetheAISharp.API
         public override async Task<string> GetBackendInfo()
         {
             return await Task.FromResult("Llama.cpp Backend").ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Performs a non-streaming text completion via llama.cpp's native POST /completion endpoint.
+        /// </summary>
+        public async Task<LlamaCppCompletionResponse> TextCompletionAsync(LlamaCppCompletionRequest body, CancellationToken cancellationToken = default)
+        {
+            return await SendRequestAsync<LlamaCppCompletionResponse>(_httpClient!, HttpMethod.Post, "/completion", body, cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Performs a streaming text completion via llama.cpp's native POST /completion endpoint with stream:true.
+        /// Raises <see cref="OpenAI_APIClient.StreamingMessageReceived"/> for each received token,
+        /// which the adapter forwards as its own TokenReceived event.
+        /// </summary>
+        public async Task TextCompletionStreamAsync(LlamaCppCompletionRequest body, CancellationToken cancellationToken = default)
+        {
+            body.Stream = true;
+
+            var request = new HttpRequestMessage(HttpMethod.Post, "/completion");
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+
+            var json = JsonConvert.SerializeObject(body, JsonSerializerSettings);
+            var content = new StringContent(json);
+            content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json");
+            request.Content = content;
+
+            try
+            {
+                using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+
+                using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                using var reader = new System.IO.StreamReader(stream);
+
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+                    if (line == null)
+                        break; // end of stream
+                    if (string.IsNullOrEmpty(line) || !line.StartsWith("data:"))
+                        continue;
+
+                    var data = line[5..].Trim();
+                    if (string.IsNullOrEmpty(data))
+                        continue;
+
+                    LlamaCppStreamingChunk? chunk;
+                    try
+                    {
+                        chunk = JsonConvert.DeserializeObject<LlamaCppStreamingChunk>(data, JsonSerializerSettings);
+                    }
+                    catch (JsonException ex)
+                    {
+                        LLMEngine.Logger?.LogError(ex, "[LlamaCpp] Failed to parse SSE chunk: {Data}", data);
+                        continue;
+                    }
+
+                    if (chunk == null)
+                        continue;
+
+                    string? finishReason = null;
+                    if (chunk.Stop)
+                        finishReason = string.IsNullOrEmpty(chunk.Stop_type) ? "stop" : chunk.Stop_type;
+
+                    RaiseOnStreamingResponse(new OpenTokenResponse
+                    {
+                        Token = chunk.Content ?? string.Empty,
+                        FinishReason = finishReason
+                    });
+
+                    if (chunk.Stop)
+                        break;
+                }
+            }
+            catch (OperationCanceledException ex)
+            {
+                LLMEngine.Logger?.LogInformation(ex, "[LlamaCpp] Text completion stream cancelled: {Message}", ex.Message);
+            }
+            catch (Exception ex)
+            {
+                LLMEngine.Logger?.LogError(ex, "[LlamaCpp] Error during text completion streaming: {Message}", ex.Message);
+                RaiseOnStreamingResponse(new OpenTokenResponse
+                {
+                    Token = $"Error during text completion streaming: {ex.Message}",
+                    FinishReason = "error"
+                });
+            }
+
+            LLMEngine.Logger?.LogInformation("[LlamaCpp] Text completion stream finished.");
         }
 
         public async Task<TokenList> TokenizeAsync(TokenRequest body, CancellationToken cancellationToken = default)
@@ -512,5 +603,168 @@ namespace LetheAISharp.API
     {
         public bool success { get; set; } = false;
 
+    }
+
+    /// <summary>
+    /// Request body for llama.cpp's native POST /completion endpoint.
+    /// Call <see cref="ImportFromGenerationInput"/> to populate from a <see cref="GenerationInput"/>.
+    /// Add any additional llama.cpp-specific fields directly to this class.
+    /// </summary>
+    public class LlamaCppCompletionRequest
+    {
+        [JsonProperty("prompt")]
+        public string Prompt { get; set; } = string.Empty;
+
+        [JsonProperty("n_predict")]
+        public int N_predict { get; set; }
+
+        [JsonProperty("temperature")]
+        public float Temperature { get; set; }
+
+        [JsonProperty("top_k")]
+        public int Top_k { get; set; }
+
+        [JsonProperty("top_p")]
+        public float Top_p { get; set; }
+
+        [JsonProperty("min_p")]
+        public float Min_p { get; set; }
+
+        [JsonProperty("typical_p")]
+        public float Typical_p { get; set; }
+
+        [JsonProperty("repeat_penalty")]
+        public float Repeat_penalty { get; set; }
+
+        [JsonProperty("repeat_last_n")]
+        public int Repeat_last_n { get; set; }
+
+        [JsonProperty("mirostat")]
+        public int Mirostat { get; set; }
+
+        [JsonProperty("mirostat_tau")]
+        public float Mirostat_tau { get; set; }
+
+        [JsonProperty("mirostat_eta")]
+        public float Mirostat_eta { get; set; }
+
+        [JsonProperty("seed")]
+        public long Seed { get; set; }
+
+        [JsonProperty("stop")]
+        public ICollection<string>? Stop { get; set; }
+
+        [JsonProperty("ignore_eos")]
+        public bool Ignore_eos { get; set; }
+
+        [JsonProperty("grammar")]
+        public string? Grammar { get; set; }
+
+        [JsonProperty("dynatemp_range")]
+        public float Dynatemp_range { get; set; }
+
+        [JsonProperty("dynatemp_exponent")]
+        public float Dynatemp_exponent { get; set; }
+
+        [JsonProperty("xtc_probability")]
+        public float Xtc_probability { get; set; }
+
+        [JsonProperty("xtc_threshold")]
+        public float Xtc_threshold { get; set; }
+
+        [JsonProperty("dry_multiplier")]
+        public float Dry_multiplier { get; set; }
+
+        [JsonProperty("dry_base")]
+        public float Dry_base { get; set; }
+
+        [JsonProperty("dry_allowed_length")]
+        public int Dry_allowed_length { get; set; }
+
+        [JsonProperty("dry_sequence_breakers")]
+        public List<string>? Dry_sequence_breakers { get; set; }
+
+        [JsonProperty("stream")]
+        public bool Stream { get; set; } = false;
+
+        [JsonProperty("cache_prompt")]
+        public bool Cache_prompt { get; set; } = true;
+
+        /// <summary>
+        /// Maps all fields common to both <see cref="GenerationInput"/> and the llama.cpp /completion API.
+        /// To add more llama.cpp-specific fields, extend this method or set them directly after calling it.
+        /// </summary>
+        public void ImportFromGenerationInput(GenerationInput input)
+        {
+            Prompt = input.Prompt;
+            N_predict = input.Max_length;
+            Temperature = (float)input.Temperature;
+            Top_k = input.Top_k;
+            Top_p = (float)input.Top_p;
+            Min_p = (float)input.Min_p;
+            Typical_p = (float)input.Typical;
+            Repeat_penalty = (float)input.Rep_pen;
+            Repeat_last_n = input.Rep_pen_range;
+            Mirostat = (int)input.Mirostat;
+            Mirostat_tau = (float)input.Mirostat_tau;
+            Mirostat_eta = (float)input.Mirostat_eta;
+            Seed = input.Sampler_seed == -1 ? LLMEngine.RNG.Next(int.MaxValue) : input.Sampler_seed;
+            Stop = input.Stop_sequence;
+            Ignore_eos = input.Bypass_eos;
+            Grammar = input.Grammar;
+            Dynatemp_range = (float)input.Dynatemp_range;
+            Dynatemp_exponent = (float)input.Dynatemp_exponent;
+            Xtc_probability = (float)input.Xtc_probability;
+            Xtc_threshold = (float)input.Xtc_threshold;
+            Dry_multiplier = (float)input.Dry_multiplier;
+            Dry_base = (float)input.Dry_base;
+            Dry_allowed_length = input.Dry_allowed_length;
+            Dry_sequence_breakers = input.Dry_sequence_breakers is not null ? [.. input.Dry_sequence_breakers] : null;
+        }
+    }
+
+    /// <summary>
+    /// Response from llama.cpp's native POST /completion endpoint (non-streaming).
+    /// </summary>
+    public class LlamaCppCompletionResponse
+    {
+        [JsonProperty("content")]
+        public string Content { get; set; } = string.Empty;
+
+        [JsonProperty("stop_type")]
+        public string? Stop_type { get; set; }
+
+        [JsonProperty("stopping_word")]
+        public string? Stopping_word { get; set; }
+
+        [JsonProperty("tokens_cached")]
+        public int Tokens_cached { get; set; }
+
+        [JsonProperty("tokens_evaluated")]
+        public int Tokens_evaluated { get; set; }
+
+        [JsonProperty("truncated")]
+        public bool Truncated { get; set; }
+
+        [JsonProperty("generation_settings")]
+        public object? Generation_settings { get; set; }
+
+        [JsonProperty("timings")]
+        public object? Timings { get; set; }
+    }
+
+    /// <summary>
+    /// A single SSE chunk from llama.cpp's streaming /completion endpoint.
+    /// </summary>
+    internal class LlamaCppStreamingChunk
+    {
+        [JsonProperty("content")]
+        public string? Content { get; set; }
+
+        [JsonProperty("stop")]
+        public bool Stop { get; set; }
+
+        [JsonProperty("stop_type")]
+        public string? Stop_type { get; set; }
     }
 }

@@ -22,7 +22,7 @@ namespace LetheAISharp.API
         private readonly Lock _ctsLock = new();
 
         public CompletionType CompletionType { get; set; } = CompletionType.Chat;
-        public List<CompletionType> AvailCompletionTypes => [ CompletionType.Chat ];
+        public List<CompletionType> AvailCompletionTypes => [ CompletionType.Chat, CompletionType.Text ];
 
         public bool SupportsStreaming => true;
         public bool SupportsTTS => false;
@@ -104,7 +104,11 @@ namespace LetheAISharp.API
             {
                 return await GenerateTextChatCompletion(parameters).ConfigureAwait(false);
             }
-            throw new NotImplementedException("Only chat completion is supported.");
+            if (CompletionType == CompletionType.Text)
+            {
+                return await GenerateTextTextCompletion(parameters).ConfigureAwait(false);
+            }
+            throw new NotImplementedException($"Completion type {CompletionType} is not supported.");
         }
 
         public async Task GenerateTextStreaming(object parameters)
@@ -113,14 +117,20 @@ namespace LetheAISharp.API
             {
                 await GenerateChatCompletionStreaming(parameters).ConfigureAwait(false);
             }
+            else if (CompletionType == CompletionType.Text)
+            {
+                await GenerateTextCompletionStreaming(parameters).ConfigureAwait(false);
+            }
             else
             {
-                throw new NotImplementedException("Only chat completion is supported.");
+                throw new NotImplementedException($"Completion type {CompletionType} is not supported.");
             }
         }
 
         public IPromptBuilder GetPromptBuilder()
         {
+            if (CompletionType == CompletionType.Text)
+                return new TextPromptBuilder();
             return new ChatPromptBuilder();
         }
 
@@ -268,6 +278,22 @@ namespace LetheAISharp.API
             await _client.StreamChatCompletion(input, token).ConfigureAwait(false);
         }
 
+        private async Task GenerateTextCompletionStreaming(object parameters)
+        {
+            if (parameters is not GenerationInput input)
+                throw new ArgumentException("Parameters must be of type GenerationInput");
+            CancellationToken token;
+            lock (_ctsLock)
+            {
+                cts?.Dispose();
+                cts = new CancellationTokenSource();
+                token = cts.Token;
+            }
+            var request = new LlamaCppCompletionRequest();
+            request.ImportFromGenerationInput(input);
+            await _client.TextCompletionStreamAsync(request, token).ConfigureAwait(false);
+        }
+
         private async Task<string> GenerateTextChatCompletion(object parameters)
         {
             if (parameters is not ChatRequest input)
@@ -298,6 +324,31 @@ namespace LetheAISharp.API
             catch (Exception ex)
             {
                 LLMEngine.Logger?.LogError(ex, "[OpenAI API] Error during GenerateText: {Message}", ex.Message);
+                return string.Empty;
+            }
+        }
+
+        private async Task<string> GenerateTextTextCompletion(object parameters)
+        {
+            if (parameters is not GenerationInput input)
+                throw new ArgumentException("Parameters must be of type GenerationInput");
+            CancellationToken token;
+            lock (_ctsLock)
+            {
+                cts?.Dispose();
+                cts = new CancellationTokenSource();
+                token = cts.Token;
+            }
+            try
+            {
+                var request = new LlamaCppCompletionRequest();
+                request.ImportFromGenerationInput(input);
+                var result = await _client.TextCompletionAsync(request, token).ConfigureAwait(false);
+                return result?.Content ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                LLMEngine.Logger?.LogError(ex, "[LlamaCpp] Error during text completion: {Message}", ex.Message);
                 return string.Empty;
             }
         }
