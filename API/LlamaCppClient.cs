@@ -280,10 +280,7 @@ namespace LetheAISharp.API
                                     topP: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.TopP,
                                     jsonSchema: currentRequest.ResponseFormatObject?.JsonSchema,
                                     user: currentRequest.User
-                                )
-                                {
-                                    chat_template_kwargs = request.chat_template_kwargs
-                                };
+                                );
                             }
                             else
                             {
@@ -300,11 +297,10 @@ namespace LetheAISharp.API
                                     topP: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.TopP,
                                     jsonSchema: currentRequest.ResponseFormatObject?.JsonSchema,
                                     user: currentRequest.User
-                                )
-                                {
-                                    chat_template_kwargs = request.chat_template_kwargs
-                                };
+                                );
                             }
+                            currentRequest.chat_template_kwargs = request.chat_template_kwargs;
+                            LLMEngine.StreamingTextProgress.Clear();
                             // keep this here, otherwise the model doesn't receive a warning that tool calls have ended, and it'll imagine them instead.
                             toolRound++;
                             // --

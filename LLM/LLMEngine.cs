@@ -208,7 +208,7 @@ namespace LetheAISharp.LLM
         public static readonly string NewLine = "\n";
 
         private static SystemStatus status = SystemStatus.NotInit;
-        private static StringBuilder StreamingTextProgress = new();
+        internal static StringBuilder StreamingTextProgress = new();
         private static InferenceChannel _currentChannel = InferenceChannel.Text;
         private static InstructFormat instruct = new() 
         { 

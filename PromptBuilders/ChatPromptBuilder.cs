@@ -118,6 +118,35 @@ namespace LetheAISharp
         {
             // Let's make sure we don't overshoot token limits.
             var workingprompt = new List<SingleMessage>(_prompt);
+
+            if (LLMEngine.Settings.ToolCallChainLimit > 0 && workingprompt.Count > LLMEngine.Settings.ToolCallChainLimit)
+            {
+                int chainCount = 0;
+                int foundID = -1;
+
+                for (int i = workingprompt.Count - 1; i >= 0; i--)
+                {
+                    var msg = workingprompt[i];
+
+                    // Count only tool call roots (assistant messages with tool calls)
+                    if (msg.Role == AuthorRole.Assistant && msg.ToolCalls.Count > 0)
+                    {
+                        chainCount++;
+                        if (chainCount > LLMEngine.Settings.ToolCallChainLimit)
+                        {
+                            foundID = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (foundID >= 0)
+                {
+                    // Remove ONLY tool-related messages before foundID
+                    workingprompt = [.. workingprompt.Where((m, idx) => 
+                        !(idx < foundID && (m.Role == AuthorRole.Tool || (m.Role == AuthorRole.Assistant && m.ToolCalls.Count > 0))))];
+                }
+            }
             var total = GetTokenUsage(workingprompt);
             var max = LLMEngine.MaxContextLength - (responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride) - 15;
             while (total > max && workingprompt.Count > 1)

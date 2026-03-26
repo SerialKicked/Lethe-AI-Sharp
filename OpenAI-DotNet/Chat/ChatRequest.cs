@@ -177,6 +177,7 @@ namespace OpenAI.Chat
             FrequencyPenalty = frequencyPenalty;
             LogitBias = logitBias;
             MaxCompletionTokens = maxTokens;
+            MaxTokens = maxTokens;
             Number = number;
             PresencePenalty = presencePenalty;
 
@@ -296,7 +297,6 @@ namespace OpenAI.Chat
         /// Still used for older models that support it.
         /// </remarks>
         [JsonPropertyName("max_tokens")]
-        [Obsolete("use MaxCompletionTokens instead")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? MaxTokens { get; set; }
 
