@@ -281,6 +281,8 @@ namespace LetheAISharp.LLM
             // Subscribe to the TokenReceived event
             Client.BaseUrl = Settings.BackendUrl;
             Client.TokenReceived += Client_StreamingMessageReceived;
+            if (Settings.DefaultCompletionType.HasValue)
+                Client.SelectCompletionType(Settings.DefaultCompletionType.Value);
 
             PromptBuilder = GetPromptBuilder();
             AgentRuntime.LoadDefaultActions();
@@ -290,12 +292,17 @@ namespace LetheAISharp.LLM
         }
 
         /// <summary>
-        /// Sets up the backend connection settings and initializes the system.
+        /// Initializes the backend service configuration with the specified URL, API type, optional authentication
+        /// and completion preferences.
         /// </summary>
-        /// <param name="url"></param>
-        /// <param name="backend"></param>
-        /// <param name="key"></param>
-        public static void Setup(string url, BackendAPI backend, string? key = null)
+        /// <remarks>This method must be called before making requests to the backend service. Calling
+        /// this method resets the system status and updates the backend client configuration.</remarks>
+        /// <param name="url">The base URL of the backend service to connect to (or the GGUF file path for LlamaSharp). Cannot be null, empty, or whitespace.</param>
+        /// <param name="backend">The type of backend API to use for service requests.</param>
+        /// <param name="key">An optional API key used for authentication with the backend service. If not provided, a default key is used.</param>
+        /// <param name="preferCompletion">An optional value indicating the preferred completion type for backend operations.</param>
+        /// <exception cref="ArgumentException">Thrown if the url parameter is null, empty, or consists only of whitespace.</exception>
+        public static void Setup(string url, BackendAPI backend, string? key = null, CompletionType? preferCompletion = null)
         {
             if (string.IsNullOrWhiteSpace(url))
                 throw new ArgumentException("Backend URL cannot be null or empty", nameof(url));
@@ -303,6 +310,7 @@ namespace LetheAISharp.LLM
             Settings.BackendUrl = url;
             Settings.BackendAPI = backend;
             Settings.OpenAIKey = key ?? "123";
+            Settings.DefaultCompletionType = preferCompletion;
             LoadBackendClient();
         }
 
@@ -506,11 +514,11 @@ namespace LetheAISharp.LLM
                     return;
                 Status = SystemStatus.Busy;
                 ResetStreamingState();
-                if (!ToolCallsLoaded)
-                    StreamingTextProgress = new StringBuilder(Instruct.GetThinkPrefill());
-                if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
+                if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart) && !ToolCallsLoaded && Client.AllowPrefill)
                 {
-                    RaiseOnInferenceStreamed(StreamingTextProgress.ToString());
+                    var prefill = Instruct.GetThinkPrefill();
+                    if (!string.IsNullOrWhiteSpace(prefill))
+                        Client_StreamingMessageReceived(_, new LLMTokenStreamingEventArgs(prefill, null, null));
                 }
                 RaiseOnFullPromptReady(PromptBuilder.PromptToText());
                 await Client.GenerateTextStreaming(PromptBuilder.PromptToQuery(AuthorRole.Assistant, forceAltRoles: IsGroupConversation && Settings.GroupInstructFormatAdapter)).ConfigureAwait(false);
@@ -1094,15 +1102,13 @@ namespace LetheAISharp.LLM
             var genparams = await GenerateFullPrompt(message, pluginmessage).ConfigureAwait(false);
 
             ResetStreamingState();
-            if (!ToolCallsLoaded)
+            if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart) && !ToolCallsLoaded && Client.AllowPrefill)
             {
-                StreamingTextProgress.Clear();
-                StreamingTextProgress.Append(Instruct.GetThinkPrefill());
+                var prefill = Instruct.GetThinkPrefill();
+                if (!string.IsNullOrWhiteSpace(prefill))
+                    Client_StreamingMessageReceived(_, new LLMTokenStreamingEventArgs(prefill, null, null));
             }
-            if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart))
-            {
-                RaiseOnInferenceStreamed(StreamingTextProgress.ToString());
-            }
+
 
             if (!string.IsNullOrEmpty(message.Message))
             {

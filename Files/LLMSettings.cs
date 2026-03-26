@@ -1,13 +1,14 @@
-﻿using LetheAISharp.LLM;
+﻿using HNSW.Net;
+using LetheAISharp.API;
+using LetheAISharp.LLM;
+using LetheAISharp.Memory;
 using LetheAISharp.SearchAPI;
-using HNSW.Net;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using LetheAISharp.Memory;
-using LetheAISharp.API;
 
 namespace LetheAISharp.Files
 {
@@ -70,9 +71,19 @@ namespace LetheAISharp.Files
         /// </summary>
         public bool BackendLLamaCppAllowAllSamplers { get; set; } = false;
 
-
-        /// <summary> API key for OpenAI (depends on the backend) </summary>
+        /// <summary> 
+        /// API key for OpenAI (depends on the backend, defaults 123 works when no key is required) 
+        /// </summary>
         public string OpenAIKey { get; set; } = "123";
+
+        /// <summary>
+        /// Completion type to use by default when sending a prompt to the backend. This is only for backends that support both text and chat 
+        /// completion (only llama.cpp at the moment). Set to null to use the backend's default (chat completion for llama.cpp and OpenAI, 
+        /// Text completion for Kobold and LlamaSharp).
+        /// </summary>
+        /// <remarks> If the backend doesn't have access to this completion type, it'll just use its default. </remarks>
+        [Description("Completion type to use by default when communicating with the LLM. Text completion doesn't have access to tool calls or image support, but it allows prefill and a more lax formatting.")]
+        public CompletionType? DefaultCompletionType { get; set; } = null;
 
         /// <summary> LlamaSharp: GPU layer count (255 = all) </summary>
         public int LlamaSharpGPULayers { get; set; } = 255;
@@ -123,7 +134,6 @@ namespace LetheAISharp.Files
         /// <remarks>Set this property to <see langword="true"/> to enforce manual confirmation for every tool call, regardless of other settings. 
         /// This can be used to increase safety or oversight in environments where automated execution is not permitted.</remarks>
         public bool ToolCallsAlwaysManualConfirm { get; set; } = false;
-
 
         #endregion
 

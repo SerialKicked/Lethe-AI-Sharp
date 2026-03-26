@@ -1,5 +1,6 @@
 ﻿using LetheAISharp.Files;
 using LetheAISharp.LLM;
+using LLama.Sampling;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -605,84 +606,111 @@ namespace LetheAISharp.API
 
     }
 
+    public class LlamaCppAdvancedSampler
+    {
+        [JsonProperty("top_k")]
+        public int? Top_k { get; set; }
+
+        [JsonProperty("min_p")]
+        public float? Min_p { get; set; }
+
+        [JsonProperty("typical_p")]
+        public float? Typical_p { get; set; }
+
+        [JsonProperty("repeat_last_n")]
+        public int? Repeat_last_n { get; set; }
+
+        [JsonProperty("mirostat")]
+        public int? Mirostat { get; set; }
+
+        [JsonProperty("mirostat_tau")]
+        public float? Mirostat_tau { get; set; }
+
+        [JsonProperty("mirostat_eta")]
+        public float? Mirostat_eta { get; set; }
+
+        [JsonProperty("ignore_eos")]
+        public bool Ignore_eos { get; set; }
+
+        [JsonProperty("dynatemp_range")]
+        public float? Dynatemp_range { get; set; }
+
+        [JsonProperty("dynatemp_exponent")]
+        public float? Dynatemp_exponent { get; set; }
+
+        [JsonProperty("xtc_probability")]
+        public float? Xtc_probability { get; set; }
+
+        [JsonProperty("xtc_threshold")]
+        public float? Xtc_threshold { get; set; }
+
+        [JsonProperty("dry_multiplier")]
+        public float? Dry_multiplier { get; set; }
+
+        [JsonProperty("dry_base")]
+        public float? Dry_base { get; set; }
+
+        [JsonProperty("dry_allowed_length")]
+        public int? Dry_allowed_length { get; set; }
+
+        [JsonProperty("dry_penalty_last_n")]
+        public int? Dry_penalty_last_n { get; set; }
+
+        [JsonProperty("dry_sequence_breakers")]
+        public List<string>? Dry_sequence_breakers { get; set; }
+
+        public virtual void ImportFromGenerationInput(GenerationInput input)
+        {
+            Top_k = input.Top_k;
+            Min_p = (float)input.Min_p;
+            Typical_p = (float)input.Typical;
+            Repeat_last_n = input.Rep_pen_range;
+            Mirostat = (int)input.Mirostat;
+            Mirostat_tau = (float)input.Mirostat_tau;
+            Mirostat_eta = (float)input.Mirostat_eta;
+            Ignore_eos = input.Bypass_eos;
+            Dynatemp_range = (float)input.Dynatemp_range;
+            Dynatemp_exponent = (float)input.Dynatemp_exponent;
+            Xtc_probability = (float)input.Xtc_probability;
+            Xtc_threshold = (float)input.Xtc_threshold;
+            Dry_multiplier = (float)input.Dry_multiplier;
+            Dry_base = (float)input.Dry_base;
+            Dry_allowed_length = input.Dry_allowed_length;
+            Dry_sequence_breakers = input.Dry_sequence_breakers is not null ? [.. input.Dry_sequence_breakers] : null;
+            Dry_penalty_last_n = input.Rep_pen_range;
+        }
+    }
+
     /// <summary>
     /// Request body for llama.cpp's native POST /completion endpoint.
     /// Call <see cref="ImportFromGenerationInput"/> to populate from a <see cref="GenerationInput"/>.
     /// Add any additional llama.cpp-specific fields directly to this class.
     /// </summary>
-    public class LlamaCppCompletionRequest
+    public class LlamaCppCompletionRequest : LlamaCppAdvancedSampler
     {
         [JsonProperty("prompt")]
         public string Prompt { get; set; } = string.Empty;
 
         [JsonProperty("n_predict")]
-        public int N_predict { get; set; }
+        public int? N_predict { get; set; }
 
         [JsonProperty("temperature")]
-        public float Temperature { get; set; }
-
-        [JsonProperty("top_k")]
-        public int Top_k { get; set; }
+        public float? Temperature { get; set; }
 
         [JsonProperty("top_p")]
-        public float Top_p { get; set; }
-
-        [JsonProperty("min_p")]
-        public float Min_p { get; set; }
-
-        [JsonProperty("typical_p")]
-        public float Typical_p { get; set; }
+        public float? Top_p { get; set; }
 
         [JsonProperty("repeat_penalty")]
-        public float Repeat_penalty { get; set; }
-
-        [JsonProperty("repeat_last_n")]
-        public int Repeat_last_n { get; set; }
-
-        [JsonProperty("mirostat")]
-        public int Mirostat { get; set; }
-
-        [JsonProperty("mirostat_tau")]
-        public float Mirostat_tau { get; set; }
-
-        [JsonProperty("mirostat_eta")]
-        public float Mirostat_eta { get; set; }
+        public float? Repeat_penalty { get; set; }
 
         [JsonProperty("seed")]
-        public long Seed { get; set; }
+        public long? Seed { get; set; }
 
         [JsonProperty("stop")]
         public ICollection<string>? Stop { get; set; }
 
-        [JsonProperty("ignore_eos")]
-        public bool Ignore_eos { get; set; }
-
         [JsonProperty("grammar")]
         public string? Grammar { get; set; }
-
-        [JsonProperty("dynatemp_range")]
-        public float Dynatemp_range { get; set; }
-
-        [JsonProperty("dynatemp_exponent")]
-        public float Dynatemp_exponent { get; set; }
-
-        [JsonProperty("xtc_probability")]
-        public float Xtc_probability { get; set; }
-
-        [JsonProperty("xtc_threshold")]
-        public float Xtc_threshold { get; set; }
-
-        [JsonProperty("dry_multiplier")]
-        public float Dry_multiplier { get; set; }
-
-        [JsonProperty("dry_base")]
-        public float Dry_base { get; set; }
-
-        [JsonProperty("dry_allowed_length")]
-        public int Dry_allowed_length { get; set; }
-
-        [JsonProperty("dry_sequence_breakers")]
-        public List<string>? Dry_sequence_breakers { get; set; }
 
         [JsonProperty("stream")]
         public bool Stream { get; set; } = false;
@@ -694,32 +722,17 @@ namespace LetheAISharp.API
         /// Maps all fields common to both <see cref="GenerationInput"/> and the llama.cpp /completion API.
         /// To add more llama.cpp-specific fields, extend this method or set them directly after calling it.
         /// </summary>
-        public void ImportFromGenerationInput(GenerationInput input)
+        public override void ImportFromGenerationInput(GenerationInput input)
         {
+            base.ImportFromGenerationInput(input);
             Prompt = input.Prompt;
             N_predict = input.Max_length;
             Temperature = (float)input.Temperature;
-            Top_k = input.Top_k;
             Top_p = (float)input.Top_p;
-            Min_p = (float)input.Min_p;
-            Typical_p = (float)input.Typical;
             Repeat_penalty = (float)input.Rep_pen;
-            Repeat_last_n = input.Rep_pen_range;
-            Mirostat = (int)input.Mirostat;
-            Mirostat_tau = (float)input.Mirostat_tau;
-            Mirostat_eta = (float)input.Mirostat_eta;
             Seed = input.Sampler_seed == -1 ? LLMEngine.RNG.Next(int.MaxValue) : input.Sampler_seed;
             Stop = input.Stop_sequence;
-            Ignore_eos = input.Bypass_eos;
             Grammar = input.Grammar;
-            Dynatemp_range = (float)input.Dynatemp_range;
-            Dynatemp_exponent = (float)input.Dynatemp_exponent;
-            Xtc_probability = (float)input.Xtc_probability;
-            Xtc_threshold = (float)input.Xtc_threshold;
-            Dry_multiplier = (float)input.Dry_multiplier;
-            Dry_base = (float)input.Dry_base;
-            Dry_allowed_length = input.Dry_allowed_length;
-            Dry_sequence_breakers = input.Dry_sequence_breakers is not null ? [.. input.Dry_sequence_breakers] : null;
         }
     }
 

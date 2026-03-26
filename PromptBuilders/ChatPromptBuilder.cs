@@ -202,6 +202,7 @@ namespace LetheAISharp
                     {
                         { "enable_thinking", !LLMEngine.Settings.DisableThinking }
                     };
+                req.ImportFromGenerationInput(LLMEngine.Sampler);
                 return req;
             }
             else
@@ -221,6 +222,7 @@ namespace LetheAISharp
                     {
                         { "enable_thinking", !LLMEngine.Settings.DisableThinking }
                     };
+                req.ImportFromGenerationInput(LLMEngine.Sampler);
                 return req;
             }
 

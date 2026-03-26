@@ -146,25 +146,27 @@ namespace LetheAISharp
             {
                 fullquery += LLMEngine.Instruct.GetResponseStart(LLMEngine.Bot, overridePrefill);
             }
-            fullquery = fullquery.TrimEnd();
+            // fullquery = fullquery.TrimEnd();
 
             vlm_pictures = [];
-            var left = LLMEngine.Settings.MaxImageCount == 0 ? int.MaxValue : LLMEngine.Settings.MaxImageCount;
-            for (int i = _prompt.Count - 1; i >= 0; i--)
+            if (LLMEngine.Client?.SupportsVision ?? false)
             {
-                if (_prompt[i].Role == AuthorRole.User && !string.IsNullOrEmpty(_prompt[i].ImagePath) && File.Exists(_prompt[i].ImagePath))
+                var left = LLMEngine.Settings.MaxImageCount == 0 ? int.MaxValue : LLMEngine.Settings.MaxImageCount;
+                for (int i = _prompt.Count - 1; i >= 0; i--)
                 {
-                    var res = ImageUtils.ImageToBase64(_prompt[i].ImagePath, LLMEngine.Settings.ImageResolution);
-                    if (res is not null)
+                    if (_prompt[i].Role == AuthorRole.User && !string.IsNullOrEmpty(_prompt[i].ImagePath) && File.Exists(_prompt[i].ImagePath))
                     {
-                        vlm_pictures.Insert(0, res);
-                        left--;
-                        if (left <= 0)
-                            break;
+                        var res = ImageUtils.ImageToBase64(_prompt[i].ImagePath, LLMEngine.Settings.ImageResolution);
+                        if (res is not null)
+                        {
+                            vlm_pictures.Insert(0, res);
+                            left--;
+                            if (left <= 0)
+                                break;
+                        }
                     }
                 }
             }
-
             GenerationInput genparams = LLMEngine.Sampler.GetCopy();
             if (tempoverride >= 0)
                 genparams.Temperature = tempoverride;

@@ -1,5 +1,6 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using LetheAISharp.API;
 using OpenAI.Extensions;
 using System;
 using System.Collections.Generic;
@@ -9,7 +10,7 @@ using System.Text.Json.Serialization;
 
 namespace OpenAI.Chat
 {
-    public sealed class ChatRequest
+    public sealed class ChatRequest : LlamaCppAdvancedSampler
     {
         /// <inheritdoc />
         public ChatRequest(

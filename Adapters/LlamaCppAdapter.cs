@@ -88,12 +88,21 @@ namespace LetheAISharp.API
         {
             var res = await _client.GetServerStateAsync().ConfigureAwait(false);
 
-            SupportsVision = res.modalities.vision;
-            SupportsToolCalls = res.chat_template_caps.supports_tool_calls;
-            SupportParallelToolCall = res.chat_template_caps.supports_parallel_tool_calls;
-
-            var isthink = res.chat_template.Contains("enable_think") || res.chat_template.Contains("<think>", StringComparison.InvariantCultureIgnoreCase) || res.chat_template.Contains("[THINK]", StringComparison.InvariantCultureIgnoreCase);
-            AllowPrefill = LLMEngine.Settings.BackendChatAllowPrefill ?? !isthink;
+            if (CompletionType == CompletionType.Chat)
+            {
+                SupportsVision = res.modalities.vision;
+                SupportsToolCalls = res.chat_template_caps.supports_tool_calls;
+                SupportParallelToolCall = res.chat_template_caps.supports_parallel_tool_calls;
+                var isthink = res.chat_template.Contains("enable_think") || res.chat_template.Contains("<think>", StringComparison.InvariantCultureIgnoreCase) || res.chat_template.Contains("[THINK]", StringComparison.InvariantCultureIgnoreCase);
+                AllowPrefill = LLMEngine.Settings.BackendChatAllowPrefill ?? !isthink;
+            }
+            else
+            {
+                SupportsVision = false;
+                SupportParallelToolCall = false;
+                SupportsToolCalls = false;
+                AllowPrefill = true;
+            }
 
             return $"Llama.cpp [{res.build_info}]";
         }
@@ -102,11 +111,11 @@ namespace LetheAISharp.API
         {
             if (CompletionType == CompletionType.Chat)
             {
-                return await GenerateTextChatCompletion(parameters).ConfigureAwait(false);
+                return await GenerateChatCompletion(parameters).ConfigureAwait(false);
             }
             if (CompletionType == CompletionType.Text)
             {
-                return await GenerateTextTextCompletion(parameters).ConfigureAwait(false);
+                return await GenerateTextCompletion(parameters).ConfigureAwait(false);
             }
             throw new NotImplementedException($"Completion type {CompletionType} is not supported.");
         }
@@ -294,7 +303,7 @@ namespace LetheAISharp.API
             await _client.TextCompletionStreamAsync(request, token).ConfigureAwait(false);
         }
 
-        private async Task<string> GenerateTextChatCompletion(object parameters)
+        private async Task<string> GenerateChatCompletion(object parameters)
         {
             if (parameters is not ChatRequest input)
                 throw new ArgumentException("Parameters must be of type ChatRequest");
@@ -328,7 +337,7 @@ namespace LetheAISharp.API
             }
         }
 
-        private async Task<string> GenerateTextTextCompletion(object parameters)
+        private async Task<string> GenerateTextCompletion(object parameters)
         {
             if (parameters is not GenerationInput input)
                 throw new ArgumentException("Parameters must be of type GenerationInput");
