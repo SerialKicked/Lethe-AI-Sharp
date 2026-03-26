@@ -32,8 +32,7 @@ namespace LetheAISharp.API
         public bool SupportsSchema => true;
         public bool SupportsToolCalls { get; private set; } = true;
         public bool SupportParallelToolCall => LLMEngine.Settings.BackendParallelToolCalls ?? false;
-        public BackendChatCompletionThinkTagBehavior ThinkTagBehavior => LLMEngine.Settings.BackendStartThinkTagBehavior ?? BackendChatCompletionThinkTagBehavior.Emitted;
-        public bool AllowPrefill => LLMEngine.Settings.BackendChatAllowPrefill ?? false;
+        public bool AllowPrefill => LLMEngine.Settings.BackendChatAllowPrefill ?? true;
 
         public OpenAIAdapter(HttpClient httpClient)
         {

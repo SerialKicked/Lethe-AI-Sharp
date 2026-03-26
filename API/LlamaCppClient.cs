@@ -42,7 +42,17 @@ namespace LetheAISharp.API
         /// </summary>
         public async Task<LlamaCppCompletionResponse> TextCompletionAsync(LlamaCppCompletionRequest body, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<LlamaCppCompletionResponse>(_httpClient!, HttpMethod.Post, "/completion", body, cancellationToken: cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var res = await SendRequestAsync<LlamaCppCompletionResponse>(_httpClient!, HttpMethod.Post, "/completion", body, cancellationToken: cancellationToken).ConfigureAwait(false);
+                return res;
+            }
+            catch (Exception ex)
+            {
+                LLMEngine.Logger?.LogError(ex, "[LlamaCpp] Error during text completion: {Message}", ex.Message);
+                var res = new LlamaCppCompletionResponse() { Content = $"Error during text completion: {ex.Message}", Stop_type = "error" };
+                return res;
+            }
         }
 
         /// <summary>
@@ -140,7 +150,15 @@ namespace LetheAISharp.API
 
         public async Task<TokenCountResponse> GetTokenCountAsync(MessageListQuery body, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<TokenCountResponse>(_httpClient!, HttpMethod.Post, "/v1/messages/count_tokens", body, cancellationToken: cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return await SendRequestAsync<TokenCountResponse>(_httpClient!, HttpMethod.Post, "/v1/messages/count_tokens", body, cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                LLMEngine.Logger?.LogError(e, "[LlamaCpp] Error getting token count: {Message}", e.Message);
+                return new TokenCountResponse { input_tokens = 100 };
+            }
         }
 
         public TokenCountResponse GetTokenCountSync(MessageListQuery body)

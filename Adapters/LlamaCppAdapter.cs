@@ -33,7 +33,6 @@ namespace LetheAISharp.API
         public bool SupportsToolCalls { get; private set; } = true;
         public bool SupportParallelToolCall { get; private set; } = false;
         public bool AllowPrefill { get; private set; } = LLMEngine.Settings.BackendChatAllowPrefill ?? false;
-        public BackendChatCompletionThinkTagBehavior ThinkTagBehavior => LLMEngine.Settings.BackendStartThinkTagBehavior ?? BackendChatCompletionThinkTagBehavior.Silent;
 
         public LlamaCppAdapter(HttpClient httpClient)
         {

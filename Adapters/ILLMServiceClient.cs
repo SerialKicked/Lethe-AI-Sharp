@@ -9,21 +9,8 @@ using System.Threading.Tasks;
 
 namespace LetheAISharp.API
 {
-    /// <summary>
-    /// On chat completion backends with thinking models (and on some jinja templates only), the initial "think" tag
-    /// may not be streamed at all, it's just silent and assumed (as it's prefilled internally). This setting is used to 
-    /// recognize the behavior so LetheAI's output stays consistant.
-    /// </summary>
-    public enum BackendChatCompletionThinkTagBehavior
-    {
-        /// <summary> The backend emits the initial "think" tag as a token, nothing changes (LM Studio). </summary>
-        Emitted,
-        /// <summary> The backend doesn't emit the initial "think" tag as a token, LethAI will prepend it (llama.cpp). </summary>
-        Silent
-    }
 
     public enum CompletionType { Text, Chat }
-
 
     /// <summary>
     /// Arguments for text token streaming events
@@ -75,7 +62,6 @@ namespace LetheAISharp.API
         bool SupportsStateSave { get; }
         bool SupportsSchema { get; }
         bool SupportsToolCalls { get; }
-        BackendChatCompletionThinkTagBehavior ThinkTagBehavior { get; }
         bool SupportParallelToolCall { get; }
         bool AllowPrefill { get; }
 

@@ -41,15 +41,6 @@ namespace LetheAISharp.Files
         public BackendAPI BackendAPI { get; set; } = BackendAPI.KoboldAPI;
 
         /// <summary>
-        /// On chat completion backends with thinking models (and on some jinja templates only), the initial "think" tag may not be streamed at all, 
-        /// it's just silent and assumed (as it's prefilled internally). 
-        /// This setting is used to recognize the behavior so LetheAI's output stays consistant.
-        /// Set null to auto-detect based on the backend and template used. Toggle true/false if you notice issues with the think tags' behavior 
-        /// (for example, if the thinking block is not properly recognized or if the "think" tag appears in the output when it shouldn't).
-        /// </summary>
-        public BackendChatCompletionThinkTagBehavior? BackendStartThinkTagBehavior { get; set; } = null;
-
-        /// <summary>
         /// When set to true, if the backend supports it, tool calls will be made in parallel instead of sequentially. 
         /// This can speed up the generation when multiple tool calls are made, but can cause issues with some backends. 
         /// Depending on the backend and model you use, you might want to experiment with this setting to see if it improves performance or causes issues.

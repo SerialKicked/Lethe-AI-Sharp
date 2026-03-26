@@ -196,12 +196,13 @@ namespace LetheAISharp
                     responseFormat: TextResponseFormat.Auto,
                     parallelToolCalls: LLMEngine.Client?.SupportParallelToolCall ?? false,
                     maxTokens: responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride,
-                    temperature: temp);
-
-                req.chat_template_kwargs = new Dictionary<string, object>()
-                    {
-                        { "enable_thinking", !LLMEngine.Settings.DisableThinking }
-                    };
+                    temperature: temp)
+                {
+                    chat_template_kwargs = new Dictionary<string, object>()
+                        {
+                            { "enable_thinking", !LLMEngine.Settings.DisableThinking }
+                        }
+                };
                 req.ImportFromGenerationInput(LLMEngine.Sampler);
                 return req;
             }
@@ -217,11 +218,13 @@ namespace LetheAISharp
                     jsonSchema: _currentSchema,
                     parallelToolCalls: LLMEngine.Client?.SupportParallelToolCall ?? false,
                     maxTokens: responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride,
-                    temperature: temp);
-                req.chat_template_kwargs = new Dictionary<string, object>()
-                    {
-                        { "enable_thinking", !LLMEngine.Settings.DisableThinking }
-                    };
+                    temperature: temp)
+                {
+                    chat_template_kwargs = new Dictionary<string, object>()
+                        {
+                            { "enable_thinking", !LLMEngine.Settings.DisableThinking }
+                        }
+                };
                 req.ImportFromGenerationInput(LLMEngine.Sampler);
                 return req;
             }

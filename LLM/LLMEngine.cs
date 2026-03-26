@@ -855,11 +855,10 @@ namespace LetheAISharp.LLM
             {
                 var token = e.Token;
                 if (CompletionAPIType == CompletionType.Chat 
-                    && string.IsNullOrEmpty(StreamingTextProgress.ToString()) 
-                    && Client!.ThinkTagBehavior == BackendChatCompletionThinkTagBehavior.Silent 
+                    && StreamingTextProgress.Length == 0 
                     && Instruct.IsThinkFormat 
                     && !Settings.DisableThinking 
-                    && e.Token != Instruct.ThinkingStart.Replace("\n", ""))
+                    && e.Token.Replace("\n", "") != Instruct.ThinkingStart.Replace("\n", ""))
                 {
                     StreamingTextProgress = new StringBuilder(Instruct.ThinkingStart);
                     token = Instruct.ThinkingStart + token;

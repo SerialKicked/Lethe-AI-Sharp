@@ -46,7 +46,6 @@ namespace LetheAISharp.API
         public bool SupportsStateSave => false;
         public bool SupportsToolCalls => false;
         public bool SupportsSchema => true;
-        public BackendChatCompletionThinkTagBehavior ThinkTagBehavior => LLMEngine.Settings.BackendStartThinkTagBehavior ?? BackendChatCompletionThinkTagBehavior.Emitted;
         public bool SupportParallelToolCall => false;
         public bool AllowPrefill => true;
 
