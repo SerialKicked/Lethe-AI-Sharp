@@ -129,6 +129,18 @@ namespace LetheAISharp.LLM
         public virtual bool DatesInSessionSummaries { get; set; } = true;
 
         /// <summary>
+        /// Determines whether this persona should override the default toolset with its own specified in the Tools property.
+        /// </summary>
+        public virtual bool OverrideDefaultToolset { get; set; } = false;
+
+        /// <summary>
+        /// List of tools specific to this persona. Only used if OverrideDefaultToolset is true.
+        /// If OverrideDefaultToolset is false, the persona will use the default tools defined in LLMEngine.Settings.
+        /// If OverrideDefaultToolset is true, and this list is empty, the persona will have no tool access.
+        /// </summary>
+        public virtual HashSet<string> Tools { get; set; } = [];
+
+        /// <summary>
         /// Gets the <see cref="Brain"/> instance associated with this object. The brain handles memory management, 
         /// retrieval, and storage for the persona, alongside multiple advanced features.
         /// </summary>
