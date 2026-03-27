@@ -212,7 +212,6 @@ namespace LetheAISharp.LLM
         private static InferenceChannel _currentChannel = InferenceChannel.Text;
         private static InstructFormat instruct = new() 
         { 
-            AddNamesToPrompt = false,
             SystemStart = "### Instruction:" + NewLine,
             SystemEnd = "",
             UserStart = "### Input:" + NewLine,

@@ -88,7 +88,7 @@ namespace LetheAISharp.Files
             }
 
             var realprompt = Message;
-            var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt;
+            var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt;
 
             // In group conversations, ALWAYS add names so the LLM knows which persona is speaking
             if (Bot is GroupPersonaBase)

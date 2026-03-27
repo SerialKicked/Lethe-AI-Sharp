@@ -7,7 +7,6 @@
   "BotStart": "### Response:\n",
   "BotEnd": "",
   "StopSequence": "",
-  "AddNamesToPrompt": false,
   "NewLinesBetweenMessages": true,
   "StopStrings": [
     "### Input",

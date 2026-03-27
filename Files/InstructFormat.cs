@@ -35,7 +35,6 @@ namespace LetheAISharp.Files
             "ThinkingForcedThought",
             "PrefillThinking",
             "ForceRAGToThinkingPrompt",
-            "AddNamesToPrompt",
             "NewLinesBetweenMessages",
             "NoInstructInStopString",
             "StopStrings"
@@ -81,21 +80,6 @@ namespace LetheAISharp.Files
         /// End sequence for the system messages. 
         /// </summary>
         public string SystemEnd { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Toggle to add the user and bot names before their respective messages in the prompt. May help some models with role recognition.
-        /// </summary>
-        public bool AddNamesToPrompt 
-        { 
-            get;
-            set
-            {
-                if (value)
-                {
-                    var debug = true;
-                }
-            }
-        } = true;
 
         /// <summary>
         /// Insert a new line between messages in the prompt. Depends on the instruction format. Some models may like it, while others may not.
@@ -157,7 +141,7 @@ namespace LetheAISharp.Files
         /// </summary>
         public bool NoInstructInStopString { get; set; } = false;
 
-        [JsonIgnore] internal bool RealAddNameToPrompt => LLMEngine.NamesInPromptOverride ?? AddNamesToPrompt;
+        [JsonIgnore] internal bool RealAddNameToPrompt => LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt;
         [JsonIgnore] public bool IsThinkFormat => !string.IsNullOrEmpty(ThinkingEnd);
 
         public string GetThinkPrefill()

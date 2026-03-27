@@ -171,6 +171,11 @@ namespace LetheAISharp.Files
         /// </summary>
         public bool DisableDateAndMoodIfNotLastSession { get; set; } = true;
 
+        /// <summary>
+        /// If set to true, the names of the personas and user will be added in message's content (like "Bob: Hello!").
+        /// </summary>
+        public bool AddNamesToPrompt { get; set; } = false;
+
         #endregion
 
 

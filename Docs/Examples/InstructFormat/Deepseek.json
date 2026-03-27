@@ -7,7 +7,6 @@
   "BotStart": "<｜Assistant｜>",
   "BotEnd": "",
   "StopSequence": "<｜end▁of▁sentence｜>",
-  "AddNamesToPrompt": false,
   "NewLinesBetweenMessages": false,
   "StopStrings": [],
   "UniqueName": "Deepseek"

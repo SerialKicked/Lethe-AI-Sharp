@@ -22,7 +22,6 @@ var chatml = new InstructFormat
     UserEnd = "<|im_end|>",
     BotStart = "<|im_start|>assistant\n",
     BotEnd = "<|im_end|>",
-    AddNamesToPrompt = false,
     NewLinesBetweenMessages = true
 };
 ```
@@ -39,7 +38,6 @@ var chatmlThinking = new InstructFormat
     UserEnd = "<|im_end|>",
     BotStart = "<|im_start|>assistant\n",
     BotEnd = "<|im_end|>",
-    AddNamesToPrompt = false,
     NewLinesBetweenMessages = true,
     ThinkingStart = "<think>\n",
     ThinkingEnd = "</think>",
@@ -67,14 +65,13 @@ You can find presets for most of the [commonly used instruction formats here](Ex
 
 ### Behavior Controls
 
-- **`AddNamesToPrompt`**: Include character names before messages (some roleplay models like that)
 - **`NewLinesBetweenMessages`**: Add newlines between message blocks (to avoid adding '\n' after all your End)
 
 ### Chain-of-Thought Support
 
 - **`ThinkingStart/End`**: Delimiters for thinking/reasoning blocks
 - **`PrefillThinking`**: Automatically start with thinking mode
-- **`ThinkingForcedThought`**: Default thinking content
+- **`ThinkingForcedThought`**: Default thinking content (add this content to the thinking block)
 
 ## Usage with LLMEngine
 

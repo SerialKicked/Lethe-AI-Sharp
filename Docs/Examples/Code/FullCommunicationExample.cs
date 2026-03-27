@@ -42,7 +42,6 @@ namespace LetheAISharp.Examples
                     UserEnd = "<|im_end|>",
                     BotStart = "<|im_start|>assistant\n",
                     BotEnd = "<|im_end|>",
-                    AddNamesToPrompt = false,
                     NewLinesBetweenMessages = true
                 };
                 LLMEngine.Instruct = instructionFormat;

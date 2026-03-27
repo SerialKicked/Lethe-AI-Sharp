@@ -7,7 +7,6 @@
   "BotStart": "<|im_start|>assistant\n",
   "BotEnd": "<|im_end|>",
   "StopSequence": "",
-  "AddNamesToPrompt": false,
   "NewLinesBetweenMessages": true,
   "StopStrings": [],
   "ThinkingStart": "<think>\n",

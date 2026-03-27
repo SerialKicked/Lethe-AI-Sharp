@@ -7,7 +7,6 @@
   "BotStart": "",
   "BotEnd": "</s>",
   "StopSequence": "",
-  "AddNamesToPrompt": false,
   "NewLinesBetweenMessages": false,
   "StopStrings": [],
   "UniqueName": "Mistral Tekken7"

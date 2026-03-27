@@ -224,7 +224,7 @@ namespace LetheAISharp
                 }
             }
 
-            if (LLMEngine.Instruct.IsThinkFormat && (LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt) && workstring.Contains(LLMEngine.Instruct.ThinkingEnd))
+            if (LLMEngine.Instruct.IsThinkFormat && (LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt) && workstring.Contains(LLMEngine.Instruct.ThinkingEnd))
             {
                 var startid = workstring.IndexOf(LLMEngine.Instruct.ThinkingEnd) + LLMEngine.Instruct.ThinkingEnd.Length + LLMEngine.NewLine.Length;
                 if (startid + 5 < workstring.Length)

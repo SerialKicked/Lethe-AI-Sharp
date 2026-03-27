@@ -96,7 +96,7 @@ namespace LetheAISharp
 
         private string GetResponseStart(BasePersona talker, bool? overridePrefill = null)
         {
-            var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt;
+            var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt;
             var res = string.Empty;
             if (addname && (!LLMEngine.Instruct.IsThinkFormat || LLMEngine.Settings.DisableThinking))
                 res += talker.Name + ":";
@@ -220,7 +220,7 @@ namespace LetheAISharp
                     topP: dooverride ? null : LLMEngine.Sampler.Top_p,
                     frequencyPenalty: dooverride ? null : LLMEngine.Sampler.Rep_pen - 1,
                     seed: setseed,
-                    user: LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt ? LLMEngine.User.Name : null,
+                    user: LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt ? LLMEngine.User.Name : null,
                     stops: [.. LLMEngine.Instruct.GetStoppingStrings(LLMEngine.User, LLMEngine.Bot)],
                     responseFormat: TextResponseFormat.Auto,
                     parallelToolCalls: LLMEngine.Client?.SupportParallelToolCall ?? false,
@@ -241,7 +241,7 @@ namespace LetheAISharp
                     topP: dooverride ? null : LLMEngine.Sampler.Top_p,
                     frequencyPenalty: dooverride ? null : LLMEngine.Sampler.Rep_pen - 1,
                     seed: setseed,
-                    user: LLMEngine.NamesInPromptOverride ?? LLMEngine.Instruct.AddNamesToPrompt ? LLMEngine.User.Name : null,
+                    user: LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt ? LLMEngine.User.Name : null,
                     stops: [.. LLMEngine.Instruct.GetStoppingStrings(LLMEngine.User, LLMEngine.Bot)],
                     responseFormat: _currentSchema is not null ? TextResponseFormat.JsonSchema : TextResponseFormat.Auto,
                     jsonSchema: _currentSchema,

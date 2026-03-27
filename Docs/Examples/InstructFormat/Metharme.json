@@ -7,7 +7,6 @@
   "BotEnd": "",
   "BoSToken": "<s>",
   "StopSequence": "</s>",
-  "AddNamesToPrompt": false,
   "NewLinesBetweenMessages": false,
   "StopStrings": [ "<|user" ],
   "UniqueName": "Metharme"

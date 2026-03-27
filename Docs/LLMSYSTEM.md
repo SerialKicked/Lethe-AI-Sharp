@@ -463,12 +463,10 @@ LLMEngine.Instruct.UserStart = "<|im_start|>user\n";
 LLMEngine.Instruct.UserEnd = "<|im_end|>\n";
 LLMEngine.Instruct.BotStart = "<|im_start|>assistant\n";
 LLMEngine.Instruct.BotEnd = "<|im_end|>\n";
-LLMEngine.Instruct.AddNamesToPrompt = false;
 ```
 
 ### Key Settings
 
-- **`AddNamesToPrompt`**: Whether to include character names in messages
 - **`NewLinesBetweenMessages`**: Add newlines between message blocks
 - **`ThinkingStart/End`**: For chain-of-thought models
 - **`StopSequence`**: When to stop generation

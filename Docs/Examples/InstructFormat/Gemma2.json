@@ -5,6 +5,5 @@
 	"UserEnd": "<end_of_turn>",
 	"BotStart": "<start_of_turn>model\n",
 	"BotEnd": "<end_of_turn>",
-	"AddNamesToPrompt": false,
 	"NewLinesBetweenMessages": true
 }
