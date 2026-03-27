@@ -11,13 +11,11 @@ The library has json formated presets for many popular models in the examples fo
 ## Common Instruction Formats
 
 ### ChatML Format
-Used by most modern models including Qwen.
+Used by many modern models including Qwen.
 
 ```csharp
 var chatml = new InstructFormat
 {
-    SysPromptStart = "<|im_start|>system\n",
-    SysPromptEnd = "<|im_end|>",
     SystemStart = "<|im_start|>system\n",
     SystemEnd = "<|im_end|>",
     UserStart = "<|im_start|>user\n", 
@@ -35,8 +33,6 @@ Used by models that support chain-of-thought reasoning.
 ```csharp
 var chatmlThinking = new InstructFormat
 {
-    SysPromptStart = "<|im_start|>system\n",
-    SysPromptEnd = "<|im_end|>",
     SystemStart = "<|im_start|>system\n",
     SystemEnd = "<|im_end|>",
     UserStart = "<|im_start|>user\n", 
@@ -59,8 +55,7 @@ You can find presets for most of the [commonly used instruction formats here](Ex
 
 ### Message Delimiters
 
-- **`SysPromptStart/End`**: Wraps the main system prompt at conversation start
-- **`SystemStart/End`**: Wraps system messages within conversations (when in doubt, use the same as with SysPrompt)
+- **`SystemStart/End`**: Wraps system messages
 - **`UserStart/End`**: Wraps user messages
 - **`BotStart/End`**: Wraps assistant/bot responses
 
@@ -86,7 +81,7 @@ You can find presets for most of the [commonly used instruction formats here](Ex
 ### Setting the Format
 
 ```csharp
-// Set globally for all operations
+// Set globally for all operations (example)
 LLMEngine.Instruct = new InstructFormat
 {
     UserStart = "<|user|>",
@@ -103,21 +98,17 @@ The instruction format affects how your prompts are actually sent to the model:
 ```csharp
 // Your code
 var builder = LLMEngine.GetPromptBuilder();
+builder.AddMessage(AuthorRole.System, "You're an useful assistant.");
+builder.AddMessage(AuthorRole.Assistant, "How can I help you today?");
 builder.AddMessage(AuthorRole.User, "Hello!");
-builder.AddMessage(AuthorRole.Assistant, "Hi there!");
 
 // With ChatML format, becomes:
+// <|im_start|>system  
+// You're an useful assistant.<|im_end|>
+// <|im_start|>assistant  
+// How can I help you today?<|im_end|>
 // <|im_start|>user
 // Hello!<|im_end|>
-// <|im_start|>assistant  
-// Hi there!<|im_end|>
-
-// With Alpaca format, becomes:
-// ### Instruction:
-// Hello!
-//
-// ### Response:
-// Hi there!
 ```
 
 ## Advanced Features
@@ -129,6 +120,7 @@ For models that support chain-of-thought reasoning:
 ```csharp
 var thinkingFormat = new InstructFormat
 {
+    // ... other settings ...
     ThinkingStart = "<think>",
     ThinkingEnd = "</think>",
     PrefillThinking = true, // most local models will require this to trigger CoT mode
@@ -151,12 +143,12 @@ var format = new InstructFormat
 
 ## Backend Differences
 
-### KoboldAPI (Text Completion)
+### Text Completion (KoboldAPI, Internal API, llama.cpp in text mode)
 - Uses all InstructFormat settings
 - Manually constructs formatted prompts
 - Full control over message structure
 
-### OpenAI API (Chat Completion)  
+### Chat Completion (OpenAI API, LMStudio, llama.cpp in chat mode)
 - Ignores most settings except ThinkingStart and ThinkingEnd
 - You still should set the correct format, as it'll help with token count evaluation
 - Uses native message format internally

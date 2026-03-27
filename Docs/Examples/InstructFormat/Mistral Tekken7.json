@@ -7,8 +7,6 @@
   "BotStart": "",
   "BotEnd": "</s>",
   "StopSequence": "",
-  "SysPromptStart": "[SYSTEM_PROMPT]",
-  "SysPromptEnd": "[/SYSTEM_PROMPT]",
   "AddNamesToPrompt": false,
   "NewLinesBetweenMessages": false,
   "StopStrings": [],

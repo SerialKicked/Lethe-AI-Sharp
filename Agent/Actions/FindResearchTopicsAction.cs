@@ -45,11 +45,11 @@ namespace LetheAISharp.Agent.Actions
 
             var requestedTask = searchlookup.GetQuery();
 
-            availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
+            availtokens -= promptbuild.GetTokenCount(AuthorRole.System, sysprompt);
             availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
 
             var docs = ChatSession.GetRawDialogsMiddleCut(param.Messages, availtokens, false, true, false);
-            promptbuild.AddMessage(new SingleMessage(AuthorRole.SysPrompt, sysprompt + docs));
+            promptbuild.AddMessage(new SingleMessage(AuthorRole.System, sysprompt + docs));
 
             var q = string.IsNullOrWhiteSpace(param.CustomRequest) ? "Review the conversation log above. Identify the topic or concept that requires a web search for additional (or up to date) information. Inform your choices based on the information presented in the prompt. Avoid any topic that could be considered illegal, terrorist, or CSAM." : param.CustomRequest;
 

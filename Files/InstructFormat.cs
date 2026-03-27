@@ -26,7 +26,6 @@ namespace LetheAISharp.Files
     {
         public static readonly string[] Properties = [
             "SystemPrompt",
-            "SysPromptStart", "SysPromptEnd",
             "SystemStart", "SystemEnd",
             "UserStart", "UserEnd",
             "BotStart", "BotEnd",
@@ -74,31 +73,29 @@ namespace LetheAISharp.Files
         public string StopSequence { get; set; } = string.Empty;
 
         /// <summary>
-        /// Start sequence for the main system prompt. Inserted just before the prompt's content.
-        /// </summary>
-        public string SysPromptStart { get; set; } = string.Empty;
-
-        /// <summary>
-        /// End sequence for the main system prompt. Inserted just after the prompt's content.
-        /// /summary>
-        public string SysPromptEnd { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Start sequence for the system messages that are inserted in the chatlog. 
-        /// Outside of rare models with weird instruction formats, this should usually be the same as SysPromptStart.
+        /// Start sequence for the system messages. 
         /// </summary>
         public string SystemStart { get; set; } = string.Empty;
         
         /// <summary>
-        /// End sequence for the system messages that are inserted in the chatlog. 
-        /// Outside of rare models with weird instruction formats, this should usually be the same as SysPromptEnd.
+        /// End sequence for the system messages. 
         /// </summary>
         public string SystemEnd { get; set; } = string.Empty;
 
         /// <summary>
         /// Toggle to add the user and bot names before their respective messages in the prompt. May help some models with role recognition.
         /// </summary>
-        public bool AddNamesToPrompt { get; set; } = true;
+        public bool AddNamesToPrompt 
+        { 
+            get;
+            set
+            {
+                if (value)
+                {
+                    var debug = true;
+                }
+            }
+        } = true;
 
         /// <summary>
         /// Insert a new line between messages in the prompt. Depends on the instruction format. Some models may like it, while others may not.
@@ -254,6 +251,7 @@ namespace LetheAISharp.Files
                     realprompt = "[" + message.Bot.ReplaceMacros(realprompt, message.User) + "]";
                     break;
                 case AuthorRole.System:
+                case AuthorRole.SysPrompt:
                     realprompt = message.Bot.ReplaceMacros(SystemStart + realprompt + SystemEnd, message.User);
                     break;
                 case AuthorRole.User:
@@ -263,9 +261,6 @@ namespace LetheAISharp.Files
                     var start = string.IsNullOrEmpty(BotStartOverride) ? BotStart : BotStartOverride;
                     var end = string.IsNullOrEmpty(BotEndOverride) ? BotEnd : BotEndOverride;
                     realprompt = message.Bot.ReplaceMacros(start + realprompt + end, message.User);
-                    break;
-                case AuthorRole.SysPrompt:
-                    realprompt = message.Bot.ReplaceMacros(SysPromptStart + realprompt + SysPromptEnd, message.User);
                     break;
                 default:
                     break;

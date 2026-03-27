@@ -242,7 +242,6 @@ namespace LetheAISharp.API
                     AuthorRole.User => "user",
                     AuthorRole.Assistant => "assistant",
                     AuthorRole.System => "system",
-                    AuthorRole.SysPrompt => "system",
                     AuthorRole.Tool => "tool",
                     _ => "delete"
                 };

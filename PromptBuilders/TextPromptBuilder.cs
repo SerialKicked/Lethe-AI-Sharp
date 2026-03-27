@@ -109,7 +109,7 @@ namespace LetheAISharp
                 {
                     var prompt = _prompt[i];
                     // System prompts are always added as-is
-                    if (prompt.Role == AuthorRole.System || prompt.Role == AuthorRole.SysPrompt)
+                    if (prompt.Role == AuthorRole.System)
                     {
                         fullprompt.Insert(0, prompt.ToTextCompletion());
                         continue;

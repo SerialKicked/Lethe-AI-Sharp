@@ -7,8 +7,6 @@
   "BotStart": "### Response:\n",
   "BotEnd": "",
   "StopSequence": "",
-  "SysPromptStart": "### Instruction:\n",
-  "SysPromptEnd": "",
   "AddNamesToPrompt": false,
   "NewLinesBetweenMessages": true,
   "StopStrings": [

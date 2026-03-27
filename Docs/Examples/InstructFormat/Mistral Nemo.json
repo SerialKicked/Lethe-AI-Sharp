@@ -1,8 +1,6 @@
 {
-	"SysPromptStart": "[INST]# SYSTEM PROMPT\n",
-	"SysPromptEnd": "[/INST]Understood.</s>",
-	"SystemStart": "[INST]",
-	"SystemEnd": "[/INST]",
+	"SystemStart": "[INST]# SYSTEM PROMPT\n",
+	"SystemEnd": "[/INST]Understood.</s>",
 	"UserStart": "[INST]",
 	"UserEnd": "[/INST]",
 	"BoSToken": "<s>",

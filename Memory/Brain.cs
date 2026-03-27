@@ -52,16 +52,6 @@ namespace LetheAISharp.Memory
         public bool DisableEurekas { get; set; } = false;
 
         /// <summary>
-        /// List of memory types that are subject to decay and deletion if not recalled within a certain timeframe.
-        /// </summary>
-        public HashSet<MemoryType> DecayableMemories { get; set; } = [MemoryType.WebSearch, MemoryType.Goal];
-
-        /// <summary>
-        /// Disable RAG usage for these memory types (might be useful if using a different system for some types).
-        /// </summary>
-        public HashSet<MemoryType> DisableRAG { get; set; } = [];
-
-        /// <summary>
         /// Gets or sets the minimum number of days that an item must remain unaccessed  before it is eligible for
         /// deletion, (it's multiplied by its priority level).
         /// </summary>
@@ -83,6 +73,8 @@ namespace LetheAISharp.Memory
         public DateTime LastInsertTime { get; protected set; }
         public int CurrentDelay { get; protected set; } = 0;
 
+        [JsonIgnore] protected HashSet<MemoryType> DecayableMemories => LLMEngine.Settings.DecayableMemories;
+        [JsonIgnore] protected HashSet<MemoryType> DisableRAG => LLMEngine.Settings.DisableRAG;
 
         [JsonProperty] public List<MemoryUnit> Memories { get; set; } = [];
         [JsonProperty] protected List<UserReturnInsert> Inserts { get; set; } = [];
@@ -94,7 +86,6 @@ namespace LetheAISharp.Memory
         [JsonProperty] public List<ExtractedFact> ExtractedFacts { get; set; } = [];
 
         public List<TopicSearch> RecentSearches { get; set; } = [];
-
 
         public string DailySchedulePrefix { get; set; } = "Today's Schedule:";
         public string[] DailySchedule { get; set; } = new string[7];
@@ -175,9 +166,8 @@ namespace LetheAISharp.Memory
             var msg = BuildAwayMessage();
             if (msg != null)
             {
-                // check if previous message is system or sysprompt
-                if (LLMEngine.History.CurrentSession.Messages.Count > 0 && (LLMEngine.History.CurrentSession.Messages.Last().Role == AuthorRole.System
-                    || LLMEngine.History.CurrentSession.Messages.Last().Role == AuthorRole.SysPrompt))
+                // check if previous message is system
+                if (LLMEngine.History.CurrentSession.Messages.Count > 0 && LLMEngine.History.CurrentSession.Messages.Last().Role == AuthorRole.System)
                 {
                     // edit the last system message instead of adding a new one
                     var lastmsg = LLMEngine.History.CurrentSession.Messages.Last();
@@ -282,7 +272,7 @@ namespace LetheAISharp.Memory
                 vectors.Add(session);
             }
 
-            var brainmemories = Memories.FindAll(m => m.Added <= DateTime.Now && m.Insertion == MemoryInsertion.Trigger && m.EmbedSummary.Length > 0 && !DisableRAG.Contains(m.Category));
+            var brainmemories = Memories.FindAll(m => m.Added <= DateTime.Now && m.Insertion == MemoryInsertion.Trigger && m.EmbedSummary.Length > 0 && !LLMEngine.Settings.DisableRAG.Contains(m.Category));
             foreach (var doc in brainmemories)
             {
                 vectors.Add(doc);

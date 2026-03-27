@@ -78,7 +78,7 @@ namespace LetheAISharp.Agent.Actions
                     }
                 }
             }
-            builder.AddMessage(new SingleMessage(AuthorRole.SysPrompt, prompt.ToString().CleanupAndTrim()));
+            builder.AddMessage(new SingleMessage(AuthorRole.System, prompt.ToString().CleanupAndTrim()));
             var txt = new StringBuilder($"You are researching '{topic}' for the following reason: {reason}").AppendLinuxLine().Append($"Merge the information available in the system prompt to offer a complex and detailed explanation on this topic. Don't use markdown formatting, favor natural language. The explanation should be 1 to 3 paragraphs long.");
             builder.AddMessage(new SingleMessage(AuthorRole.User, txt.ToString()));
             return builder;

@@ -1,6 +1,4 @@
 {
-	"SysPromptStart": "<|start_header_id|>system<|end_header_id|>\n\n",
-	"SysPromptEnd": "<|eot_id|>",
 	"SystemStart": "<|start_header_id|>system<|end_header_id|>\n\n",
 	"SystemEnd": "<|eot_id|>",
 	"UserStart": "<|start_header_id|>user<|end_header_id|>\n\n",

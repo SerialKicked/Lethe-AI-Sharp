@@ -7,8 +7,6 @@
   "BotStart": "<|im_start|>assistant\n",
   "BotEnd": "<|im_end|>",
   "StopSequence": "",
-  "SysPromptStart": "<|im_start|>system\n",
-  "SysPromptEnd": "<|im_end|>",
   "AddNamesToPrompt": false,
   "NewLinesBetweenMessages": true,
   "StopStrings": [],

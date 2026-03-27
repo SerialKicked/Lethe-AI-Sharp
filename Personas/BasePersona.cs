@@ -344,7 +344,7 @@ namespace LetheAISharp.LLM
             sysprompt.AppendLinuxLine();
             sysprompt.AppendLinuxLine($"# Memories");
             sysprompt.AppendLinuxLine();
-            availtks -= promptbuilder.GetTokenCount(AuthorRole.SysPrompt, sysprompt.ToString());
+            availtks -= promptbuilder.GetTokenCount(AuthorRole.System, sysprompt.ToString());
             var maxcount = 60;
             var entries = new List<string>();
             for (int i = History.Sessions.Count - 2; i >= 0; i--)
@@ -372,7 +372,7 @@ namespace LetheAISharp.LLM
                 sysprompt.AppendLinuxLine(SelfEditField);
             else
                 sysprompt.AppendLinuxLine("This space is empty for now.");
-            promptbuilder.AddMessage(new SingleMessage(AuthorRole.SysPrompt, sysprompt.ToString()));
+            promptbuilder.AddMessage(new SingleMessage(AuthorRole.System, sysprompt.ToString()));
             promptbuilder.AddMessage(new SingleMessage(AuthorRole.User, $"Using {Name}'s memories alongside their biography, edit their personal thoughts section accordingly. Write two to three short paragraphs from {Name}'s perspective, in the first person. Focus on important events, life changing experiences, and promises, that {Name} would want to keep in mind. Don't include a title."));
             var rln = SelfEditTokens;
             if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))

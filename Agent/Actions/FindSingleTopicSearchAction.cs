@@ -47,11 +47,11 @@ namespace LetheAISharp.Agent.Actions
 
             var requestTask = q + LLMEngine.NewLine + searchlookup.GetQuery();
 
-            availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
+            availtokens -= promptbuild.GetTokenCount(AuthorRole.System, sysprompt);
             availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestTask);
 
             var docs = ChatSession.GetRawDialogsMiddleCut(param.Messages, availtokens, false, true, false);
-            promptbuild.AddMessage(new SingleMessage(AuthorRole.SysPrompt, sysprompt + docs));
+            promptbuild.AddMessage(new SingleMessage(AuthorRole.System, sysprompt + docs));
             promptbuild.AddMessage(new SingleMessage(AuthorRole.User, requestTask));
             await promptbuild.SetStructuredOutput(searchlookup);
             var query = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, replyln);

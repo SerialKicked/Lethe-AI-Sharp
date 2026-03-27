@@ -41,8 +41,6 @@ namespace LetheAISharp.Examples
                 // Using the wrong format may lead to very poor results.
                 var instructionFormat = new InstructFormat()
                 {
-                    SysPromptStart = "<|im_start|>system\n",
-                    SysPromptEnd = "<|im_end|>",
                     SystemStart = "<|im_start|>system\n",
                     SystemEnd = "<|im_end|>",
                     UserStart = "<|im_start|>user\n",
@@ -59,7 +57,7 @@ namespace LetheAISharp.Examples
 
                 // Build the prompt using the PromptBuilder, the backend-agnostic way to create prompts
                 var builder = LLMEngine.GetPromptBuilder();
-                builder.AddMessage(AuthorRole.SysPrompt, "You are an useful assistant.");
+                builder.AddMessage(AuthorRole.System, "You are an useful assistant.");
                 builder.AddMessage(AuthorRole.User, "What is the capital of France? Please provide a short answer.");
                 var query = builder.PromptToQuery(AuthorRole.Assistant);
                 
@@ -74,7 +72,7 @@ namespace LetheAISharp.Examples
                 
                 // Build the streaming prompt
                 var streamBuilder = LLMEngine.GetPromptBuilder();
-                streamBuilder.AddMessage(AuthorRole.SysPrompt, "You are an useful assistant.");
+                streamBuilder.AddMessage(AuthorRole.System, "You are an useful assistant.");
                 streamBuilder.AddMessage(AuthorRole.User, "Write a very short story about a friendly robot in exactly two sentences.");
                 var streamQuery = streamBuilder.PromptToQuery(AuthorRole.Assistant);
                 

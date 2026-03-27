@@ -144,27 +144,9 @@ public enum AuthorRole
     User,       // User/human messages  
     Assistant,  // AI assistant responses
     Unknown,    // Unknown/unspecified role
-    SysPrompt   // Main system prompt (beginning of conversation)
+    Tool        // Used for tool calls in agent mode, not actual messages (internal)
 }
 ```
-
-### Important Distinction: SysPrompt vs System
-
-- **`AuthorRole.SysPrompt`**: Used for the **main system prompt** at the beginning of a conversation. This sets the overall context, character personality, and instructions for the entire session.
-
-- **`AuthorRole.System`**: Used for **system messages** inserted within the conversation flow. These are typically status updates, instructions, or contextual information that appear between user and assistant messages.
-
-```csharp
-// Example: Main system prompt (beginning of conversation)
-builder.AddMessage(AuthorRole.SysPrompt, "You are a helpful AI assistant specialized in science.");
-
-// Example: System message within conversation
-builder.AddMessage(AuthorRole.User, "What's the weather like?");
-builder.AddMessage(AuthorRole.System, "Weather data is currently unavailable.");
-builder.AddMessage(AuthorRole.Assistant, "I apologize, but I don't have access to current weather information.");
-```
-
-**Note**: For 90% of instruction formats, `SysPrompt` and `System` are handled identically. However, the library automatically handles the differences when using models with specific formatting requirements.
 
 ### The `SingleMessage` Class
 
@@ -266,15 +248,13 @@ The PromptBuilder allows you to create complex, multi-role conversations:
 var builder = LLMEngine.GetPromptBuilder();
 
 // Add messages with different roles
-builder.AddMessage(AuthorRole.SysPrompt, "You are a helpful assistant.");
+builder.AddMessage(AuthorRole.System, "You are a helpful assistant.");
 builder.AddMessage(AuthorRole.User, "Explain quantum physics in simple terms.");
 
 // Convert to query and execute
 var query = builder.PromptToQuery(AuthorRole.Assistant);
 var response = await LLMEngine.SimpleQuery(query);
 ```
-
-**Note**: Use `AuthorRole.SysPrompt` for system prompts and `AuthorRole.System` for system messages in conversation.
 
 Both `AddMessage` and `InsertMessage` also accept a `SingleMessage` directly, enabling richer metadata such as image paths, custom char/user IDs, timestamps, and hidden flags:
 
@@ -283,7 +263,7 @@ Both `AddMessage` and `InsertMessage` also accept a `SingleMessage` directly, en
 builder.AddMessage(new SingleMessage(AuthorRole.User, "Explain quantum physics."));
 
 // Insert a SingleMessage at a specific index
-builder.InsertMessage(0, new SingleMessage(AuthorRole.SysPrompt, "You are a helpful assistant."));
+builder.InsertMessage(0, new SingleMessage(AuthorRole.System, "You are a helpful assistant."));
 ```
 
 ## Full Communication Mode
@@ -469,16 +449,16 @@ Console.WriteLine($"User start: '{instruct.UserStart}'");
 Console.WriteLine($"User end: '{instruct.UserEnd}'");
 Console.WriteLine($"Bot start: '{instruct.BotStart}'");
 Console.WriteLine($"Bot end: '{instruct.BotEnd}'");
-Console.WriteLine($"System prompt start: '{instruct.SysPromptStart}'");
-Console.WriteLine($"System prompt end: '{instruct.SysPromptEnd}'");
+Console.WriteLine($"System start: '{instruct.SystemStart}'");
+Console.WriteLine($"System end: '{instruct.SystemEnd}'");
 ```
 
 ### ChatML Example Configuration
 
 ```csharp
 // Configure for ChatML format
-LLMEngine.Instruct.SysPromptStart = "<|im_start|>system\n";
-LLMEngine.Instruct.SysPromptEnd = "<|im_end|>\n";
+LLMEngine.Instruct.SystemStart = "<|im_start|>system\n";
+LLMEngine.Instruct.SystemEnd = "<|im_end|>\n";
 LLMEngine.Instruct.UserStart = "<|im_start|>user\n";
 LLMEngine.Instruct.UserEnd = "<|im_end|>\n";
 LLMEngine.Instruct.BotStart = "<|im_start|>assistant\n";
@@ -619,7 +599,7 @@ You are talking with {{user}}.
 #### In Simple Queries
 ```csharp
 var builder = LLMEngine.GetPromptBuilder();
-builder.AddMessage(AuthorRole.SysPrompt, "You are {{char}}, interacting with {{user}} on {{day}}.");
+builder.AddMessage(AuthorRole.System, "You are {{char}}, interacting with {{user}} on {{day}}.");
 builder.AddMessage(AuthorRole.User, "Hello {{char}}!");
 var query = builder.PromptToQuery(AuthorRole.Assistant);
 var response = await LLMEngine.SimpleQuery(query);
@@ -804,7 +784,7 @@ if (LLMEngine.SupportsSchema)
 
     // Build a prompt basic prompt, this is obviously kind of a silly example:
     var builder = LLMEngine.GetPromptBuilder();
-    builder.AddMessage(AuthorRole.SysPrompt, "You are an useful bot, you respond in JSON.");
+    builder.AddMessage(AuthorRole.System, "You are an useful bot, you respond in JSON.");
     builder.AddMessage(AuthorRole.User, "Hello, what is the weather like today?");
     
     // forces the bot to respond in the specified structured format
@@ -872,7 +852,7 @@ class SimpleBot
             // Build prompt properly
             var builder = LLMEngine.GetPromptBuilder();
             builder.AddMessage(AuthorRole.User, input);
-            builder.AddMessage(AuthorRole.SysPrompt, "You are a helpful assistant.");
+            builder.AddMessage(AuthorRole.System, "You are a helpful assistant.");
             var query = builder.PromptToQuery(AuthorRole.Assistant);
             await LLMEngine.SimpleQueryStreaming(query);
         }

@@ -155,7 +155,7 @@ namespace LetheAISharp.Agent.Tools
             {
                 Name = ReminderTitle,
                 Content = Message,
-                Category = MemoryType.General,
+                Category = MemoryType.Reminder,
                 Insertion = MemoryInsertion.UserReturn,
                 Added = date,
                 EndTime = date + new TimeSpan(1,0,0,0)

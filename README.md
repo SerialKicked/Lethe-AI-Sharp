@@ -38,7 +38,7 @@ if (LLMEngine.Status != SystemStatus.Ready)
 
 // 3. One-shot generation
 var pb = LLMEngine.GetPromptBuilder();
-pb.AddMessage(AuthorRole.SysPrompt, "You're an helpful and friendly bot!");
+pb.AddMessage(AuthorRole.System, "You're an helpful and friendly bot!");
 pb.AddMessage(AuthorRole.User, "Explain gravity in one friendly paragraph.");
 var query = pb.PromptToQuery();
 var reply = await LLMEngine.SimpleQuery(query);

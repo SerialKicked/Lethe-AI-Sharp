@@ -63,7 +63,7 @@ namespace LetheAISharp.Agent.Actions
             str.AppendLinuxLine("{{userbio}}").AppendLinuxLine();
             str.AppendLinuxLine("# Transcript").AppendLinuxLine();
 
-            tokenleft -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, str.ToString());
+            tokenleft -= promptbuild.GetTokenCount(AuthorRole.System, str.ToString());
 
             var req = new StringBuilder();
             req.AppendLinuxLine($"Current Date: {DateTime.Now.ToHumanString()}").AppendLinuxLine();
@@ -79,7 +79,7 @@ namespace LetheAISharp.Agent.Actions
             var transcript = LLMEngine.History.GetRawDialogs(tokenleft - 2000, false, true, false, TimeSpan.FromDays(7));
             str.Append(transcript);
 
-            promptbuild.AddMessage(new SingleMessage(AuthorRole.SysPrompt, str.ToString()));
+            promptbuild.AddMessage(new SingleMessage(AuthorRole.System, str.ToString()));
             promptbuild.AddMessage(new SingleMessage(AuthorRole.User, req.ToString()));
 
             return promptbuild;

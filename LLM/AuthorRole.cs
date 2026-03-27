@@ -6,6 +6,7 @@
         User,
         Assistant,
         Unknown,
+        [Obsolete("Use System instead of SysPrompt")]
         SysPrompt,
         Tool
     }

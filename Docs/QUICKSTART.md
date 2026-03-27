@@ -46,7 +46,7 @@ if (LLMEngine.Status == SystemStatus.Ready)
 ```csharp
 // Non-streaming query
 var builder = LLMEngine.GetPromptBuilder();
-builder.AddMessage(AuthorRole.SysPrompt, "You are a helpful assistant.");
+builder.AddMessage(AuthorRole.System, "You are a helpful assistant.");
 builder.AddMessage(AuthorRole.User, "What is artificial intelligence?");
 var query = builder.PromptToQuery(AuthorRole.Assistant);
 var response = await LLMEngine.SimpleQuery(query);
@@ -56,7 +56,7 @@ Console.WriteLine(response);
 LLMEngine.OnInferenceStreamed += (_, token) => Console.Write(token);
 
 var streamBuilder = LLMEngine.GetPromptBuilder();
-streamBuilder.AddMessage(AuthorRole.SysPrompt, "You are a helpful assistant.");
+streamBuilder.AddMessage(AuthorRole.System, "You are a helpful assistant.");
 streamBuilder.AddMessage(AuthorRole.User, "Write a haiku about programming.");
 var streamQuery = streamBuilder.PromptToQuery(AuthorRole.Assistant);
 await LLMEngine.SimpleQueryStreaming(streamQuery);

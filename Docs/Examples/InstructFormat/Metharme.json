@@ -1,6 +1,4 @@
 {
-  "SysPromptStart": "<|system|>",
-  "SysPromptEnd": "",
   "SystemStart": "<|system|>",
   "SystemEnd": "",
   "UserStart": "<|user|>",

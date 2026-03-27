@@ -203,6 +203,16 @@ namespace LetheAISharp.Files
         /// </summary>
         public bool SessionDetailedSummary { get; set; } = false;
 
+        /// <summary>
+        /// List of memory types that are subject to decay and deletion if not recalled within a certain timeframe.
+        /// </summary>
+        public HashSet<MemoryType> DecayableMemories { get; set; } = [ MemoryType.WebSearch, MemoryType.Goal, MemoryType.Reminder ];
+
+        /// <summary>
+        /// Disable RAG usage for these memory types (might be useful if using a different system for some types).
+        /// </summary>
+        public HashSet<MemoryType> DisableRAG { get; set; } = [ MemoryType.File, MemoryType.Image ];
+
         #endregion
 
 

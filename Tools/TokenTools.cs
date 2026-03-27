@@ -66,10 +66,6 @@ namespace LetheAISharp
                 specialchar.Add(format.UserStart);
             if (!string.IsNullOrEmpty(format.UserEnd))
                 specialchar.Add(format.UserEnd);
-            if (!string.IsNullOrEmpty(format.SysPromptStart))
-                specialchar.Add(format.SysPromptStart);
-            if (!string.IsNullOrEmpty(format.SysPromptEnd))
-                specialchar.Add(format.SysPromptEnd);
             if (!string.IsNullOrEmpty(format.BoSToken))
                 specialchar.Add(format.BoSToken);
 
@@ -110,7 +106,7 @@ namespace LetheAISharp
                 OpenAI.Role.User => AuthorRole.User,
                 OpenAI.Role.Assistant => AuthorRole.Assistant,
                 OpenAI.Role.Developer => AuthorRole.System,
-                OpenAI.Role.System => AuthorRole.SysPrompt,
+                OpenAI.Role.System => AuthorRole.System,
                 _ => AuthorRole.User
             };
         }

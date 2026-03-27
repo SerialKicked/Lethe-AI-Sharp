@@ -36,8 +36,6 @@ namespace LetheAISharp.Examples
                 // Using the wrong format may lead to very poor results.
                 var instructionFormat = new InstructFormat()
                 {
-                    SysPromptStart = "<|im_start|>system\n",
-                    SysPromptEnd = "<|im_end|>",
                     SystemStart = "<|im_start|>system\n",
                     SystemEnd = "<|im_end|>",
                     UserStart = "<|im_start|>user\n",

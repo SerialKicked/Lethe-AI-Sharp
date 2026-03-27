@@ -153,11 +153,11 @@ namespace LetheAISharp.Files
 
             var requestedTask = session.GetQuery();
 
-            availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
+            availtokens -= promptbuild.GetTokenCount(AuthorRole.System, sysprompt);
             availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
 
             var docs = GetRawDialogs(availtokens, false, true, false, LLMEngine.Settings.CutInTheMiddleSummaryStrategy);
-            promptbuild.AddMessage(new SingleMessage(AuthorRole.SysPrompt, sysprompt + docs));
+            promptbuild.AddMessage(new SingleMessage(AuthorRole.System, sysprompt + docs));
             promptbuild.AddMessage(new SingleMessage(AuthorRole.User, requestedTask));
             await promptbuild.SetStructuredOutput(session);
             var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, replyln);
@@ -245,7 +245,7 @@ namespace LetheAISharp.Files
             var promptBuilder = LLMEngine.GetPromptBuilder();
             var msgtxt = "You are an automated system designed to give titles to summaries." + LLMEngine.NewLine +
                 LLMEngine.NewLine + "# Summary:" + LLMEngine.NewLine + LLMEngine.NewLine + sum;
-            promptBuilder.AddMessage(new SingleMessage(AuthorRole.SysPrompt, msgtxt));
+            promptBuilder.AddMessage(new SingleMessage(AuthorRole.System, msgtxt));
             promptBuilder.AddMessage(new SingleMessage(AuthorRole.User, "Give a title to the summary above. This title should be a single short and descriptive sentence. Write only the title, nothing else."));
             var temp = LLMEngine.Sampler.Temperature;
             if (temp > 0.5f)
@@ -296,11 +296,11 @@ namespace LetheAISharp.Files
                 "# Chat Session:" + LLMEngine.NewLine +
                 "Starting Date: " + StringExtensions.DateToHumanString(StartTime) + " - " + "Duration: " + StringExtensions.TimeSpanToHumanString(EndTime - StartTime) + LLMEngine.NewLine + LLMEngine.NewLine;
 
-            availtokens -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, sysprompt);
+            availtokens -= promptbuild.GetTokenCount(AuthorRole.System, sysprompt);
             availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
 
             var docs = GetRawDialogs(availtokens, false, lightDialogs, showHidden, LLMEngine.Settings.CutInTheMiddleSummaryStrategy);
-            promptbuild.AddMessage(new SingleMessage(AuthorRole.SysPrompt, sysprompt + docs));
+            promptbuild.AddMessage(new SingleMessage(AuthorRole.System, sysprompt + docs));
             promptbuild.AddMessage(new SingleMessage(AuthorRole.User, requestedTask));
 
             var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.5) ? 0.5 : LLMEngine.Sampler.Temperature, replyln);
@@ -354,7 +354,6 @@ namespace LetheAISharp.Files
                     case AuthorRole.Tool:
                         continue;// skip messages that are just tool calls, as they add little value to the analysis and can be very long.
                     case AuthorRole.System:
-                    case AuthorRole.SysPrompt:
                         if (ignoresystem)
                             continue;
                         text = msg.Message.StartsWith('*') ? LLMEngine.NewLine + msg.Message.Trim() + LLMEngine.NewLine : LLMEngine.NewLine + "*" + msg.Message.Trim() + "*" + LLMEngine.NewLine;
@@ -400,7 +399,6 @@ namespace LetheAISharp.Files
                     case AuthorRole.Tool:
                         continue;// skip messages that are just tool calls, as they add little value to the analysis and can be very long.
                     case AuthorRole.System:
-                    case AuthorRole.SysPrompt:
                         if (ignoresystem)
                             continue;
                         text = msg.Message.StartsWith('*')
@@ -556,7 +554,7 @@ namespace LetheAISharp.Files
             var neutral = 0;
             foreach (var msg in Messages)
             {
-                if (msg.Role == AuthorRole.System || msg.Role == AuthorRole.SysPrompt || msg.Role == AuthorRole.Unknown)
+                if (msg.Role == AuthorRole.System || msg.Role == AuthorRole.Unknown)
                     continue;
 
                 var talker = msg.Sender?.UniqueName;

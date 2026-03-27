@@ -56,13 +56,13 @@ namespace LetheAISharp.Agent.Actions
             }
             str.AppendLinuxLine("## Transcript").AppendLinuxLine();
 
-            tokenleft -= promptbuild.GetTokenCount(AuthorRole.SysPrompt, str.ToString());
+            tokenleft -= promptbuild.GetTokenCount(AuthorRole.System, str.ToString());
             tokenleft -= promptbuild.GetTokenCount(AuthorRole.User, request);
 
             var transcript = param.GetRawDialogs(tokenleft, true, false, false, true);
             str.Append(transcript);
 
-            promptbuild.AddMessage(new SingleMessage(AuthorRole.SysPrompt, str.ToString()));
+            promptbuild.AddMessage(new SingleMessage(AuthorRole.System, str.ToString()));
             promptbuild.AddMessage(new SingleMessage(AuthorRole.User, request));
 
             return promptbuild;

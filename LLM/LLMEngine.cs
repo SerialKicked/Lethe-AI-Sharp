@@ -213,8 +213,6 @@ namespace LetheAISharp.LLM
         private static InstructFormat instruct = new() 
         { 
             AddNamesToPrompt = false,
-            SysPromptStart = "### Instruction:" + NewLine,
-            SysPromptEnd = "",
             SystemStart = "### Instruction:" + NewLine,
             SystemEnd = "",
             UserStart = "### Input:" + NewLine,
@@ -1003,7 +1001,7 @@ namespace LetheAISharp.LLM
 
             // Prepare the full system prompt and count the tokens used
             var rawprompt = GenerateSystemPromptContent(message.Message);
-            availtokens -= PromptBuilder.AddMessage(new SingleMessage(AuthorRole.SysPrompt, rawprompt));
+            availtokens -= PromptBuilder.AddMessage(new SingleMessage(AuthorRole.System, rawprompt));
 
             // Prepare the bot's response tokens and count them
             if (string.IsNullOrEmpty(message.Message) && message.Role == AuthorRole.User)
