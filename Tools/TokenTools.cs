@@ -107,6 +107,7 @@ namespace LetheAISharp
                 OpenAI.Role.Assistant => AuthorRole.Assistant,
                 OpenAI.Role.Developer => AuthorRole.System,
                 OpenAI.Role.System => AuthorRole.System,
+                OpenAI.Role.Tool => AuthorRole.Tool,
                 _ => AuthorRole.User
             };
         }
