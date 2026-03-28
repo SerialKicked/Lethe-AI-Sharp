@@ -54,13 +54,14 @@ namespace LetheAISharp.Memory
         /// <summary>
         /// Disable all automatic natural memory inserts.
         /// </summary>
-        [Description("If true, disables all automatic forced memory inserts.")]
+        [Description("If checked, disables all automatic forced memory inserts.")]
         public bool DisableEurekas { get; set; } = false;
 
         /// <summary>
         /// Gets or sets the minimum number of days that an item must remain unaccessed  before it is eligible for
         /// deletion, (it's multiplied by its priority level).
         /// </summary>
+        [Description("Minimum number of days that an item must remain unaccessed before it is eligible for deletion, multiplied by its priority level.")]
         public int MinNoRecallDaysBeforeDeletionPerPrioLevel { get; set; } = 10;
 
         /// <summary>
@@ -68,11 +69,13 @@ namespace LetheAISharp.Memory
         /// This only has basic functionalities featured as a demo for roleplay characters. 
         /// The Brain and Mood classes are meant to be overridden for more advanced behavior.
         /// </summary>
+        [Description("If checked, enables the basic mood system to adjust responses based on mood state.")]
         public bool MoodHandling { get; set; } = false;
 
         /// <summary>
         /// If mood handling is enabled, setting this to true will keep the mood static and not update it over time.
         /// </summary>
+        [Description("If checked, keeps the mood static and does not update it over time.")]
         public bool StaticMood { get; set; } = false;
 
 
