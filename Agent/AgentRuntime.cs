@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -17,7 +18,6 @@ namespace LetheAISharp.Agent
     public class AgentConfig
     {
         public Dictionary<string, AgentTaskSetting> PluginSettings { get; set; } = [];
-        public TimeSpan MinInactivityTime { get; set; } = new TimeSpan(0, 15, 0);
     }
 
     /// <summary>
@@ -86,7 +86,7 @@ namespace LetheAISharp.Agent
             while (_running && !_cts.Token.IsCancellationRequested)
             {
                 // don't do anything if not in agent mode, or if user was active recently
-                if (!Owner.AgentMode || (DateTime.Now - _lastuseractivity) < Config.MinInactivityTime || LLMEngine.Status == SystemStatus.NotInit)
+                if (!Owner.AgentMode || (DateTime.Now - _lastuseractivity) < LLMEngine.Settings.BackgroundAgentMinInactivityTime || LLMEngine.Status == SystemStatus.NotInit)
                 {
                     await Task.Delay(1000, _cts.Token).ConfigureAwait(false);
                     continue;

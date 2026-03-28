@@ -85,10 +85,45 @@ namespace LetheAISharp.Files
         /// <summary> LlamaSharp: set to true to disable KV cache offloading to GPU (slower / less VRAM) </summary>
         public bool LlamaSharpNoKVoffload { get; set; } = false;
 
+        #endregion
+
+
+        #region *** General Settings ***
+
+        [Description("Minimum time of user inactivity before the background agent is allowed to execute tasks. Default is 30 minutes.")]
+        public TimeSpan BackgroundAgentMinInactivityTime { get; set; } = new TimeSpan(0, 30, 0);
+
         /// <summary>
         /// Force the use of internal grammar rule generator, even if backend supports it.
         /// </summary>
         public bool ForceInternalGrammar { get; set; } = false;
+
+        /// <summary> Overrides the scenario field of the currently loaded character </summary>
+        public string ScenarioOverride { get; set; } = string.Empty;
+
+        /// <summary> Should we stop the generation after the first paragraph? </summary>
+        public bool StopGenerationOnFirstParagraph { get; set; } = false;
+
+        /// <summary> Thinking models only, attempt to disable the thinking block </summary>
+        public bool DisableThinking { get; set; } = false;
+
+        /// <summary> 
+        /// Move all RAG, WorldInfo, and Brain entries to the system prompt independantly of their respective settings. 
+        /// Some models perform better with such info in the system prompt, while others prefer it in the main dialog.
+        /// </summary>
+        public bool MoveAllInsertsToSysPrompt { get; set; } = false;
+
+        /// <summary>
+        /// If set to true (default) and the active chat session is not the lastest, date, mood and memories (with Natural insert policy)
+        /// will not be inserted in the prompt. This is useful when continuing old chat sessions where this information could be irrelevant or
+        /// even contradictory.
+        /// </summary>
+        public bool DisableDateAndMoodIfNotLastSession { get; set; } = true;
+
+        /// <summary>
+        /// If set to true, the names of the personas and user will be added in message's content (like "Bob: Hello!").
+        /// </summary>
+        public bool AddNamesToPrompt { get; set; } = false;
 
         #endregion
 
@@ -146,40 +181,10 @@ namespace LetheAISharp.Files
         /// <summary> Maximum number of images to be sent in the prompt, this will save tokens when sending many images. Set to 0 for no limit. </summary>
         public int MaxImageCount { get; set; } = 4;
 
-        /// <summary> Overrides the scenario field of the currently loaded character </summary>
-        public string ScenarioOverride { get; set; } = string.Empty;
-
-        /// <summary> Should we stop the generation after the first paragraph? </summary>
-        public bool StopGenerationOnFirstParagraph { get; set; } = false;
-
-        /// <summary> Thinking models only, attempt to disable the thinking block </summary>
-        public bool DisableThinking { get; set; } = false;
-
-        /// <summary> Allow keyword-activated snippets to be inserted in the prompt (see WorldInfo and BasePersona) </summary>
-        public bool AllowWorldInfo { get; set; } = true;
-
-        /// <summary> 
-        /// Move all RAG, WorldInfo, and Brain entries to the system prompt independantly of their respective settings. 
-        /// Some models perform better with such info in the system prompt, while others prefer it in the main dialog.
-        /// </summary>
-        public bool MoveAllInsertsToSysPrompt { get; set; } = false;
-
-        /// <summary>
-        /// If set to true (default) and the active chat session is not the lastest, date, mood and memories (with Natural insert policy)
-        /// will not be inserted in the prompt. This is useful when continuing old chat sessions where this information could be irrelevant or
-        /// even contradictory.
-        /// </summary>
-        public bool DisableDateAndMoodIfNotLastSession { get; set; } = true;
-
-        /// <summary>
-        /// If set to true, the names of the personas and user will be added in message's content (like "Bob: Hello!").
-        /// </summary>
-        public bool AddNamesToPrompt { get; set; } = false;
-
         #endregion
 
 
-        #region *** Long term memory system and summaries ***
+        #region *** Memory Systems ***
 
         /// <summary> 
         /// If set to true, summaries of previous chat sessions will be insereted in the system prompt to provide extended context.
@@ -217,6 +222,11 @@ namespace LetheAISharp.Files
         /// Disable RAG usage for these memory types (might be useful if using a different system for some types).
         /// </summary>
         public HashSet<MemoryType> DisableRAG { get; set; } = [ MemoryType.File, MemoryType.Image ];
+
+        /// <summary> 
+        /// Allow keyword-activated snippets to be inserted in the prompt (see WorldInfo and BasePersona) 
+        /// </summary>
+        public bool AllowWorldInfo { get; set; } = true;
 
         #endregion
 

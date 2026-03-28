@@ -3,6 +3,7 @@ using LetheAISharp.Files;
 using LetheAISharp.Memory;
 using Newtonsoft.Json;
 using System;
+using System.ComponentModel;
 using System.Globalization;
 using System.Text;
 
@@ -32,40 +33,46 @@ namespace LetheAISharp.LLM
         /// User personas will have {{user}} and {{userbio}} macros replaced with their Name and Bio, while Bot personas will use {{char}} and {{charbio}}.
         /// Most fields are bot only. For users, only Name and Bio really matter.
         /// </summary>
+        [Description("Determines if this is a User or Bot persona. It's mostly a flag for the front-end but also helps with prompt macros. For users, only Name and Bio really matter.")]
         public bool IsUser { get; set; } = false;
 
         /// <summary>
         /// In full chat mode, If DisableBotGuidance is set to true, the bot will not receive any system message 
-        /// regarding date, mood, eurekas, or other contextual guidance in regards to this user. 
+        /// regarding date, mood, eurekas, or other contextual guidance. 
         /// This also works if the user has DisableBotGuidance set to true, in that case, the bot won't get any guidance either.
         /// </summary>
         /// <remarks>
         /// This is mostly for multi-user situation, roleplay, or testing. 
         /// So you don't need to disable 3 or 4 different settings when you don't want a conversation with a particular user to change a bot's state
         /// </remarks>
+        [Description("In full chat mode, If DisableBotGuidance is set to true, the bot will not receive any system message regarding date, mood, eurekas. This is mostly for multi-user situation, roleplay, or testing (so you don't need to turn off 4 different settings). This also works if the current user persona has DisableBotGuidance set to true, in that case, the bot won't get any guidance either, independantly of its settings.")]
         public bool DisableBotGuidance { get; set; } = false;
 
         /// <summary> 
         /// Character's name
         /// can be put into system prompt and other inputs with {{user}} or {{char}} macros
         /// </summary>
+        [Description("Character's name. Can be put into system prompt and other inputs with {{user}} or {{char}} macros.")]
         public virtual string Name { get; set; } = string.Empty;
 
         /// <summary> 
         /// Character's bio.
         /// Can be put into prompt with {{userbio}} or {{charbio}} macros
         /// </summary>
+        [Description("This is the character's bio. Can be put into system prompt with {{userbio}} or {{charbio}} macros.")]
         public virtual string Bio { get; set; } = string.Empty;
 
         /// <summary> 
         /// Optional Self-editable field for the character, updated on new summary if SelfEditTokens > 0. 
         /// Can be put into prompt with the {{selfedit}} macro.
         /// </summary>
+        [Description("This is an optional field in the system prompt that the bot is allowed to self-edit.")]
         public virtual string SelfEditField { get; set; } = string.Empty;
 
         /// <summary> 
         /// If set above 0, this character will be allowed to write this amount of tokens in its SelfEditField field. Updated each chat session.
         /// </summary>
+        [Description("If set above 0, this character will be allowed to write this amount of tokens in its SelfEditField field. Updated each chat session.")]
         public virtual int SelfEditTokens { get; set; } = 0;
 
         /// <summary> 
@@ -73,23 +80,27 @@ namespace LetheAISharp.LLM
         /// Can be put into the prompt with the {{scenario}} macro.
         /// </summary>
         /// <seealso cref="Files.SystemPrompt"/>
+        [Description("Character's default scenario. An arbitrary text to give some context to the language model. Can be left empty.")]
         public virtual string Scenario { get; set; } = string.Empty;
 
         /// <summary> 
         /// First message the character will send when starting a new session 
         /// </summary>
+        [Description("First message the character will send when starting a chat. Can include macros and be left empty.")]
         public virtual List<string> FirstMessage { get; set; } = [];
 
         /// <summary> 
         /// Examples of dialogs from the character to get a more consistent tone, assuming the system prompt has a field for this. 
         /// </summary>
         /// <seealso cref="Files.SystemPrompt"/>
+        [Description("Examples of dialogs from the character to get a more consistent tone, assuming the system prompt has a field for this. Can be left empty. Can also be used to give instructions instead.")]
         public virtual List<string> ExampleDialogs { get; set; } = [];
 
         /// <summary> 
         /// If set, this will override the system prompt selected in LLMEngine and use this instead. Can be useful for very custom characters. 
         /// </summary>
         /// <seealso cref="Files.SystemPrompt"/>
+        [Description("If set, this will override the normal system prompt. Can be useful for very custom characters. Can be left empty.")]
         public virtual string SystemPrompt { get; set; } = string.Empty;
 
         /// <summary> 
@@ -98,6 +109,7 @@ namespace LetheAISharp.LLM
         /// The frontend is meant to ovedride BeginChat() and load the actual WorldInfo files into the MyWorlds field.
         /// </summary>
         /// <seealso cref="Files.WorldInfo"/>
+        [Description("WorldInfo ID applied to this character. WorldInfo is a keyword-activated text insertion system that can be used to give context to the model. Those are unique ID corresponding to the actual files in the front-end.")]
         public List<string> Worlds { get; set; } = [];
 
         /// <summary> 
@@ -109,28 +121,33 @@ namespace LetheAISharp.LLM
         /// Toggles the background agent mode for this persona (the bot will act autonomously in the background using the provided AgentTasks). 
         /// Only the currently loaded persona will run the agentic logic. See documentations for more information.
         /// </summary>
+        [Description("Toggles the background agent mode for this persona (the bot will act autonomously when the user is AFK, using the provided tasks). Only the currently loaded persona will run the agentic logic. See documentations for more information.")]
         public virtual bool AgentMode { get; set; } = false;
 
         /// <summary> 
         /// Optional list of plugin ID for the background agent mode. See documentations for more information.
         /// </summary>
+        [Description("Optional list of plugins for the background agent mode. See documentations for more information.")]
         public List<string> AgentTasks { get; set; } = [];
 
         /// <summary> 
         /// If set to true, system messages will occasionally be inserted in the chat to inform the bot of how much time has passed 
         /// between the latest user message and its last response. It'll also help with keeping track of dates and time in general.
         /// </summary>
+        [Description("If set to true, system messages will occasionally be inserted in the chat to inform the bot of how much time has passed between the latest user message and its last response. It'll also help with keeping track of dates and time in general. This is recommended for assistants and characters that need to maintain a sense of time.")]
         public virtual bool SenseOfTime { get; set; } = false;
 
         /// <summary>
         /// For better recall accuracy IRL dates are included in session summaries. 
         /// However for roleplay characters, this might be counter productive. Set this to false to disable dates.
         /// </summary>
+        [Description("For better recall accuracy IRL dates are included in chat session summaries. However for roleplay characters, this might be counter productive. Set this to false to disable dates.")]
         public virtual bool DatesInSessionSummaries { get; set; } = true;
 
         /// <summary>
         /// Determines whether this persona should override the default toolset with its own specified in the Tools property.
         /// </summary>
+        [Description("Determines whether this persona should override the default tool-call set with its own.")]
         public virtual bool OverrideDefaultToolset { get; set; } = false;
 
         /// <summary>
@@ -138,6 +155,7 @@ namespace LetheAISharp.LLM
         /// If OverrideDefaultToolset is false, the persona will use the default tools defined in LLMEngine.Settings.
         /// If OverrideDefaultToolset is true, and this list is empty, the persona will have no tool access.
         /// </summary>
+        [Description("List of tools specific to this persona. Only used if OverrideDefaultToolset is true. If OverrideDefaultToolset is false, the persona will use the default tools defined in LLMEngine.Settings. If OverrideDefaultToolset is true, and this list is empty, the persona will have no tool access.")]
         public virtual HashSet<string> Tools { get; set; } = [];
 
         /// <summary>

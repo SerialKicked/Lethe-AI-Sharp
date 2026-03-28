@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
 using System.Text;
+using System.ComponentModel;
 
 namespace LetheAISharp.Memory
 {
@@ -29,26 +30,31 @@ namespace LetheAISharp.Memory
         /// <summary>
         /// Minimum time between two automatic memory inserts.
         /// </summary>
+        [Description("Minimum time between two forced memory inserts.")]
         public TimeSpan MinInsertDelay { get; set; } = TimeSpan.FromMinutes(30);
 
         /// <summary>
         /// Minimum number of user messages between two automatic memory inserts.
         /// </summary>
+        [Description("Minimum number of user messages between two forced memory inserts.")]
         public int MinMessageDelay { get; set; } = 4;
 
         /// <summary>
         /// Time in hours of inactivity after which the bot will send a mood/away message.
         /// </summary>
+        [Description("Time in hours of user inactivity after which the bot will be sent a system message informing them of time, mood, and other contextual information.")]
         public float HoursBeforeAFK { get; set; } = 4;
 
         /// <summary>
         /// Determines how long a natural memory remains available for insertion.
         /// </summary>
+        [Description("Determines how long a forced memory insert remains available for insertion. Memories older than this cutoff will be removed during maintenance.")]
         public TimeSpan EurekaCutOff { get; set; } = TimeSpan.FromDays(15);
 
         /// <summary>
         /// Disable all automatic natural memory inserts.
         /// </summary>
+        [Description("If true, disables all automatic forced memory inserts.")]
         public bool DisableEurekas { get; set; } = false;
 
         /// <summary>
