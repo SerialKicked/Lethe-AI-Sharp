@@ -12,7 +12,7 @@ namespace LetheAISharp.Agent.Tools
     /// Basic toolset for demonstration purposes. 
     /// This toolset includes simple tools like performing a web search, and getting the current date and time.
     /// </summary>
-    public class LetheBasicTools : IToolList
+    public class WebSearchTools : IToolList
     {
         public string Id => "Web Search";
         private List<Tool> toolList = [];
