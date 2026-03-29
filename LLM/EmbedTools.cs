@@ -16,6 +16,7 @@ namespace LetheAISharp.LLM
     {
         /// <summary> Called when the system embedded a session </summary>
         public static event EventHandler<string>? OnEmbedText;
+        private static readonly SemaphoreSlim _embedLock = new(1, 1);
 
         private static void RaiseOnEmbedText(string toembed) => OnEmbedText?.Invoke(null, toembed);
 
@@ -45,11 +46,11 @@ namespace LetheAISharp.LLM
             EmbedSettings = new ModelParams(LLMEngine.Settings.RAGModelPath)
             { 
                 GpuLayerCount = 255,
-                Embeddings = true
+                Embeddings = true,
+                PoolingType = LLama.Native.LLamaPoolingType.Mean
             };
             EmbedWeights = LLamaWeights.LoadFromFile(EmbedSettings);
             Embedder = new LLamaEmbedder(EmbedWeights, EmbedSettings);
-            
             return Embedder;
         }
 
@@ -60,8 +61,8 @@ namespace LetheAISharp.LLM
         {
             if (Embedder != null)
             {
-                EmbedWeights?.Dispose();
                 Embedder?.Dispose();
+                EmbedWeights?.Dispose();
                 Embedder = null;
                 EmbedWeights = null;
                 EmbedSettings = null;
@@ -77,13 +78,21 @@ namespace LetheAISharp.LLM
         {
             if (!LLMEngine.Settings.RAGEnabled)
                 return [];
-            var embed = Embedder ?? LoadEmbedder();
-            var emb = textToEmbed;
-            if (emb.Length > LLMEngine.Settings.RAGEmbeddingSize)
-                emb = emb[..LLMEngine.Settings.RAGEmbeddingSize];
-            var tsk = await embed.GetEmbeddings(emb).ConfigureAwait(false);
-            RaiseOnEmbedText(textToEmbed);
-            return tsk[0].EuclideanNormalization();
+            await _embedLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                var embed = Embedder ?? LoadEmbedder();
+                var emb = textToEmbed;
+                if (emb.Length > LLMEngine.Settings.RAGEmbeddingSize)
+                    emb = emb[..LLMEngine.Settings.RAGEmbeddingSize];
+                var tsk = await embed.GetEmbeddings(emb).ConfigureAwait(false);
+                RaiseOnEmbedText(textToEmbed);
+                return tsk[0].EuclideanNormalization();
+            }
+            finally
+            {
+                _embedLock.Release();
+            }
         }
 
         public static void RemoveEmbedEventHandler()
