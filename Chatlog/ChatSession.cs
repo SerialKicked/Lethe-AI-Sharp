@@ -2,6 +2,7 @@
 using LetheAISharp.GBNF;
 using LetheAISharp.LLM;
 using LetheAISharp.Memory;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System.Reflection.Metadata.Ecma335;
@@ -162,11 +163,19 @@ namespace LetheAISharp.Files
             await promptbuild.SetStructuredOutput(session);
             var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, replyln);
             var finalstr = await LLMEngine.SimpleQuery(ct).ConfigureAwait(false);
-            session = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
-            session?.ClampRelevance();
-            LLMEngine.NamesInPromptOverride = null;
-            LLMEngine.Instruct.PrefillThinking = prefill;
-            return session!;
+            try
+            {
+                session = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
+                session?.ClampRelevance();
+                LLMEngine.NamesInPromptOverride = null;
+                LLMEngine.Instruct.PrefillThinking = prefill;
+                return session!;
+            }
+            catch (Exception ex)
+            {
+                LLMEngine.Logger?.LogCritical("Session Switching Error: {message}", ex.Message);
+                throw;
+            }
         }
 
         /// <summary>

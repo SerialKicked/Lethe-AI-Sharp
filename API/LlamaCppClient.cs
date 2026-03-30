@@ -724,7 +724,7 @@ namespace LetheAISharp.API
         public ICollection<string>? Stop { get; set; }
 
         [JsonProperty("grammar")]
-        public string? Grammar { get; set; }
+        public string? grammar { get; set; }
 
         [JsonProperty("stream")]
         public bool Stream { get; set; } = false;
@@ -746,7 +746,7 @@ namespace LetheAISharp.API
             Repeat_penalty = (float)input.Rep_pen;
             Seed = input.Sampler_seed == -1 ? LLMEngine.RNG.Next(int.MaxValue) : input.Sampler_seed;
             Stop = input.Stop_sequence;
-            Grammar = input.Grammar;
+            grammar = LLMEngine.CompletionAPIType == CompletionType.Text ? input.Grammar : null;
         }
     }
 
