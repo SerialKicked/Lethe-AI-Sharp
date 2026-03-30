@@ -222,7 +222,7 @@ namespace LetheAISharp.Files
             {
                 realprompt = message.ToolCallToString();
             }
-            else if ((LLMEngine.Bot is GroupPersonaBase) || RealAddNameToPrompt)
+            else if ((LLMEngine.Bot is GroupPersonaBase) || RealAddNameToPrompt || message.Bot != LLMEngine.Bot || message.User != LLMEngine.User)
             {
                 if (message.Role == AuthorRole.Assistant)
                     realprompt = string.Format("{0}: {1}", message.Bot.Name, message.Message);

@@ -205,7 +205,7 @@ namespace LetheAISharp.Agent.Tools
         public async Task<string> SetSchedule(DayOfWeek day, string schedule)
         {
             await Task.Delay(5).ConfigureAwait(false);
-            LLMEngine.Bot.Brain.SetDailySchedule(DayOfWeek.Monday, schedule);
+            LLMEngine.Bot.Brain.SetDailySchedule(day, schedule);
             return $"Schedule for {day} set to '{schedule}' successfully.";
         }
 

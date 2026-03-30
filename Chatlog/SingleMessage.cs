@@ -97,7 +97,7 @@ namespace LetheAISharp.Files
             if (Role != AuthorRole.Assistant && Role != AuthorRole.User)
                 addname = false;
             string? selname = null;
-            if (addname)
+            if (addname || Bot != LLMEngine.Bot || User != LLMEngine.User)
             {
                 if (Role == AuthorRole.Assistant)
                 {
