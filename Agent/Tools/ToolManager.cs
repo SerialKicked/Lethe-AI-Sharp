@@ -147,11 +147,11 @@ namespace LetheAISharp.Agent.Tools
 
             // 1) Invoke any explicit entry points first (gives plugin authors full control)
             foreach (var type in assembly.GetTypes()
-                         .Where(t => typeof(IToolPluginEntry).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
+                         .Where(t => typeof(IPluginEntry).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
             {
                 try
                 {
-                    var entry = (IToolPluginEntry)Activator.CreateInstance(type)!;
+                    var entry = (IPluginEntry)Activator.CreateInstance(type)!;
                     entry.Register();
                 }
                 catch (Exception ex)

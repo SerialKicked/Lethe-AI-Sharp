@@ -38,56 +38,10 @@
             "what's new",
         ];
 
-        private static readonly List<string> ComplimentTriggers =
-        [
-            "you look nice",
-            "you look great",
-            "you did well",
-            "good job",
-            "well done",
-            "congrats",
-            "bravo",
-            "kudos",
-            "thank you",
-            "thanks",
-            "much appreciated",
-            "I appreciate it",
-            "you are amazing",
-            "you are awesome",
-            "you are the best",
-            "you are incredible",
-            "you are fantastic",
-            "you are wonderful",
-            "you are impressive",
-            "you are outstanding",
-            "you are remarkable",
-            "you are extraordinary",
-            "you are exceptional",
-            "you are brilliant",
-            "you are superb",
-            "you're amazing",
-            "you're awesome",
-            "you're the best",
-            "you're incredible",
-            "you're fantastic",
-            "you're wonderful",
-            "you're impressive",
-            "you're remarkable",
-            "you're extraordinary",
-            "you're exceptional",
-            "you're brilliant",
-        ];
-
         public static bool IsEurekaTrigger(string input)
         {
             var lowered = input.ToLowerInvariant();
             return EurekaTriggers.Any(trigger => lowered.Contains(trigger));
-        }
-
-        public static bool IsComplimentTrigger(string input)
-        {
-            var lowered = input.ToLowerInvariant();
-            return ComplimentTriggers.Any(trigger => lowered.Contains(trigger));
         }
     }
 }

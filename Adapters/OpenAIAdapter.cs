@@ -208,7 +208,7 @@ namespace LetheAISharp.API
         {
             throw new NotSupportedException("OpenAI API does not support KV cache manipulation");
         }
-
+         
         public Task<bool> ClearKVStates()
         {
             throw new NotSupportedException("OpenAI API does not support KV cache manipulation");

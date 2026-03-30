@@ -2,6 +2,7 @@
 using LetheAISharp.Agent.Plugins;
 using LetheAISharp.Files;
 using LetheAISharp.LLM;
+using LetheAISharp.Moods;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -379,6 +380,18 @@ namespace LetheAISharp.Agent
                     continue;
                 _actions[id] = instance;
                 LLMEngine.Logger?.LogInformation("Auto-registered action plugin: {id} from {dll}", id, dllName);
+            }
+
+            // 4) Auto-discover IMoodlet implementations
+            foreach (var type in assembly.GetTypes()
+                         .Where(t => typeof(IMoodlet).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
+            {
+                var instance = (IMoodlet)Activator.CreateInstance(type)!;
+                if (MoodManager.Moodlets.ContainsKey(instance.Id))
+                    continue;
+                var capturedType = type;
+                MoodManager.Moodlets[instance.Id] = (IMoodlet)Activator.CreateInstance(capturedType)!;
+                LLMEngine.Logger?.LogInformation("Auto-registered moodlet plugin: {name} from {dll}", instance.Id, dllName);
             }
         }
 

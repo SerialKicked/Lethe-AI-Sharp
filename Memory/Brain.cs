@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using System.Threading.Tasks;
 using System.Text;
 using System.ComponentModel;
+using LetheAISharp.Moods;
 
 namespace LetheAISharp.Memory
 {
@@ -103,7 +104,7 @@ namespace LetheAISharp.Memory
 
         [JsonIgnore] protected MemoryVault MindPalace { get; set; } = new MemoryVault();
 
-        public virtual MoodState Mood { get; set; } = new MoodState();
+        public virtual MoodManager Mood { get; set; } = new MoodManager();
 
         /// <summary>
         /// Called to initialize the brain with its owner persona.
@@ -129,6 +130,9 @@ namespace LetheAISharp.Memory
             CurrentDelay = 0;
             LastInsertTime = DateTime.Now;
             LocalMemoryMaintenance();
+            foreach (var moodlet in Mood.MoodData)
+                if (MoodManager.Moodlets.TryGetValue(moodlet.Key, out var m))
+                    Mood.MoodData[moodlet.Key] = m.ProcessNewSession(moodlet.Value, Modifier.None);
         }
 
         /// <summary>
