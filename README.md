@@ -64,7 +64,7 @@ Alternatively, if running an external backend is too much, **Lethe AI** also com
 |------------|------------|-----------|------------|----------|
 | Text generation mode | ✅ Text | ✅ Chat / Text | ✅ Chat | ✅ Text |
 | Streaming | ✅ | ✅ | ✅ | ✅ |
-| Structured output | ✅ GBNF | ✅ Schema | ✅ Schema | ✅ GBNF |
+| Structured output | ✅ GBNF | ✅ Schema / GBNF | ✅ Schema | ✅ GBNF |
 | Chain of thoughts | ✅ | ✅ | ✅ | ✅ |
 | Personas & chat sessions | ✅ | ✅ | ✅ | ✅ |
 | Memory integration | ✅ | ✅ | ✅ | ✅ |
