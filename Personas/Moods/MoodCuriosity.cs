@@ -12,6 +12,7 @@ namespace LetheAISharp.Moods
         public string Description { get; set; } = "How curious the persona feels.";
         public double NaturalValue { get; set; } = 0.5;
         public double NaturalChangeRate { get; set; } = 0.005;
+        public double StartingValue { get; set; } = 0.75;
 
         public double OnTimePassed(double currentValue, TimeSpan timeSpan)
         {

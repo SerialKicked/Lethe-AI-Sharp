@@ -3,6 +3,7 @@ using LetheAISharp.Agent.Tools;
 using LetheAISharp.API;
 using LetheAISharp.Files;
 using LetheAISharp.Memory;
+using LetheAISharp.Moods;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -283,6 +284,7 @@ namespace LetheAISharp.LLM
 
             PromptBuilder = GetPromptBuilder();
             AgentRuntime.LoadDefaultActions();
+            MoodManager.LoadDefaultMoods();
             if (LoadedPersonas.Count == 0)
                 LoadPersonas();
             Status = SystemStatus.Ready;

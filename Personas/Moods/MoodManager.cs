@@ -92,9 +92,8 @@ namespace LetheAISharp.Moods
             return ComplimentTriggers.Any(trigger => lowered.Contains(trigger));
         }
 
-        public static void Init()
+        public static void LoadDefaultMoods()
         {
-            Moodlets = [];
             Moodlets["Cheer"] = new MoodCheer();
             Moodlets["Curiosity"] = new MoodCuriosity();
             Moodlets["Energy"] = new MoodEnergy();
