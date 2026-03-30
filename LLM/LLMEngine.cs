@@ -222,7 +222,7 @@ namespace LetheAISharp.LLM
             NewLinesBetweenMessages = true,
             StopStrings = [ "### Instruct", "### Input", "### Response" ],
         };
-        private static TextStreamReceiver textStreamReceiver = new();
+        private static readonly TextStreamReceiver textStreamReceiver = new();
 
         private static bool _isSimpleQuery = false;
         private static ILogger? logger = null;
@@ -437,7 +437,7 @@ namespace LetheAISharp.LLM
         /// </summary>
         /// <param name="uniqueName">The unique identifier of the persona to retrieve. Cannot be null.</param>
         /// <returns>The persona associated with the specified unique name, or null if no such persona is loaded.</returns>
-        public static BasePersona? GetPersona(string uniqueName) => LoadedPersonas.ContainsKey(uniqueName) ? LoadedPersonas[uniqueName] : null;
+        public static BasePersona? GetPersona(string uniqueName) => LoadedPersonas.TryGetValue(uniqueName, out BasePersona? value) ? value : null;
 
         /// <summary>
         /// Checks if the current bot is a group persona.

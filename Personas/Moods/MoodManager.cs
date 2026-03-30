@@ -98,42 +98,5 @@ namespace LetheAISharp.Moods
             Moodlets["Curiosity"] = new MoodCuriosity();
             Moodlets["Energy"] = new MoodEnergy();
         }
-
-        public static void RegisterDll(string dllPath)
-        {
-            if (!File.Exists(dllPath))
-            {
-                LLMEngine.Logger?.LogError("Mood Plugin DLL not found: {dll}", dllPath);
-                return;
-            }
-
-            var assembly = Assembly.LoadFrom(dllPath);
-            var dllName = Path.GetFileName(dllPath);
-        }
-
-        /// <summary>
-        /// Loads all plugin DLLs from a directory, calling <see cref="RegisterDll"/> for each match.
-        /// Returns silently if the directory does not exist. Errors for individual DLLs are logged
-        /// and do not prevent other DLLs from loading.
-        /// </summary>
-        /// <param name="directoryPath">Path to the plugins folder.</param>
-        /// <param name="searchPattern">File search pattern; defaults to <c>*.dll</c>.</param>
-        public static void RegisterPluginsFromDirectory(string directoryPath, string searchPattern = "*.dll")
-        {
-            if (!Directory.Exists(directoryPath))
-                return;
-
-            foreach (var dll in Directory.GetFiles(directoryPath, searchPattern))
-            {
-                try
-                {
-                    RegisterDll(dll);
-                }
-                catch (Exception ex)
-                {
-                    LLMEngine.Logger?.LogError(ex, "Failed to load plugin DLL: {dll}", Path.GetFileName(dll));
-                }
-            }
-        }
     }
 }

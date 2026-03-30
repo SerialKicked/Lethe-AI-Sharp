@@ -159,15 +159,11 @@ namespace LetheAISharp.LLM
         public virtual HashSet<string> Tools { get; set; } = [];
 
         /// <summary>
-        /// List of moods that apply to this persona. Moods are a flexible system used to influence the bot's behavior and responses based on the current emotional state.
-        /// </summary>
-        public virtual HashSet<string> Moods { get; set; } = [];
-
-        /// <summary>
         /// Gets the <see cref="Brain"/> instance associated with this object. The brain handles memory management, 
         /// retrieval, and storage for the persona, alongside multiple advanced features.
         /// </summary>
         [JsonIgnore] public virtual Brain Brain { get; set; }
+
 
         /// <summary>
         /// Loaded keyword-activated WorldInfo entries for this character. The frontend is meant to load those based on the Worlds field.
