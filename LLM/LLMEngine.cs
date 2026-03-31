@@ -957,6 +957,20 @@ namespace LetheAISharp.LLM
                     rawprompt.AppendLinuxLine(coreFacts);
                 }
             }
+
+            if (ToolCallsLoaded && Bot.Tools.Count > 0 && Settings.ToolCallsAddSystemPromptNote)
+            {
+                var tools = ToolManager.GetToolsets().Where(e => !string.IsNullOrEmpty(e.SystemPromptInstruction));
+                if (tools.Any())
+                {
+                    rawprompt.AppendLinuxLine($"{NewLine}{SystemPrompt.CategorySeparator} Tool Access").AppendLinuxLine();
+                    foreach (var tool in tools)
+                    {
+                        rawprompt.AppendLinuxLine(tool.SystemPromptInstruction);
+                    }
+
+                }
+            }
             
             if (Settings.AntiHallucinationMemoryFormat && !Bot.Brain.DisableEurekas)
             { 

@@ -15,6 +15,11 @@ namespace LetheAISharp.Agent.Tools
     public class MemoryTools : IToolList
     {
         public string Id => "Memory Tools";
+        
+        public string Description => "A set of tools for managing, searching, and storing long-term memory entries and reminders.";
+
+        public string SystemPromptInstruction => "You have access to a set of memory management tools that allow you to save important information, set reminders, and search through your long-term memory. Use these tools proactively whenever the user shares new information, references past events, or asks you to remember something. Don't wait to be asked - if you think something is worth remembering or could be useful in the future, use the appropriate tool to save it. You can also use the search tools to retrieve relevant memories based on keywords, dates, or other criteria mentioned by you or the user.";
+
         private List<Tool> toolList = [];
 
         public IReadOnlyList<Tool> GetToolList() => toolList;
@@ -26,9 +31,10 @@ namespace LetheAISharp.Agent.Tools
             {
                 Tool.ClearRegisteredTools();
             }
-            toolList.Add(Tool.GetOrCreateTool(this, nameof(SaveMemory), "Commit information to your long term memory. Provide a short title, and the content of the memory you want to save (which can be of any length). You can use this tool automatically."));
-            toolList.Add(Tool.GetOrCreateTool(this, nameof(MemorySearch), "Search your long term memory for relevant information. Provide the text to look for. Keep it short and direct (ex: a keyword, title, or short sentence like). You can use this tool automatically without user input."));
-            toolList.Add(Tool.GetOrCreateTool(this, nameof(GetMemoryByDate), "Search your long term memory for relevant information. Provide the year, month, and day (as numbers). You can search for any day in a month by setting day to 0. You can use this tool automatically without user input."));
+            toolList.Add(Tool.GetOrCreateTool(this, nameof(SaveMemory), 
+                "Use this tool to Commit information to your long term memory when the user is mentioning something new that seems worth remembering. Provide a short title, and the content of the memory you want to save (which can be of any length). Use this tool proactively."));
+            toolList.Add(Tool.GetOrCreateTool(this, nameof(MemorySearch), "Search your long term memory for relevant information. Provide the text to look for. Keep it short and direct (ex: a keyword, title, or short sentence like).  Use this tool proactively whenever the user references events or asks you to remember something, do not wait to be asked."));
+            toolList.Add(Tool.GetOrCreateTool(this, nameof(GetMemoryByDate), "User this tool to remember events and memories tied to a date. Provide the year, month, and day (as numbers). You can search for any day in a month by setting day to 0. Use this tool proactively whenever the user references past events or asks you to remember a date, do not wait to be asked."));
             toolList.Add(Tool.GetOrCreateTool(this, nameof(SetReminder), "Set a reminder for a specific date. Provide a title for the reminder, the message you want to be reminded of, and the date of the reminder."));
             toolList.Add(Tool.GetOrCreateTool(this, nameof(SetSchedule), "Set a daily schedule for a specific day of the week. Provide the day of the week and the schedule details."));
             toolList.Add(Tool.GetOrCreateTool(this, nameof(GetSchedule), "Get the daily schedule for a specific day of the week. Provide the day of the week to retrieve the schedule."));

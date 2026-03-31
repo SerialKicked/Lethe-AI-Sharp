@@ -8,6 +8,11 @@ namespace LetheAISharp.Agent.Tools
     public class CompositeToolList(params IToolList[] toolLists) : IToolList
     {
         public string Id => string.Join("+", toolLists.Select(t => t.Id));
+
+        public string Description => string.Join("\n\n", toolLists.Select(t => $"{t.Id}: {t.Description}"));
+
+        public string SystemPromptInstruction => string.Join("\n\n", toolLists.Select(t => t.SystemPromptInstruction));
+
         public IReadOnlyList<Tool> GetToolList() => [.. toolLists.SelectMany(t => t.GetToolList())];
 
         public void LoadTools(bool clearExisting = false)

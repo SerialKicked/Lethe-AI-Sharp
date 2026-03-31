@@ -8,6 +8,9 @@ namespace LetheAISharp.Agent.Tools
     public interface IToolList
     {
         string Id { get; }
+        string Description { get; }
+        string SystemPromptInstruction { get; }
+
         IReadOnlyList<Tool> GetToolList();
         bool RequiresConfirmation(string functionName) => false;
         void LoadTools(bool clearExisting = false);

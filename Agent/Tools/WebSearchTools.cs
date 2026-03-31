@@ -15,6 +15,11 @@ namespace LetheAISharp.Agent.Tools
     public class WebSearchTools : IToolList
     {
         public string Id => "Web Search";
+
+        public string Description => "A set of tools for performing web searches and retrieving current date and time information.";
+
+        public string SystemPromptInstruction => "You have access to a web search tool. Use this tools proactively whenever relevant information is needed or when the user asks for it.";
+
         private List<Tool> toolList = [];
 
         public IReadOnlyList<Tool> GetToolList() => toolList;

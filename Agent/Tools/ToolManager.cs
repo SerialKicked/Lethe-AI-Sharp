@@ -35,6 +35,11 @@ namespace LetheAISharp.Agent.Tools
             return _toolLists.Count == 0 ? [] : [.. _toolLists.Values.Where(e => AllowedToolSets.Contains(e.Id)).SelectMany(tl => tl.GetToolList())];
             }
 
+        public List<IToolList> GetToolsets()
+        {
+            return _toolLists.Count == 0 ? [] : [.. _toolLists.Values.Where(e => AllowedToolSets.Contains(e.Id))];
+        }
+
         /// <summary>
         /// Register a toolset with the manager. The tool list's <see cref="IToolList.LoadTools"/> method is called immediately to allow it to initialize any resources.
         /// </summary>

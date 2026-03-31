@@ -161,6 +161,9 @@ namespace LetheAISharp.Files
         /// This can be used to increase safety or oversight in environments where automated execution is not permitted.</remarks>
         public bool ToolCallsAlwaysManualConfirm { get; set; } = false;
 
+        public bool ToolCallsAddSystemPromptNote { get; set; } = true;
+
+
         #endregion
 
 
