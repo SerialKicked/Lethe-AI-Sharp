@@ -234,16 +234,6 @@ namespace LetheAISharp.Files
         #endregion
 
 
-        #region *** Sentiment Analysis Module ***
-
-        public bool SentimentEnabled { get; set; } = false;
-        public string SentimentModelPath { get; set; } = "data/classifiers/emotion-bert-classifier.gguf";
-        public string SentimentGoEmotionHeadPath { get; set; } = "data/classifiers/goemotions_head.json";
-        public string SentimentThresholdsPath { get; set; } = "data/classifiers/optimized_thresholds.json";
-
-        #endregion
-
-
         #region *** RAG Settings (retrieval of past information based on text embedding similarity) ***
 
         /// <summary> Toggle RAG functionalities on/off </summary>

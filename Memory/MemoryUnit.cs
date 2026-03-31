@@ -123,11 +123,6 @@ namespace LetheAISharp.Memory
         public string Reason { get; set; } = string.Empty;
 
         /// <summary>
-        /// Sentiment analysis results (optional, mostly unused at library level)
-        /// </summary>
-        public List<(string Label, float Probability)> Sentiments { get; set; } = [];
-
-        /// <summary>
         /// Should be used files
         /// </summary>
         public string Path { get; set; } = string.Empty;
@@ -266,21 +261,6 @@ namespace LetheAISharp.Memory
         public void Touch()
         {
             LastTrigger = DateTime.Now; TriggerCount++;
-        }
-
-        /// <summary>
-        /// Updates the sentiment analysis results for the current content.
-        /// </summary>
-        /// <remarks>This method performs sentiment analysis on the <see cref="Content"/> property  and
-        /// updates the <see cref="Sentiments"/> property with the results. Sentiment  analysis is only performed if the
-        /// sentiment analysis feature is enabled in  <see cref="LLMEngine.Settings"/>.</remarks>
-        /// <returns></returns>
-        public virtual async Task UpdateSentiment()
-        {
-            if (LLMEngine.Settings.SentimentEnabled)
-            {
-                Sentiments = await SentimentAnalysis.Analyze(Content).ConfigureAwait(false);
-            }
         }
 
         /// <summary>
