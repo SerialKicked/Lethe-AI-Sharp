@@ -79,7 +79,6 @@ Alternatively, if running an external backend is too much, **Lethe AI** also com
 2) VLM support depends entirely on underlying server and LLM capabilities. KoboldCpp has notoriously bad image input support, so if you need image support, load it as a OpenAI-compatible backend instead and make sure it's in Jinja template mode, then it will behave properly.
 
 ## ⭐ Core Features
-
 - Persona system (bot & user role objects, custom prompts, instruction formats)
 - Session-based chatlog with automated summarization
 - LLM message streaming support
@@ -105,9 +104,6 @@ Alternatively, if running an external backend is too much, **Lethe AI** also com
 - Customizable tasks can run in the background while the user is AFK
 - Includes 2 default tasks that run relevant web searches and mention results in following chat session
 - Write your own tasks and tools easily to boost your bot's abilities, can be imported from external dll too
-
-## 🛠️ Experimental Features (work in progress)
-- Sentiment analysis
 
 ## 👀 See it in action
 
