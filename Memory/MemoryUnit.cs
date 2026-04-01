@@ -207,6 +207,10 @@ namespace LetheAISharp.Memory
         /// </summary>
         public bool CaseSensitive { get; set; } = false;
 
+        public bool MetaInfoToggle { get; set; } = false;
+
+        public string MetaInfo { get; set; } = string.Empty;
+
         /// <summary>
         /// Generates a formatted text snippet based on the specified options.
         /// </summary>

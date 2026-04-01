@@ -1,9 +1,9 @@
-﻿#pragma warning disable CA1416 // Validate platform compatibility
-using LetheAISharp.LLM;
+﻿using LetheAISharp.LLM;
+using Microsoft.Extensions.Logging;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Processing;
 using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -39,21 +39,8 @@ namespace LetheAISharp
             newWidth = Math.Max(1, newWidth);
             newHeight = Math.Max(1, newHeight);
 
-            // Create a new bitmap with the calculated dimensions
-            Bitmap scaledImage = new(newWidth, newHeight);
-
-            // Draw the original image onto the new bitmap with scaling
-            using (Graphics graphics = Graphics.FromImage(scaledImage))
-            {
-                // Set the interpolation mode for better quality
-                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-                graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
-                graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
-
-                // Draw the image
-                graphics.DrawImage(image, 0, 0, newWidth, newHeight);
-            }
+            // Clone and resize the image with high quality bicubic resampling
+            var scaledImage = image.Clone(ctx => ctx.Resize(newWidth, newHeight, KnownResamplers.Bicubic));
 
             return scaledImage;
         }
@@ -69,12 +56,12 @@ namespace LetheAISharp
         {
             try
             {
-                using var image = Image.FromFile(imagePath);
+                using var image = Image.Load(imagePath);
                 return ImageToBase64(image, maxSize);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error converting image to base64: {ex.Message}");
+                LLMEngine.Logger?.LogError(ex,"Error converting image to base64: {mess}", ex.Message);
                 return null;
             }
         }
@@ -104,7 +91,7 @@ namespace LetheAISharp
                 {
                     using MemoryStream ms = new();
                     // Save the image to the memory stream in PNG format
-                    imageToUse.Save(ms, ImageFormat.Png);
+                    imageToUse.Save(ms, new PngEncoder());
                     ms.Position = 0;
 
                     byte[] imageBytes = ms.ToArray();
@@ -121,7 +108,7 @@ namespace LetheAISharp
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error converting image to base64: {ex.Message}");
+                LLMEngine.Logger?.LogError(ex, "Error converting image to base64: {mess}", ex.Message);
                 return null;
             }
         }
@@ -138,15 +125,14 @@ namespace LetheAISharp
                 using HttpClient httpClient = new();
                 byte[] imageBytes = await httpClient.GetByteArrayAsync(imageUrl).ConfigureAwait(false);
                 using MemoryStream ms = new(imageBytes);
-                using Image image = Image.FromStream(ms);
+                using Image image = Image.Load(ms);
                 return ImageToBase64(image);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error downloading or converting image from URL to base64: {ex.Message}");
+                LLMEngine.Logger?.LogError(ex, "Error downloading or converting image from URL to base64: {mess}", ex.Message);
                 return null;
             }
         }
     }
 }
-#pragma warning restore CA1416 // Validate platform compatibility
