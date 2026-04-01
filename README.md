@@ -79,7 +79,6 @@ Alternatively, if running an external backend is too much, **Lethe AI** also com
 2) VLM support depends entirely on underlying server and LLM capabilities. KoboldCpp has notoriously bad image input support, so if you need image support, load it as a OpenAI-compatible backend instead and make sure it's in Jinja template mode, then it will behave properly.
 
 ## ⭐ Core Features
-
 - Persona system (bot & user role objects, custom prompts, instruction formats)
 - Session-based chatlog with automated summarization
 - LLM message streaming support
@@ -106,9 +105,6 @@ Alternatively, if running an external backend is too much, **Lethe AI** also com
 - Includes 2 default tasks that run relevant web searches and mention results in following chat session
 - Write your own tasks and tools easily to boost your bot's abilities, can be imported from external dll too
 
-## 🛠️ Experimental Features (work in progress)
-- Sentiment analysis
-
 ## 👀 See it in action
 
 <img width="1920" height="1032" alt="LetheChat_QrSGcp5ZBb" src="https://github.com/user-attachments/assets/7a81b84c-4c64-4249-9dfc-e5e210213787" />
@@ -127,12 +123,11 @@ git submodule add https://github.com/SerialKicked/Lethe-AI-Sharp.git
 ### Manual Install
 git clone, or download the project files in a new folder, and add it directly to your solution's project list. This gives you more control and full access to the source code.
 
-### Optional Models & Data Files
-Place them into `data/classifiers/` (configure their *build action* to “Copy if newer”):
+### Optional Model
+Place it into `data/classifiers/` (configure their *build action* to “Copy if newer”):
 | File | Purpose | Required? |
 |---------|------|-----------|
 | [gte-large.Q6_K.gguf](https://huggingface.co/SerialKicked/Lethe-AI-Repo/resolve/main/gte-large.Q6_K.gguf?download=true) | Embeddings for RAG & Memory similarity | Yes for everything memory or RAG related |
-| [emotion-bert-classifier.gguf](https://huggingface.co/SerialKicked/Lethe-AI-Repo/resolve/main/emotion-bert-classifier.gguf?download=true) | Sentiment / emotion (experimental) | No |
 
 ## 🔎 Usage and Documentation
 
