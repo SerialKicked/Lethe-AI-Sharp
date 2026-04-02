@@ -62,7 +62,7 @@ namespace LetheAISharp.Memory
         /// Embeds the fact text into a vector for semantic similarity search.
         /// Does nothing if RAG is disabled.
         /// </summary>
-        public async Task EmbedText()
+        public async Task BuildEmbedding()
         {
             if (!LLMEngine.Settings.RAGEnabled)
                 return;

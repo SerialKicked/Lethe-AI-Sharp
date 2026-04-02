@@ -179,7 +179,7 @@ namespace LetheAISharp.Agent.Tools
                 Category = MemoryType.General,
                 Insertion = MemoryInsertion.Trigger
             };
-            await mem.EmbedText().ConfigureAwait(false);
+            await mem.BuildEmbedding().ConfigureAwait(false);
             LLMEngine.Bot.Brain.Memorize(mem);
             return $"Memory '{MemoryTitle}' saved successfully.";
         }
@@ -203,7 +203,7 @@ namespace LetheAISharp.Agent.Tools
                 Added = date,
                 EndTime = date + new TimeSpan(1,0,0,0)
             };
-            await mem.EmbedText().ConfigureAwait(false);
+            await mem.BuildEmbedding().ConfigureAwait(false);
             LLMEngine.Bot.Brain.Memorize(mem);
             return $"Reminder '{ReminderTitle}' set for {date.ToHumanString()} successfully.";
         }

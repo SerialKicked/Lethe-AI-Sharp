@@ -639,7 +639,7 @@ namespace LetheAISharp.Files
             // Embed all the messages in the chatlog
             foreach (var session in Sessions)
             {
-                await session.EmbedText().ConfigureAwait(false);
+                await session.BuildEmbedding().ConfigureAwait(false);
             }
         }
 

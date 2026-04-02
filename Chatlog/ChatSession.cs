@@ -123,7 +123,7 @@ namespace LetheAISharp.Files
                 MetaData.IsRoleplaySession = await IsRoleplay().ConfigureAwait(false);
                 MetaData.Title = await GenerateTitle(sum).ConfigureAwait(false);
             }
-            await EmbedText().ConfigureAwait(false);
+            await BuildEmbedding().ConfigureAwait(false);
         }
 
         /// <summary>

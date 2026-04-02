@@ -189,7 +189,7 @@ namespace LetheAISharp
                 }
             }
 
-            var prefill = overridePrefill ?? LLMEngine.Instruct.PrefillThinking;
+            var prefill = overridePrefill ?? (LLMEngine.Instruct.PrefillThinking || LLMEngine.IsGroupConversation);
             if (LLMEngine.Client?.AllowPrefill == false)
                 prefill = false;
             // prefilling is not available when using tool calls in prompt or when a structured output schema is set,

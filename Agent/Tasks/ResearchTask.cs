@@ -97,7 +97,7 @@ namespace LetheAISharp.Agent.Plugins
                     Priority = topic.Urgency
                 };
 
-                await mem.EmbedText().ConfigureAwait(false);
+                await mem.BuildEmbedding().ConfigureAwait(false);
                 owner.Brain.Memorize(mem);
             }
             owner.Brain.AddUserReturnInsert("{{mchar}} has done some research about the previous chat sessions.", this.Id);

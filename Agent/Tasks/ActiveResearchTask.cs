@@ -121,7 +121,7 @@ namespace LetheAISharp.Agent.Plugins
                     Priority = topic.Urgency + 1
                 };
 
-                await mem.EmbedText().ConfigureAwait(false);
+                await mem.BuildEmbedding().ConfigureAwait(false);
                 owner.Brain.Memorize(mem);
             }
             owner.Brain.AddUserReturnInsert("{{mchar}} found some new information that might be useful regarding the recently discussed topics.", this.Id);

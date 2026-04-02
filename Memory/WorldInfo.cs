@@ -92,7 +92,7 @@ namespace LetheAISharp.Memory
             else
             {
                 foreach (var item in Entries)
-                    await item.EmbedText().ConfigureAwait(false);
+                    await item.BuildEmbedding().ConfigureAwait(false);
             }
         }
     }

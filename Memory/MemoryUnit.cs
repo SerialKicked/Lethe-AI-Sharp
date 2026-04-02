@@ -276,7 +276,7 @@ namespace LetheAISharp.Memory
         /// embedding. The operation is asynchronous and depends on the RAG (Retrieval-Augmented Generation) setting
         /// being enabled in the LLM engine.</remarks>
         /// <returns></returns>
-        public virtual async Task EmbedText()
+        public virtual async Task BuildEmbedding()
         {
             if (!LLMEngine.Settings.RAGEnabled)
                 return;

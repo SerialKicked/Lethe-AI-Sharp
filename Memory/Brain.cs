@@ -252,7 +252,7 @@ namespace LetheAISharp.Memory
         {
             foreach (var mem in Memories)
             {
-                await mem.EmbedText().ConfigureAwait(false);
+                await mem.BuildEmbedding().ConfigureAwait(false);
             }
         }
 
@@ -657,7 +657,7 @@ namespace LetheAISharp.Memory
             if (sourceSessionGuid.HasValue)
                 newFact.SourceMemories.Add(sourceSessionGuid.Value);
 
-            await newFact.EmbedText().ConfigureAwait(false);
+            await newFact.BuildEmbedding().ConfigureAwait(false);
 
             // No embedding available (RAG disabled) — just store the fact without dedup
             if (newFact.EmbedSummary.Length == 0)
