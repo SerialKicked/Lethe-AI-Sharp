@@ -74,6 +74,18 @@ namespace LetheAISharp.Agent
             _lastuseractivity = DateTime.MinValue;
         }
 
+        public void CancelWork()
+        {
+            NotifyUserActivity();
+            _cts?.Cancel();
+        }
+
+        private void BuildNewToken()
+        {
+            _cts?.Dispose();
+            _cts = new();
+        }
+
         /// <summary>
         /// The main loop that runs the agent tasks based on user inactivity and agent mode status.
         /// </summary>
@@ -89,7 +101,7 @@ namespace LetheAISharp.Agent
                 // don't do anything if not in agent mode, or if user was active recently
                 if (!Owner.AgentMode || (DateTime.Now - _lastuseractivity) < LLMEngine.Settings.BackgroundAgentMinInactivityTime || LLMEngine.Status == SystemStatus.NotInit)
                 {
-                    await Task.Delay(1000, _cts.Token).ConfigureAwait(false);
+                    await Task.Delay(5000, _cts.Token).ConfigureAwait(false);
                     continue;
                 }
                 // Run through all plugins
@@ -109,15 +121,20 @@ namespace LetheAISharp.Agent
                     catch (OperationCanceledException)
                     {
                         // gtfo
+                        if (_running)
+                            BuildNewToken();
                         break;
                     }
                     catch (Exception ex)
                     {
                         LLMEngine.Logger?.LogError(ex, "Error in plugin {PluginId}: {ex}", plugin.Id, ex.Message);
                     }
-                    await Task.Delay(1000, _cts.Token).ConfigureAwait(false);
                     if (!_running || _cts.Token.IsCancellationRequested)
+                    {
+                        if (_running)
+                            BuildNewToken();
                         break;
+                    }
                 }
             }
         }

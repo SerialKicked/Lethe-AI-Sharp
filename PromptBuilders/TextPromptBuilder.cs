@@ -30,6 +30,8 @@ namespace LetheAISharp
 
         public int AddMessage(SingleMessage message)
         {
+            if (message.Role == AuthorRole.Tool || (message.Role == AuthorRole.Assistant && message.ToolCalls?.Count > 0 && string.IsNullOrWhiteSpace(message.Message)))
+                return 1;
             _prompt.Add(message);
             return LLMEngine.GetTokenCount(message.ToTextCompletion());
         }
@@ -195,6 +197,9 @@ namespace LetheAISharp
             }
             if (index > _prompt.Count)
                 return -1;
+            if (message.Role == AuthorRole.Tool || (message.Role == AuthorRole.Assistant && message.ToolCalls?.Count > 0 && string.IsNullOrWhiteSpace(message.Message)))
+                return 1;
+
             _prompt.Insert(index, message);
             return LLMEngine.GetTokenCount(message.ToTextCompletion());
         }
@@ -213,6 +218,9 @@ namespace LetheAISharp
 
         public int GetTokenCount(SingleMessage message, bool countImages = true)
         {
+            if (message.Role == AuthorRole.Tool || (message.Role == AuthorRole.Assistant && message.ToolCalls?.Count > 0 && string.IsNullOrWhiteSpace(message.Message)))
+                return 1;
+
             var realmessage = message.ToTextCompletion();
 
             if (string.IsNullOrEmpty(realmessage))
