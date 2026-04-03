@@ -148,7 +148,7 @@ namespace LetheAISharp
             {
                 fullquery += LLMEngine.Instruct.GetResponseStart(LLMEngine.Bot, overridePrefill);
             }
-            // fullquery = fullquery.TrimEnd();
+
 
             vlm_pictures = [];
             if (LLMEngine.Client?.SupportsVision ?? false)

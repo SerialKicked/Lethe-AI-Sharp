@@ -372,6 +372,8 @@ namespace LetheAISharp.Files
         /// </summary>
         public bool CommitGroupSessionToSecondaryPersonaHistory { get; set; } = false;
 
+        public bool GroupChatInfoThinkingBlock { get; set; } = true;
+
         #endregion
 
     }

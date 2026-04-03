@@ -96,20 +96,24 @@ namespace LetheAISharp
 
         private string GetResponseStart(BasePersona talker, bool? overridePrefill = null)
         {
-            var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt;
+            var doprefill = overridePrefill ?? LLMEngine.Instruct.PrefillThinking;
+            var addname = (LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt);
+
+            if (!talker.IsUser && LLMEngine.Settings.DisableThinking && doprefill && addname && LLMEngine.Instruct.IsThinkFormat)
+            {
+                var simpleres = LLMEngine.Instruct.GetThinkPrefill();
+                simpleres += talker.Name + ":";
+                return simpleres;
+            }
             var res = string.Empty;
             if (addname && (!LLMEngine.Instruct.IsThinkFormat || LLMEngine.Settings.DisableThinking))
                 res += talker.Name + ":";
             if (talker.IsUser)
                 return res;
-            var doprefill = overridePrefill ?? LLMEngine.Instruct.PrefillThinking;
+
             if (doprefill)
             {
                 res += LLMEngine.Instruct.GetThinkPrefill();
-                if (addname)
-                {
-                    res += $" It's {talker.Name} turn to talk.";
-                }
             }
             return res;
         }

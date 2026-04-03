@@ -37,7 +37,7 @@ namespace LetheAISharp.Files
             "ForceRAGToThinkingPrompt",
             "NewLinesBetweenMessages",
             "NoInstructInStopString",
-            "StopStrings"
+            "StopStrings", "GroupThinkingPrefix"
             ];
 
         /// <summary>
@@ -141,22 +141,25 @@ namespace LetheAISharp.Files
         /// </summary>
         public bool NoInstructInStopString { get; set; } = false;
 
+        public string GroupThinkingPrefix { get; set; } = string.Empty;
+
         [JsonIgnore] internal bool RealAddNameToPrompt => LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt;
         [JsonIgnore] public bool IsThinkFormat => !string.IsNullOrEmpty(ThinkingEnd);
 
         public string GetThinkPrefill()
         {
             var res = string.Empty;
-            // --
-            // Chat completion mode should handle prefill normally now, so it's commented out.
-            // if (LLMEngine.Client?.CompletionType == API.CompletionType.Chat)
-            //     return res;
-            // --
+
             if (PrefillThinking && !string.IsNullOrEmpty(ThinkingStart) && LLMEngine.Client?.AllowPrefill == true)
             {
                 res = ThinkingStart;
                 if (!string.IsNullOrWhiteSpace(ThinkingForcedThought))
                     res += LLMEngine.Bot.ReplaceMacros(ThinkingForcedThought);
+
+                if (LLMEngine.IsGroupConversation && !string.IsNullOrEmpty(GroupThinkingPrefix) && LLMEngine.Settings.GroupChatInfoThinkingBlock && !LLMEngine.Settings.DisableThinking)
+                {
+                    res += LLMEngine.Bot.ReplaceMacros(GroupThinkingPrefix);
+                }
 
                 if (LLMEngine.Settings.RAGMoveToThinkBlock && LLMEngine.dataInserts.Count > 0)
                 {
@@ -197,21 +200,26 @@ namespace LetheAISharp.Files
 
         public string GetResponseStart(BasePersona talker, bool? overridePrefill = null)
         {
-            var res = talker.IsUser ? LLMEngine.Bot.ReplaceMacros(BotStart, talker) : talker.ReplaceMacros(BotStart);
+            var doprefill = overridePrefill ?? PrefillThinking;
+            if (talker.IsUser)
+            {
+                var userres = talker.ReplaceMacros(UserStart);
+                if (RealAddNameToPrompt)
+                    userres += talker.Name + ":";
+                return userres;
+            }
+            var res = talker.ReplaceMacros(BotStart);
+            if (LLMEngine.Settings.DisableThinking && doprefill && RealAddNameToPrompt && IsThinkFormat)
+            {
+                res += GetThinkPrefill();
+                res += talker.Name + ":";
+                return res;
+            }
             if ((RealAddNameToPrompt && (!IsThinkFormat || LLMEngine.Settings.DisableThinking)) || 
                 (LLMEngine.NamesInPromptBotOnlyOverride == true && !talker.IsUser))
                 res += talker.Name + ":";
-            if (talker.IsUser)
-                return res;
-            var doprefill = overridePrefill ?? PrefillThinking;
             if (doprefill)
-            {
                 res += GetThinkPrefill();
-                if (RealAddNameToPrompt)
-                {
-                    res += $" It's {talker.Name} turn to talk.";
-                }
-            }
             return res;
         }
 
