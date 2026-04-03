@@ -71,9 +71,9 @@ Alternatively, if running an external backend is too much, **Lethe AI** also com
 | Samplers | ✅ Advanced  | ✅ Advanced |  ✅ Basics  | ✅ Advanced |
 | Token management | ✅ Exact | ✅ Exact | ⚠️ Estimated  | ✅ Exact |
 | Web search | ✅ | ✅ | ✅ | ✅ |
-| Tool-calling *(1)* | ❌ | ✅ | ✅  | ❌ |
+| Tool-calling *(1)* | ❌ | ✅ (Chat) | ✅  | ❌ |
 | Text-to-speech | ✅ (if loaded) | ❌ | ❌ | ❌ |
-| Image input *(2)* | ⚠️ In theory | ✅ | ✅ | ❌ |
+| Image input *(2)* | ⚠️ In theory | ✅ (Chat) | ✅ | ❌ |
 
 1) Function calling support depends largely on the LLM's capabilities.
 2) VLM support depends entirely on underlying server and LLM capabilities. KoboldCpp has notoriously bad image input support, so if you need image support, load it as a OpenAI-compatible backend instead and make sure it's in Jinja template mode, then it will behave properly.
