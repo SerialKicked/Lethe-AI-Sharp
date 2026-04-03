@@ -1,7 +1,7 @@
 {
   "BoSToken": "",
-  "SysPromptStart": "<｜begin▁of▁sentence｜>",
-  "SysPromptEnd": "",
+  "SystemStart": "<｜begin▁of▁sentence｜>",
+  "SystemEnd": "",
   "UserStart": "<｜User｜>",
   "UserEnd": "",
   "BotStart": "<｜Assistant｜>",

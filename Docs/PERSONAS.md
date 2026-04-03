@@ -28,6 +28,7 @@ A persona represents either the user or the bot (NPC/agent) in a conversation. T
 | `AgentMode`, `AgentTasks` | Enable autonomous background behavior |
 | `SelfEditTokens`, `SelfEditField` | Auto-evolving internal thoughts |
 | `SenseOfTime`, `DatesInSessionSummaries` | Temporal awareness settings |
+| `OverrideDefaultToolset`, `Tools` | Per-persona toolset selection (overrides global `AllowedToolsets`) |
 
 ## Runtime Objects (Read-Only)
 
@@ -303,6 +304,31 @@ public override void BeginChat()
     }
 }
 ```
+
+## Per-Persona Toolset Override
+
+By default, all personas share the same set of active toolsets defined in `LLMEngine.Settings.AllowedToolsets`. To give a specific persona its own toolset selection, set `OverrideDefaultToolset = true` and populate the `Tools` property with the desired toolset IDs.
+
+```csharp
+var specialistBot = new BasePersona
+{
+    Name = "WebResearcher",
+    Bio = "A bot that specialises in real-time web research",
+    // This persona uses only the web-search toolset, ignoring the global AllowedToolsets
+    OverrideDefaultToolset = true,
+    Tools = new HashSet<string> { "WebSearch" }
+};
+
+var generalBot = new BasePersona
+{
+    Name = "Assistant",
+    Bio = "A general-purpose assistant",
+    // Uses whatever is configured in LLMEngine.Settings.AllowedToolsets (default behaviour)
+    OverrideDefaultToolset = false
+};
+```
+
+When `OverrideDefaultToolset` is `true` and `Tools` is empty, the persona has **no tool access at all** — useful for personas that should never call tools. Toolsets must be registered in the `ToolManager` before they can be referenced here; see [AGENTS.md](AGENTS.md) for registration details.
 
 ## Agent Mode and Background Tasks
 

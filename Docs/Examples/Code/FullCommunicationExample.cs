@@ -86,17 +86,20 @@ namespace LetheAISharp.Examples
 
                 // Step 3: Setup event handlers
                 
-                // note: this one is the "old school" version, use LLMEngine.OnInferenceSegment for the new "thinking"-aware token output
-                LLMEngine.OnInferenceStreamed += (sender, token) =>
+                // Channel-aware streaming (recommended): only Text channel tokens are printed to console.
+                // Thinking block content is separated and not displayed to the user.
+                LLMEngine.OnInferenceSegment += (sender, segment) =>
                 {
-                    Console.Write(token);
+                    if (segment.Channel == InferenceChannel.Text)
+                        Console.Write(segment.Text);
                 };
 
-                // note: this one is the "old school" version, use LLMEngine.OnInferenceCompleted for the new "thinking"-aware token output
-                LLMEngine.OnInferenceEnded += (sender, response) =>
+                // Structured completion result: contains the final visible response, any thinking content,
+                // and a list of all tool calls made during the turn.
+                LLMEngine.OnInferenceCompleted += (sender, result) =>
                 {
-                    // it's the app's responsibility to save the received message (or not)
-                    LLMEngine.History.LogMessage(AuthorRole.Assistant, response, user, bot);
+                    // Log only the visible response to history (excludes thinking content)
+                    LLMEngine.History.LogMessage(AuthorRole.Assistant, result.Response, user, bot);
                     Console.WriteLine(); // New line after response
                 };
                 

@@ -80,19 +80,22 @@ namespace LetheAISharp.Examples
                 
                 // Setup event handlers for streaming
                 string fullResponse = "";
-                // note: this one is the "old school" version, use LLMEngine.OnInferenceSegment for the new "thinking"-aware token output
-                LLMEngine.OnInferenceStreamed += (sender, token) =>
+                // Channel-aware streaming (recommended): only Text channel tokens are captured/printed.
+                LLMEngine.OnInferenceSegment += (sender, segment) =>
                 {
-                    Console.Write(token);
-                    fullResponse += token;
+                    if (segment.Channel == InferenceChannel.Text)
+                    {
+                        Console.Write(segment.Text);
+                        fullResponse += segment.Text;
+                    }
                 };
                 
                 bool responseComplete = false;
-                // note: this one is the "old school" version, use LLMEngine.OnInferenceCompleted for the new "thinking"-aware token output
-                LLMEngine.OnInferenceEnded += (sender, complete) =>
+                // Structured completion result: fires once when the full response is ready.
+                LLMEngine.OnInferenceCompleted += (sender, result) =>
                 {
                     Console.WriteLine();
-                    Console.WriteLine($"Complete response: {complete}");
+                    Console.WriteLine($"Complete response: {result.Response}");
                     responseComplete = true;
                 };
                 

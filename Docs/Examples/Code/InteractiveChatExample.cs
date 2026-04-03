@@ -72,14 +72,19 @@ namespace LetheAISharp.Examples
 
                 // Setup event handlers for real-time response display
 
-                // note: this one is the "old school" version, use LLMEngine.OnInferenceSegment for the new "thinking"-aware token output
-                LLMEngine.OnInferenceStreamed += (sender, token) => Console.Write(token);
-                // note: this one is the "old school" version, use LLMEngine.OnInferenceCompleted for the new "thinking"-aware token output
-                LLMEngine.OnInferenceEnded += (sender, response) =>
+                // Channel-aware streaming (recommended): only Text channel tokens are printed to console.
+                // Thinking block content is separated and not displayed to the user.
+                LLMEngine.OnInferenceSegment += (sender, segment) =>
+                {
+                    if (segment.Channel == InferenceChannel.Text)
+                        Console.Write(segment.Text);
+                };
+
+                // Structured completion result: log only the visible response to chat history.
+                LLMEngine.OnInferenceCompleted += (sender, result) =>
                 {
                     // It's the app's responsibility to log the complete response to the chatlog
-                    // thats what we do here
-                    LLMEngine.History.LogMessage(AuthorRole.Assistant, response, user, bot);
+                    LLMEngine.History.LogMessage(AuthorRole.Assistant, result.Response, user, bot);
                     Console.WriteLine();
                 };
                 LLMEngine.OnStatusChanged += (sender, status) =>

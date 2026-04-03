@@ -56,22 +56,30 @@ You can find presets for most of the [commonly used instruction formats here](Ex
 - **`SystemStart/End`**: Wraps system messages
 - **`UserStart/End`**: Wraps user messages
 - **`BotStart/End`**: Wraps assistant/bot responses
+- **`BotStartOverride`**: If non-empty, replaces `BotStart` when injecting the assistant prefill (the partial token used to steer the model's response). Useful when the prefill token differs slightly from the normal response opening.
+- **`BotEndOverride`**: If non-empty, replaces `BotEnd` in the same prefill context.
 
 ### Special Sequences
 
 - **`BoSToken`**: Beginning-of-sequence token (rarely needed)
 - **`StopSequence`**: Forces generation to stop when encountered
 - **`StopStrings`**: Forces generation to stop when any of the strings are encountered (useful for bad fine tunes, or when you want to inforce some behaviors, like forcing the model to stop "talking" after a new line).
+- **`NoInstructInStopString`**: When `true`, the `SystemStart`, `SystemEnd` tokens are not added to the stop-string list. Useful for formats where the system delimiters would incorrectly stop generation mid-response.
 
 ### Behavior Controls
 
 - **`NewLinesBetweenMessages`**: Add newlines between message blocks (to avoid adding '\n' after all your End)
+- **`ForceRAGToThinkingPrompt`**: When `true`, RAG and WorldInfo results are injected into the thinking block rather than the normal prompt position. Only has an effect on thinking-capable formats.
 
 ### Chain-of-Thought Support
 
 - **`ThinkingStart/End`**: Delimiters for thinking/reasoning blocks
 - **`PrefillThinking`**: Automatically start with thinking mode
 - **`ThinkingForcedThought`**: Default thinking content (add this content to the thinking block)
+
+### Group Chat Support
+
+- **`GroupThinkingPrefix`**: When non-empty, this string is prepended inside the thinking block during group chats to tell the model which persona is currently speaking. Useful when the model does not reliably pick up name prefixes from the message content alone.
 
 ## Usage with LLMEngine
 
@@ -150,6 +158,8 @@ var format = new InstructFormat
 - You still should set the correct format, as it'll help with token count evaluation
 - Uses native message format internally
 - Limited customization options
+
+> 💡 **Note on `AddNamesToPrompt`**: this setting (which prepends `"Name: "` to each message) was previously part of `InstructFormat`. It has been moved to `LLMSettings.AddNamesToPrompt` where it belongs conceptually alongside other global prompt-building switches.
 
 ## Loading and Saving
 

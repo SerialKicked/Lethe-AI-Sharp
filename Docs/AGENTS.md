@@ -412,6 +412,147 @@ var recentResearch = owner.Brain.GetMemoriesByType("web_research")
     .Any(m => m.Content.Contains("neural networks"));
 ```
 
+## Tool Calling and Toolsets
+
+The library separates **agent tasks** (background work executed when the user is AFK) from **tool calls** (functions the LLM can invoke during a conversation turn). This section covers the tool-call side.
+
+### IToolList Interface
+
+A toolset is any class that implements `IToolList`:
+
+```csharp
+public interface IToolList
+{
+    string Id { get; }                       // Unique toolset identifier
+    string Description { get; }             // Human-readable description
+    string SystemPromptInstruction { get; } // Text injected into the system prompt when this toolset is active
+    IReadOnlyList<Tool> GetToolList();       // The OpenAI-format tool definitions
+    bool RequiresConfirmation(string functionName); // Per-function confirmation flag
+    void LoadTools(bool clearExisting = false);
+    void UnloadTools();
+    int EstimatedTokenCost { get; }          // Approximate token cost of including this toolset
+}
+```
+
+When a toolset is active, its `SystemPromptInstruction` is automatically appended to the system prompt to inform the model about available capabilities.
+
+### ToolManager
+
+`LLMEngine.ToolManager` is the central registry for toolsets:
+
+```csharp
+// Register a toolset
+LLMEngine.ToolManager.RegisterToolList(new MyCustomToolList());
+
+// Unregister a toolset
+LLMEngine.ToolManager.UnregisterToolList("MyCustomTools");
+
+// List registered toolset IDs
+var ids = LLMEngine.ToolManager.GetRegisteredToolListIds();
+
+// Get an estimated token cost for all active toolsets
+int cost = LLMEngine.ToolManager.EstimatedTokenCost();
+```
+
+After registration, add the toolset's ID to `LLMEngine.Settings.AllowedToolsets` (or a persona's `Tools` set) to activate it:
+
+```csharp
+LLMEngine.Settings.AllowedToolsets.Add("MyCustomTools");
+```
+
+### Built-in Toolsets
+
+| Toolset ID | Purpose |
+|------------|---------|
+| `MemoryTools` | Lets the model read and write to the persona's Brain |
+| `WebSearchTools` | Lets the model run web searches |
+
+### Creating a Custom Toolset
+
+```csharp
+using LetheAISharp.Agent.Tools;
+using OpenAI;
+
+public class WeatherToolList : IToolList
+{
+    public string Id => "WeatherTools";
+    public string Description => "Provides real-time weather information";
+    public string SystemPromptInstruction => "You can look up current weather conditions for any city.";
+
+    private List<Tool> _tools = [];
+
+    public void LoadTools(bool clearExisting = false)
+    {
+        _tools = [ Tool.FromFunc("get_weather",
+            (string city) => GetCurrentWeather(city),
+            "Returns current weather for the given city.") ];
+    }
+
+    public void UnloadTools() => _tools.Clear();
+    public IReadOnlyList<Tool> GetToolList() => _tools;
+    public bool RequiresConfirmation(string functionName) => false;
+
+    private string GetCurrentWeather(string city) => $"Sunny, 22°C in {city}.";
+}
+
+// Register and activate
+LLMEngine.ToolManager.RegisterToolList(new WeatherToolList());
+LLMEngine.Settings.AllowedToolsets.Add("WeatherTools");
+```
+
+### CompositeToolList
+
+`CompositeToolList` lets you bundle multiple `IToolList` instances under a single ID, which is useful when you want to expose a group of tools as one togglable unit:
+
+```csharp
+var combined = new CompositeToolList("AllTools", "Combined utility toolset",
+    new WeatherToolList(), new CalendarToolList());
+LLMEngine.ToolManager.RegisterToolList(combined);
+```
+
+### Plugin DLL Loading
+
+Toolsets (and agent tasks/actions) can be distributed as plain .NET class library DLLs and loaded at runtime without recompiling the host application.
+
+**Loading a single DLL:**
+```csharp
+LLMEngine.ToolManager.RegisterDll("/path/to/MyPlugin.dll");
+// or via AgentRuntime (also registers IAgentTask / IAgentAction types):
+AgentRuntime.RegisterDll("/path/to/MyPlugin.dll");
+```
+
+**Loading a whole folder:**
+```csharp
+// Safe to call even if the directory doesn't exist yet
+LLMEngine.ToolManager.RegisterPluginsFromDirectory(
+    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Plugins"));
+// or:
+AgentRuntime.RegisterPluginsFromDirectory("Plugins");
+```
+
+**What happens during loading:**
+1. The assembly is loaded with `Assembly.LoadFrom`.
+2. Any class implementing `IPluginEntry` has its `Register()` method called first — use this for custom constructor logic or ordering control.
+3. All remaining classes implementing `IToolList` (and, when using `AgentRuntime`, `IAgentTask` / `IAgentAction<,>`) are auto-discovered and registered.
+
+**`IPluginEntry` (optional):**
+
+```csharp
+public class MyPluginEntry : IPluginEntry
+{
+    public void Register()
+    {
+        // Called before auto-discovery. Use for manual registration,
+        // dependency injection, or any setup that must run first.
+        LLMEngine.Logger?.LogInformation("MyPlugin loaded.");
+    }
+}
+```
+
+If your plugin doesn't need special registration logic, you can skip `IPluginEntry` entirely — auto-discovery handles everything.
+
+See `Docs/Examples/Code/PluginDllExample.cs` for a complete worked example.
+
 ## Configuration and Persistence
 
 ### Task Settings
