@@ -28,7 +28,7 @@ LLMEngine.Settings = settings;
 3. [Backend Connection](#2-backend-connection)
 4. [Model Settings](#3-model-settings)
 5. [Long Term Memory System and Summaries](#4-long-term-memory-system-and-summaries)
-6. [Sentiment Analysis Module](#5-sentiment-analysis-module)
+6. [Tool Calling Settings](#5-tool-calling-settings)
 7. [RAG Settings](#6-rag-settings)
 8. [Web Search API Settings](#7-web-search-api-settings)
 9. [Group Chat Settings](#8-group-chat-settings)
@@ -78,6 +78,20 @@ settings.SaveToFile("settings.json");
 The folder where agentic brain data is stored. Each persona gets its own files here, named after `BasePersona.UniqueName` with `.brain` and `.agent` extensions.
 
 Change this if you want to store character data somewhere other than the default relative path — for example, when running multiple separate projects from the same binary.
+
+---
+
+### `BackgroundAgentMinInactivityTime`
+**Type:** `TimeSpan` | **Default:** `00:30:00` (30 minutes)
+
+Minimum period of user inactivity before the background agent is allowed to run its tasks. The agent will not interrupt an active conversation. Reduce this for a more responsive background agent; increase it to give the user more undisturbed time before background tasks kick in.
+
+---
+
+### `ForceInternalGrammar`
+**Type:** `bool` | **Default:** `false`
+
+When `true`, the library always uses its own internal GBNF grammar generator for structured-output requests, even if the connected backend natively supports grammar/JSON-schema constraints. Leave this at `false` unless you encounter issues with the backend's grammar support.
 
 ---
 
@@ -144,12 +158,31 @@ Only relevant when `BackendAPI` is `LlamaSharp`. When `true`, the KV cache is ke
 
 ---
 
-### `OpenAIProcessAllImages`
+### `DefaultCompletionType`
+**Type:** `CompletionType?` | **Default:** `null` (use backend default)
+
+Only relevant for backends that support both text and chat completion (currently llama.cpp). Set to `CompletionType.Chat` or `CompletionType.Text` to override the backend's default. Text completion mode doesn't support tool calls or images but allows prefill and more flexible formatting. Leave at `null` to use the backend's default behavior.
+
+---
+
+### `BackendParallelToolCalls`
+**Type:** `bool?` | **Default:** `null` (auto-detect)
+
+When `true`, tool calls are executed in parallel instead of sequentially when the backend supports it. Parallel calls can reduce latency when multiple tools are needed. `null` lets the library auto-detect based on the backend. Set to `false` to force sequential execution if you see ordering issues.
+
+---
+
+### `BackendChatAllowPrefill`
+**Type:** `bool?` | **Default:** `null` (auto-detect)
+
+Controls whether the library is allowed to inject a partial assistant message at the start of a generation (prefill). Prefill is used in group chats to steer which persona speaks, and with some thinking models to ensure the thinking block is always opened. Set to `false` if your backend returns an error when a partial assistant message is included.
+
+---
+
+### `BackendLLamaCppAllowAllSamplers`
 **Type:** `bool` | **Default:** `false`
 
-Only relevant when `BackendAPI` is `OpenAI` and you're talking to a vision-capable model. When `false` (the default), only the image attached to the most recent user message is sent to the API. When `true`, every image in the conversation history is sent.
-
-Sending all images can consume a very large number of tokens and significantly increase costs. Only enable this if you specifically need the model to be able to reference earlier images in the conversation.
+When `true`, the full set of llama.cpp advanced samplers (mirostat, DRY, XTC, etc.) is exposed and used. This requires the llama-server to have been started with the `--props` option. If `false`, only the standard OpenAI-compatible samplers are used.
 
 ---
 
@@ -173,6 +206,20 @@ Maximum number of tokens the model is allowed to generate in a single reply. Inc
 **Type:** `int` | **Default:** `768`
 
 The dimensionality of the image embedding vectors your vision model produces. `768` is the most common size. Only relevant if you're using image inputs — you shouldn't need to change this unless your specific vision model uses a different size.
+
+---
+
+### `ImageResolution`
+**Type:** `int` | **Default:** `1024`
+
+Images larger than this pixel dimension (width or height) are resized before being sent to the model. `1024` matches the most common VLM limit. Reduce this to save tokens; increase it only if your model explicitly supports higher resolution inputs.
+
+---
+
+### `MaxImageCount`
+**Type:** `int` | **Default:** `4`
+
+Maximum number of images included in a single prompt. When the conversation contains more images than this limit, only the most recent ones are kept. Set to `0` for no limit.
 
 ---
 
@@ -217,6 +264,13 @@ When `true`, all dynamically inserted content (RAG entries, WorldInfo snippets, 
 In full chatlog mode the library lets users "go back in time" and continue from a past chat session, even when newer sessions exist. When this is `true` (the default), the date and mood modifiers are suppressed for those historical sessions.
 
 Without this, you'd see a past session receiving timestamps and mood information from the current date, which contradicts the session's chronological position and can confuse the model. Keep this enabled unless you have a specific reason to inject current date/mood into historical sessions.
+
+---
+
+### `AddNamesToPrompt`
+**Type:** `bool` | **Default:** `false`
+
+When `true`, each message's content is prefixed with the speaker's name (e.g., `"Alice: Hello!"`). This helps models that don't reliably track who is speaking, especially in multi-persona or group-chat scenarios. Enable this if the model seems confused about which character said what.
 
 ---
 
@@ -283,35 +337,55 @@ When `false`, the standard concise summary from structured output is used for se
 
 ---
 
-## 5. Sentiment Analysis Module
+## 5. Tool Calling Settings
 
-> ⚠️ **This module is work-in-progress / experimental.** It is intended to use a local classifier model to gauge the emotional tone of messages, but the feature is not fully complete. The settings are documented here for completeness.
+> These settings control tool calling (function calling) behaviour. Tools must be registered with the `ToolManager` before they can be used. See [AGENTS.md](AGENTS.md) for documentation on how to register toolsets and create custom tools.
 
-### `SentimentEnabled`
+### `ToolCallsAllowed`
 **Type:** `bool` | **Default:** `true`
 
-Enables or disables the sentiment analysis module. Even though the default is `true`, **it is recommended to set this to `false`** until the module is stable. Leaving it enabled on a system where the model files are absent will produce warnings but won't crash the engine.
+Master switch for tool calling. When `false`, the agent will never invoke any registered tools regardless of other settings. Tool calling only works in streaming mode.
 
 ---
 
-### `SentimentModelPath`
-**Type:** `string` | **Default:** `"data/classifiers/emotion-bert-classifier.gguf"`
+### `ToolCallLimit`
+**Type:** `int` | **Default:** `10`
 
-Path to the GGUF classifier model used for emotion detection. The model file must be downloaded separately — refer to the [README](../README.md) for download links.
-
----
-
-### `SentimentGoEmotionHeadPath`
-**Type:** `string` | **Default:** `"data/classifiers/goemotions_head.json"`
-
-Path to the GoEmotions classification head configuration file. Must be downloaded alongside the main classifier model.
+Maximum number of tool-call rounds the model may perform within a single generation turn. This is a safety limit to prevent infinite loops. Adjust up if your tasks legitimately require many sequential tool calls; adjust down to keep responses snappy.
 
 ---
 
-### `SentimentThresholdsPath`
-**Type:** `string` | **Default:** `"data/classifiers/optimized_thresholds.json"`
+### `ToolCallChainLimit`
+**Type:** `int` | **Default:** `15`
 
-Path to the optimized per-class threshold file used to convert raw classifier scores into discrete emotion labels.
+Maximum number of tool call/result pairs that are kept in the prompt at once. Older pairs are dropped to save context tokens. This should be equal to or higher than `ToolCallLimit`. Set to `0` to keep all tool calls in the prompt.
+
+---
+
+### `AllowedToolsets`
+**Type:** `HashSet<string>` | **Default:** `[]` (empty — no toolsets active)
+
+The set of toolset IDs that are enabled globally. Only toolsets whose `IToolList.Id` appears here will be included when the model is asked to generate a response. Individual personas can override this list by setting `OverrideDefaultToolset = true` and populating their own `Tools` property (see [PERSONAS.md](PERSONAS.md)).
+
+```csharp
+// Enable a toolset by its registered ID
+LLMEngine.Settings.AllowedToolsets.Add("WebSearch");
+LLMEngine.Settings.AllowedToolsets.Add("MemoryTools");
+```
+
+---
+
+### `ToolCallsAlwaysManualConfirm`
+**Type:** `bool` | **Default:** `false`
+
+When `true`, every tool call requires explicit user confirmation before it is executed, regardless of what individual toolsets declare. Use this in safety-critical environments or when you want full oversight over all automated actions.
+
+---
+
+### `ToolCallsAddSystemPromptNote`
+**Type:** `bool` | **Default:** `true`
+
+When `true`, a brief system-prompt note explaining how tool calls work is injected automatically when tools are available. This helps models that do not reliably follow the tool-calling protocol. Disable if your model handles tool calls well without the hint, or if you are managing system prompt content yourself.
 
 ---
 
@@ -323,6 +397,58 @@ Path to the optimized per-class threshold file used to convert raw classifier sc
 **Type:** `bool` | **Default:** `true`
 
 Master switch for all RAG functionality. When `false`, no semantic retrieval happens regardless of other RAG settings.
+
+---
+
+### `DecayableMemories`
+**Type:** `HashSet<MemoryType>` | **Default:** `{ WebSearch, Goal, Reminder }`
+
+Memory types that are subject to automatic decay: if a memory of one of these types has not been recalled within a calculated time window (based on its priority), it is pruned from the Brain. This keeps ephemeral memories like web-search results and reminders from accumulating indefinitely.
+
+---
+
+### `DisableRAG`
+**Type:** `HashSet<MemoryType>` | **Default:** `{ File, Image }`
+
+Memory types that are excluded from RAG retrieval. Entries of these types are never embedded or searched via similarity — they are only accessed directly. The default exclusions (`File`, `Image`) prevent large binary-backed entries from participating in semantic search.
+
+---
+
+### `FactRetrievalEnabled`
+**Type:** `bool` | **Default:** `true`
+
+Enables the extracted-facts retrieval layer. When enabled, concise single-sentence facts extracted from chat sessions are used as a lightweight semantic index: if the user's input matches a fact's embedding, that fact's source `MemoryUnit` objects are pulled in directly (two-hop retrieval). This substantially improves recall for personal facts that span multiple topics. See [MEMORY.md](MEMORY.md) for details.
+
+---
+
+### `CoreFactsTokenBudget`
+**Type:** `int` | **Default:** `512`
+
+Token budget reserved in the system prompt for the highest-ranked extracted facts. The top facts (ranked by `ReferenceCount × recency`) that fit within this budget are inserted into the system prompt on every turn, giving the model a persistent summary of key knowledge about the user. Set to `0` to disable system-prompt injection of facts while keeping fact-boosted RAG retrieval active.
+
+---
+
+### `FactDeduplicationThreshold`
+**Type:** `float` | **Default:** `0.05`
+
+Cosine distance threshold for fact deduplication. If a newly extracted fact is within this distance of an existing fact, they are treated as the same fact: `LastSeen` and `ReferenceCount` are updated instead of creating a duplicate. Lower values = stricter deduplication.  
+*Cosine distance scale: 0 = identical, 1 = orthogonal, 2 = opposite. Recommended range: 0.05–0.08.*
+
+---
+
+### `FactSupersessionThreshold`
+**Type:** `float` | **Default:** `0.075`
+
+Cosine distance threshold for fact supersession. If a new fact's embedding falls between `FactDeduplicationThreshold` and this value, the old fact is marked as superseded and the new fact inherits its `SourceMemories`. This handles knowledge updates (e.g. "User is a nurse" → "User is a teacher").  
+*Recommended range: 0.075–0.1.*
+
+---
+
+### `FactRetrievalThreshold`
+**Type:** `float` | **Default:** `0.10`
+
+Cosine distance threshold used when matching user input against fact embeddings at retrieval time. Facts within this distance trigger loading of their source `MemoryUnit` objects. Higher values = more permissive retrieval; lower values = only very close matches pull in context.  
+*Recommended range: 0.10–0.15.*
 
 ---
 
@@ -435,6 +561,13 @@ When `true`, the library attempts to scrape the full content of the most relevan
 
 ---
 
+### `WebSearchDetailedMaxLength`
+**Type:** `int` | **Default:** `5000`
+
+Maximum number of characters extracted from a scraped web page when `WebSearchDetailedResults` is `true`. Limits context growth when pages are very long. Set to `0` to disable the limit and always include the full page content.
+
+---
+
 ## 8. Group Chat Settings
 
 > These settings only take effect when using the group chat system. See [LLMSYSTEM.md](LLMSYSTEM.md) for an overview of how group chats work.
@@ -466,38 +599,62 @@ By default, when a group chat session ends, only the main persona's history is u
 
 ---
 
+### `GroupChatInfoThinkingBlock`
+**Type:** `bool` | **Default:** `true`
+
+When `true`, a note identifying the currently speaking persona is prepended inside the thinking block during group chats. This helps thinking models correctly track which character they should be roleplaying, especially when the persona is not clearly distinguishable from message names alone. Set to `false` if your model and format already handle this reliably via name prefixes.
+
+---
+
 ## Full Reference Table
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `DataPath` | `string` | `"data/chars/"` | Folder for persona brain and agent data files |
+| `BackgroundAgentMinInactivityTime` | `TimeSpan` | `00:30:00` | Inactivity period before background agent activates |
+| `ForceInternalGrammar` | `bool` | `false` | Always use internal GBNF grammar instead of backend-native grammar |
 | `BackendUrl` | `string` | `"http://localhost:5001"` | Backend server URL or GGUF file path |
 | `BackendAPI` | `BackendAPI` | `KoboldAPI` | API protocol to use |
 | `OpenAIKey` | `string` | `"123"` | API key for OpenAI-compatible backends |
+| `DefaultCompletionType` | `CompletionType?` | `null` | Override default completion mode (chat vs. text) |
+| `BackendParallelToolCalls` | `bool?` | `null` | Parallel tool call execution (`null` = auto-detect) |
+| `BackendChatAllowPrefill` | `bool?` | `null` | Allow assistant prefill in chat completion (`null` = auto-detect) |
+| `BackendLLamaCppAllowAllSamplers` | `bool` | `false` | Enable llama.cpp advanced samplers (requires `--props`) |
 | `LlamaSharpGPULayers` | `int` | `255` | GPU layers to offload (LlamaSharp only) |
 | `LlamaSharpFlashAttention` | `bool` | `true` | Enable Flash Attention (LlamaSharp only) |
 | `LlamaSharpNoKVoffload` | `bool` | `false` | Keep KV cache in CPU RAM (LlamaSharp only) |
-| `OpenAIProcessAllImages` | `bool` | `false` | Send all images in history to OpenAI (not just the latest) |
 | `MaxTotalTokens` | `int` | `16384` | Total token budget (context window size) |
 | `MaxReplyLength` | `int` | `512` | Max tokens the model may generate per reply |
 | `ImageEmbeddingSize` | `int` | `768` | Dimensionality of image embeddings |
+| `ImageResolution` | `int` | `1024` | Max image dimension before resizing |
+| `MaxImageCount` | `int` | `4` | Max images included per prompt (`0` = unlimited) |
 | `ScenarioOverride` | `string` | `""` | Replaces the character's scenario field |
 | `StopGenerationOnFirstParagraph` | `bool` | `false` | Stop generating after the first paragraph |
 | `DisableThinking` | `bool` | `false` | Suppress thinking block on reasoning models |
 | `AllowWorldInfo` | `bool` | `true` | Enable keyword-triggered WorldInfo snippets |
 | `MoveAllInsertsToSysPrompt` | `bool` | `false` | Force all RAG/WI/memory inserts into the system prompt |
 | `DisableDateAndMoodIfNotLastSession` | `bool` | `true` | Suppress date/mood modifiers when viewing historical sessions |
+| `AddNamesToPrompt` | `bool` | `false` | Prefix each message with the speaker's name |
 | `SessionMemorySystem` | `bool` | `false` | Enable long-term session memory summaries |
 | `SessionHandling` | `SessionHandling` | `FitAll` | How much conversation history to include in the chatlog |
 | `SessionReservedTokens` | `int` | `2048` | Token budget reserved for session summaries |
 | `CutInTheMiddleSummaryStrategy` | `bool` | `false` | Preserve session start + end when summarizing (vs. end only) |
 | `AntiHallucinationMemoryFormat` | `bool` | `true` | Add prompt guidance for handling mid-conversation system messages |
 | `SessionDetailedSummary` | `bool` | `false` | Generate a richer, more detailed session summary |
-| `SentimentEnabled` | `bool` | `true` | Enable sentiment analysis (WIP — recommend `false`) |
-| `SentimentModelPath` | `string` | `"data/classifiers/emotion-bert-classifier.gguf"` | Path to emotion classifier model |
-| `SentimentGoEmotionHeadPath` | `string` | `"data/classifiers/goemotions_head.json"` | Path to GoEmotions head config |
-| `SentimentThresholdsPath` | `string` | `"data/classifiers/optimized_thresholds.json"` | Path to per-class threshold file |
+| `ToolCallsAllowed` | `bool` | `true` | Master switch for tool calling |
+| `ToolCallLimit` | `int` | `10` | Max tool-call rounds per generation turn |
+| `ToolCallChainLimit` | `int` | `15` | Max tool call/result pairs kept in prompt |
+| `AllowedToolsets` | `HashSet<string>` | `[]` | Toolset IDs enabled globally |
+| `ToolCallsAlwaysManualConfirm` | `bool` | `false` | Require manual confirmation for every tool call |
+| `ToolCallsAddSystemPromptNote` | `bool` | `true` | Inject a system note explaining tool call format |
 | `RAGEnabled` | `bool` | `true` | Enable RAG retrieval |
+| `DecayableMemories` | `HashSet<MemoryType>` | `{WebSearch, Goal, Reminder}` | Memory types subject to automatic decay |
+| `DisableRAG` | `HashSet<MemoryType>` | `{File, Image}` | Memory types excluded from RAG retrieval |
+| `FactRetrievalEnabled` | `bool` | `true` | Enable extracted-facts two-hop retrieval layer |
+| `CoreFactsTokenBudget` | `int` | `512` | Token budget for top facts in the system prompt |
+| `FactDeduplicationThreshold` | `float` | `0.05` | Cosine distance for fact deduplication |
+| `FactSupersessionThreshold` | `float` | `0.075` | Cosine distance for fact supersession |
+| `FactRetrievalThreshold` | `float` | `0.10` | Cosine distance for fact-boosted RAG retrieval |
 | `RAGModelPath` | `string` | `"data/classifiers/gte-large.Q6_K.gguf"` | Path to GGUF embedding model |
 | `RAGMoveToThinkBlock` | `bool` | `false` | Inject RAG results into thinking block (experimental) |
 | `RAGConvertTo3rdPerson` | `bool` | `true` | Rewrite queries in 3rd person before embedding search |
@@ -511,6 +668,8 @@ By default, when a group chat session ends, only the main persona's history is u
 | `WebSearchAPI` | `BackendSearchAPI` | `DuckDuckGo` | Web search provider |
 | `WebSearchBraveAPIKey` | `string` | `""` | Brave Search API key |
 | `WebSearchDetailedResults` | `bool` | `true` | Scrape full page content for search results |
+| `WebSearchDetailedMaxLength` | `int` | `5000` | Max characters extracted from a scraped page (`0` = unlimited) |
 | `GroupSecondaryPersonaSeePastSessions` | `GroupChatPastSessionMode` | `All` | Past session visibility for secondary personas |
 | `GroupInstructFormatAdapter` | `bool` | `false` | Force strict role alternation in group chats |
 | `CommitGroupSessionToSecondaryPersonaHistory` | `bool` | `false` | Save group chat activity to secondary persona histories |
+| `GroupChatInfoThinkingBlock` | `bool` | `true` | Inject speaking-persona info into the thinking block in group chats |

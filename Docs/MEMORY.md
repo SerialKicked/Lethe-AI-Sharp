@@ -23,7 +23,8 @@ The persona's `Brain` class provides methods to manage memories, including addin
 3. [WorldInfo System](#worldinfo-system)
 4. [Agent System](#agent-system)
 5. [RAG Integration](#rag-integration)
-6. [Memory Insertion Strategies](#memory-insertion-strategies)
+6. [Known Facts (Extracted Facts)](#known-facts-extracted-facts)
+7. [Memory Insertion Strategies](#memory-insertion-strategies)
 
 ## MemoryUnit Format
 
@@ -245,9 +246,58 @@ By default, this includes:
 - WorldInfo entries with `DoEmbeds` property enabled
 - Research results from agent tasks after they've been inserted into conversation
 
-## Memory Insertion Strategies
+## Known Facts (Extracted Facts)
 
-The library supports multiple strategies for inserting memories into conversations:
+The `ExtractedFact` system is a lightweight semantic index that sits on top of the regular RAG memory vault. Rather than embedding long session summaries (which cover many topics and can be hard to match precisely), the brain extracts concise, single-sentence facts from each session and embeds those instead.
+
+### How It Works
+
+When a session is processed, short facts are extracted from it via structured output — statements like *"User works as a software engineer"* or *"User's cat is named Whiskers."* Each fact is embedded independently and stored in `Brain.ExtractedFacts`.
+
+At retrieval time, **two-hop retrieval** is used:
+1. The user's message is compared against all fact embeddings.
+2. Any fact whose embedding is close enough (within `FactRetrievalThreshold`) has its `SourceMemories` GUIDs used to directly load the originating `MemoryUnit` objects (typically full session summaries).
+3. Those sessions are then injected into the prompt, bypassing the standard vector distance check on the session summaries themselves.
+
+This dramatically improves recall for personal facts that span many topics in a session, because "does the user mention their cat?" resolves through a tiny, focused embedding rather than a sprawling multi-topic summary.
+
+### ExtractedFact Properties
+
+| Property | Type | Purpose |
+|----------|------|---------|
+| `Guid` | `Guid` | Unique identifier |
+| `Fact` | `string` | The concise single-sentence fact |
+| `EmbedSummary` | `float[]` | Embedding vector for similarity search |
+| `FirstSeen` | `DateTime` | When the fact was first extracted |
+| `LastSeen` | `DateTime` | When the fact was last confirmed (updated on dedup) |
+| `ReferenceCount` | `int` | How many times this fact has been seen across sessions |
+| `SourceMemories` | `List<Guid>` | GUIDs of `MemoryUnit` objects this fact was extracted from |
+| `Superseded` | `bool` | `true` if a newer fact replaced this one |
+| `SupersededBy` | `Guid?` | GUID of the superseding fact, if any |
+
+### Deduplication and Supersession
+
+To keep the fact list from growing unbounded, the system uses cosine-distance comparison when a new fact arrives:
+
+- **Duplicate** (distance ≤ `FactDeduplicationThreshold`): same fact — update `LastSeen` and `ReferenceCount`.
+- **Supersession** (`FactDeduplicationThreshold` < distance ≤ `FactSupersessionThreshold`): related but updated fact — mark the old fact as `Superseded`, carry forward `SourceMemories`.
+- **New fact** (distance > `FactSupersessionThreshold`): stored as a brand-new entry.
+
+### System Prompt Inclusion
+
+In addition to driving RAG retrieval, the highest-ranked facts are injected directly into the system prompt on every turn. Ranking is based on `ReferenceCount × recency_factor` (recency decays slowly over time). The number of facts included is controlled by `CoreFactsTokenBudget` in `LLMSettings`. The section title in the system prompt is configured via `SystemPrompt.CoreFactsTitle`.
+
+### Relevant Settings
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `FactRetrievalEnabled` | `true` | Enable/disable the entire fact layer |
+| `CoreFactsTokenBudget` | `512` | Token budget for facts in the system prompt |
+| `FactDeduplicationThreshold` | `0.05` | Distance for treating two facts as identical |
+| `FactSupersessionThreshold` | `0.075` | Distance for treating a fact as superseding another |
+| `FactRetrievalThreshold` | `0.10` | Distance for fact-triggered memory retrieval |
+
+## Memory Insertion Strategies
 
 ### Trigger-Based Insertion
 
