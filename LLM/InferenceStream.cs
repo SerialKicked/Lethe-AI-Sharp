@@ -18,7 +18,8 @@ namespace LetheAISharp.LLM
         /// <summary> Result being fed back after tool execution. </summary>
         ToolResult,
         /// <summary> Error or system-level message. </summary>
-        System
+        System,
+        Unknown
     }
 
     /// <summary>

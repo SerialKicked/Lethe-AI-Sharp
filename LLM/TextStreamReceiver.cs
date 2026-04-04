@@ -11,7 +11,7 @@ namespace LetheAISharp.LLM
     /// </summary>
     internal class TextStreamReceiver
     {
-        private InferenceChannel currentState = InferenceChannel.Text;
+        private InferenceChannel currentState = InferenceChannel.Thinking;
         private StringBuilder _streamBuffer = new();
         private StringBuilder thinkingBuffer = new();
         private StringBuilder talkingBuffer = new();
@@ -82,11 +82,6 @@ namespace LetheAISharp.LLM
             }
             _streamBuffer.Clear();
             _streamBuffer.Append(buf);
-            // while at it, make sure to flush any complete thinking/talking segments that might be in the buffer after processing tags
-            //thinkingBuffer.Replace(EndThinkingToken, string.Empty);
-            //thinkingBuffer.Replace(StartThinkingToken, string.Empty);
-            //talkingBuffer.Replace(StartThinkingToken, string.Empty);
-            //talkingBuffer.Replace(EndThinkingToken, string.Empty);
             return currentState;
         }
 
@@ -161,6 +156,7 @@ namespace LetheAISharp.LLM
             _streamBuffer.Clear();
             thinkingBuffer.Clear();
             talkingBuffer.Clear();
+            currentState = InferenceChannel.Thinking;
         }
     }
 }

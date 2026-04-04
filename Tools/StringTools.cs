@@ -77,6 +77,20 @@ namespace LetheAISharp
                 .Replace("\r", "\\r");
         }
 
+        public static string StripThinkTags(this string query)
+        {
+            var workstring = query;
+            if (!string.IsNullOrEmpty(LLMEngine.Instruct.ThinkingStart))
+            {
+                workstring = workstring.Replace(LLMEngine.Instruct.ThinkingStart, "");
+            }
+            if (!string.IsNullOrEmpty(LLMEngine.Instruct.ThinkingEnd))
+            {
+                workstring = workstring.Replace(LLMEngine.Instruct.ThinkingEnd, "");
+            }
+            return workstring;
+        }
+
         public static string SanitizeSearchQuery(this string query)
         {
             if (string.IsNullOrWhiteSpace(query))

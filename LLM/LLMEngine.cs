@@ -864,7 +864,8 @@ namespace LetheAISharp.LLM
                 }
                 StreamingTextProgress.Append(e.Token);
                 _currentChannel = textStreamReceiver.FeedToken(token);
-                RaiseInferenceSegment(new InferenceSegment { Channel = _currentChannel, Text = token, IsComplete = false });
+                if (_currentChannel != InferenceChannel.Unknown)
+                    RaiseInferenceSegment(new InferenceSegment { Channel = _currentChannel, Text = token, IsComplete = false });
                 RaiseOnInferenceStreamed(token);
             }
         }
