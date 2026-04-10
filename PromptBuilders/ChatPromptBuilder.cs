@@ -94,12 +94,12 @@ namespace LetheAISharp
             return cost;
         }
 
-        private string GetResponseStart(BasePersona talker, bool? overridePrefill = null)
+        private string GetResponseStart(BasePersona talker)
         {
-            var doprefill = overridePrefill ?? LLMEngine.Instruct.PrefillThinking;
+            var addthink = LLMEngine.Instruct.PrefillThinking;
             var addname = (LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt);
 
-            if (!talker.IsUser && LLMEngine.Settings.DisableThinking && doprefill && addname && LLMEngine.Instruct.IsThinkFormat)
+            if (!talker.IsUser && LLMEngine.Settings.DisableThinking && addthink && addname && LLMEngine.Instruct.IsThinkFormat)
             {
                 var simpleres = LLMEngine.Instruct.GetThinkPrefill();
                 simpleres += talker.Name + ":";
@@ -111,7 +111,7 @@ namespace LetheAISharp
             if (talker.IsUser)
                 return res;
 
-            if (doprefill)
+            if (addthink)
             {
                 res += LLMEngine.Instruct.GetThinkPrefill();
             }
@@ -193,8 +193,10 @@ namespace LetheAISharp
                 }
             }
 
+            var isLlamaCpp = LLMEngine.Client is LlamaCppAdapter;
             var prefill = overridePrefill ?? (LLMEngine.Instruct.PrefillThinking || LLMEngine.IsGroupConversation);
-            if (LLMEngine.Client?.AllowPrefill == false)
+
+            if (LLMEngine.Client?.AllowPrefill == false && LLMEngine.Settings.BackendChatAllowPrefill != true)
                 prefill = false;
             // prefilling is not available when using tool calls in prompt or when a structured output schema is set,
             // as it would interfere with the format of the response
@@ -207,22 +209,16 @@ namespace LetheAISharp
                 }
             }
 
-            var dooverride = (LLMEngine.Client is LlamaCppAdapter) && LLMEngine.Settings.BackendLLamaCppAllowAllSamplers;
-            double? temp = tempoverride >= 0 ? tempoverride : (LLMEngine.ForceTemperature >= 0) ? LLMEngine.ForceTemperature : LLMEngine.Sampler.Temperature;
-            int? setseed = LLMEngine.Sampler.Sampler_seed != -1 ? LLMEngine.Sampler.Sampler_seed : null;
-            if (dooverride)
-            {
-                temp = null;
-                setseed = null;
-            }
+            double temp = tempoverride >= 0 ? tempoverride : (LLMEngine.ForceTemperature >= 0) ? LLMEngine.ForceTemperature : LLMEngine.Sampler.Temperature;
+            int? setseed = LLMEngine.Sampler.Sampler_seed != -1 ? LLMEngine.Sampler.Sampler_seed : LLMEngine.RNG.Next(int.MaxValue);
 
             if (LLMEngine.ToolCallsLoaded && _currentSchema is null)
             {
                 var req = new ChatRequest(finalprompt,
                     tools: LLMEngine.ToolManager.GetToolList(),
                     toolChoice: "auto",
-                    topP: dooverride ? null : LLMEngine.Sampler.Top_p,
-                    frequencyPenalty: dooverride ? null : LLMEngine.Sampler.Rep_pen - 1,
+                    topP: LLMEngine.Sampler.Top_p,
+                    frequencyPenalty: isLlamaCpp ? null : LLMEngine.Sampler.Rep_pen - 1,
                     seed: setseed,
                     user: LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt ? LLMEngine.User.Name : null,
                     stops: [.. LLMEngine.Instruct.GetStoppingStrings(LLMEngine.User, LLMEngine.Bot)],
@@ -242,8 +238,8 @@ namespace LetheAISharp
             else
             {
                 var req = new ChatRequest(finalprompt,
-                    topP: dooverride ? null : LLMEngine.Sampler.Top_p,
-                    frequencyPenalty: dooverride ? null : LLMEngine.Sampler.Rep_pen - 1,
+                    topP: LLMEngine.Sampler.Top_p,
+                    frequencyPenalty: isLlamaCpp ? null : LLMEngine.Sampler.Rep_pen - 1,
                     seed: setseed,
                     user: LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt ? LLMEngine.User.Name : null,
                     stops: [.. LLMEngine.Instruct.GetStoppingStrings(LLMEngine.User, LLMEngine.Bot)],
@@ -251,13 +247,19 @@ namespace LetheAISharp
                     jsonSchema: _currentSchema,
                     parallelToolCalls: LLMEngine.Client?.SupportParallelToolCall ?? false,
                     maxTokens: responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride,
-                    temperature: temp)
+                    temperature: temp);
+                req.chat_template_kwargs = new Dictionary<string, object>();
+                if (_currentSchema is not null)
                 {
-                    chat_template_kwargs = new Dictionary<string, object>()
-                        {
-                            { "enable_thinking", !LLMEngine.Settings.DisableThinking }
-                        }
-                };
+                    req.chat_template_kwargs["add_generation_prompt"] = false;
+                    req.chat_template_kwargs["enable_thinking"] = false;
+                    req.add_generation_prompt = false;
+                }
+                else
+                {
+                    req.chat_template_kwargs["enable_thinking"] = !LLMEngine.Settings.DisableThinking;
+                    req.add_generation_prompt = null;
+                }
                 req.ImportFromGenerationInput(LLMEngine.Sampler);
                 return req;
             }

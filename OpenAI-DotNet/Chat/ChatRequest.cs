@@ -212,7 +212,7 @@ namespace OpenAI.Chat
         /// The messages to generate chat completions for, in the chat format.
         /// </summary>
         [JsonPropertyName("messages")]
-        public IReadOnlyList<Message> Messages { get; }
+        public IList<Message> Messages { get; set; }
 
         /// <summary>
         /// ID of the model to use.
@@ -434,7 +434,7 @@ namespace OpenAI.Chat
         /// </summary>
         [JsonPropertyName("tools")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public IReadOnlyList<Tool>? Tools { get; }
+        public IReadOnlyList<Tool>? Tools { get; set; }
 
         /// <summary>
         /// Controls which (if any) function is called by the model.<br/>
@@ -447,7 +447,7 @@ namespace OpenAI.Chat
         /// </summary>
         [JsonPropertyName("tool_choice")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-        public dynamic? ToolChoice { get; }
+        public dynamic? ToolChoice { get; set; }
 
         /// <summary>
         /// Whether to enable parallel function calling during tool use.
@@ -455,6 +455,14 @@ namespace OpenAI.Chat
         [JsonPropertyName("parallel_tool_calls")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? ParallelToolCalls { get; set; }
+
+        /// <summary>
+        /// This should be a kvwarg but llama.cpp is retarded. Anyway toggle on/off innate Jinja prefill (assuming it's in jinja), useful of JsonSchema 
+        /// or other structured output formats where the model needs to be prompted to produce specific tokens at the start of generation. 
+        /// </summary>
+        [JsonPropertyName("add_generation_prompt")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? add_generation_prompt { get; set; }
 
         /// <summary>
         /// A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse.

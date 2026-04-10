@@ -833,6 +833,8 @@ namespace LetheAISharp.Memory
 
             foreach (var item in Eurekas)
             {
+                if (item.Added > DateTime.Now)
+                    continue;
                 if (item.CheckKeywords(userinput))
                     return item;
 
@@ -864,7 +866,7 @@ namespace LetheAISharp.Memory
             // make a list with only the NaturalForced
             if (onlyForced)
             {
-                mylist = mylist.FindAll(e => e.Insertion == MemoryInsertion.NaturalForced);
+                mylist = mylist.FindAll(e => e.Insertion == MemoryInsertion.NaturalForced && e.Added <= DateTime.Now);
                 return mylist.Count > 0 ? mylist[0] : null;
             }
             return mylist[0];

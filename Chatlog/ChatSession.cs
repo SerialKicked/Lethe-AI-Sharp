@@ -94,6 +94,8 @@ namespace LetheAISharp.Files
             if (LLMEngine.SupportsSchema == true)
             {
                 var meta = await GetSessionInfo().ConfigureAwait(false);
+                if (meta == null)
+                    return;
                 MetaData = meta;
                 if (LLMEngine.Settings.SessionDetailedSummary)
                 {

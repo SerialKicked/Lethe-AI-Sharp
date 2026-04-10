@@ -261,45 +261,10 @@ namespace LetheAISharp.API
                                 partialResponse.FirstChoice.Message
                             };
                             updatedMessages.AddRange(toolmsgs);
-
-                            if (toolRound < maxToolRounds)
-                            {
-                                // Create a new request preserving all original parameters
-                                currentRequest = new ChatRequest(
-                                    messages: updatedMessages,
-                                    tools: currentRequest.Tools ?? [],
-                                    toolChoice: toolRound < maxToolRounds ? "auto" : "none",
-                                    model: currentRequest.Model,
-                                    maxTokens: currentRequest.MaxCompletionTokens,
-                                    responseFormat: currentRequest.ResponseFormat,
-                                    seed: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.Seed,
-                                    stops: currentRequest.Stops,
-                                    frequencyPenalty: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.FrequencyPenalty,
-                                    presencePenalty: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.PresencePenalty,
-                                    temperature: currentRequest.Temperature,
-                                    topP: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.TopP,
-                                    jsonSchema: currentRequest.ResponseFormatObject?.JsonSchema,
-                                    user: currentRequest.User
-                                );
-                            }
-                            else
-                            {
-                                currentRequest = new ChatRequest(
-                                    messages: updatedMessages,
-                                    model: currentRequest.Model,
-                                    maxTokens: currentRequest.MaxCompletionTokens,
-                                    responseFormat: currentRequest.ResponseFormat,
-                                    seed: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.Seed,
-                                    stops: currentRequest.Stops,
-                                    frequencyPenalty: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.FrequencyPenalty,
-                                    presencePenalty: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.PresencePenalty,
-                                    temperature: currentRequest.Temperature,
-                                    topP: LLMEngine.Settings.BackendLLamaCppAllowAllSamplers ? null : currentRequest.TopP,
-                                    jsonSchema: currentRequest.ResponseFormatObject?.JsonSchema,
-                                    user: currentRequest.User
-                                );
-                            }
-                            currentRequest.chat_template_kwargs = request.chat_template_kwargs;
+                            currentRequest.Messages = updatedMessages;
+                            currentRequest.ToolChoice = toolRound < maxToolRounds ? "auto" : "none";
+                            if (toolRound >= maxToolRounds)
+                                currentRequest.Tools = null;
                             LLMEngine.StreamingTextProgress.Clear();
                             // keep this here, otherwise the model doesn't receive a warning that tool calls have ended, and it'll imagine them instead.
                             toolRound++;
@@ -490,7 +455,7 @@ namespace LetheAISharp.API
 
         public int dry_penalty_last_n { get; set; }
 
-        public List<string> dry_sequence_breakers { get; set; } = new();
+        public List<string> dry_sequence_breakers { get; set; } = [];
 
         public int mirostat { get; set; }
 
@@ -498,7 +463,7 @@ namespace LetheAISharp.API
 
         public float mirostat_eta { get; set; }
 
-        public List<string> stop { get; set; } = new();
+        public List<string> stop { get; set; } = [];
 
         public int max_tokens { get; set; }
 
@@ -516,7 +481,7 @@ namespace LetheAISharp.API
 
         public string grammar { get; set; } = string.Empty;
 
-        public List<string> samplers { get; set; } = new();
+        public List<string> samplers { get; set; } = [];
 
         [JsonPropertyName("speculative.n_max")]
         public int SpeculativeNMax { get; set; }
@@ -611,7 +576,7 @@ namespace LetheAISharp.API
     {
         public string value { get; set; } = string.Empty;
 
-        public List<string> args { get; set; } = new();
+        public List<string> args { get; set; } = [];
     }
 
     public class LlamaSetServerStateResponse

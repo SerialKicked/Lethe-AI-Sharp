@@ -280,7 +280,7 @@ namespace LetheAISharp.API
                 token = cts.Token;
             }
 
-            if (LLMEngine.Settings.BackendLLamaCppAllowAllSamplers)
+            if (LLMEngine.Settings.BackendLLamaCppUseProps)
             {
                 var serverState = await _client.GetServerStateAsync(token).ConfigureAwait(false);
                 if (serverState?.default_generation_settings != null)
@@ -323,7 +323,7 @@ namespace LetheAISharp.API
             var param = input;
             try
             {
-                if (LLMEngine.Settings.BackendLLamaCppAllowAllSamplers)
+                if (LLMEngine.Settings.BackendLLamaCppUseProps)
                 {
                     var serverState = await _client.GetServerStateAsync(token).ConfigureAwait(false);
                     if (serverState?.default_generation_settings != null)

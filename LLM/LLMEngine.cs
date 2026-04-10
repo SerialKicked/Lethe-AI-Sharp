@@ -857,7 +857,9 @@ namespace LetheAISharp.LLM
                     && StreamingTextProgress.Length == 0 
                     && Instruct.IsThinkFormat 
                     && !Settings.DisableThinking 
-                    && e.Token.Replace("\n", "") != Instruct.ThinkingStart.Replace("\n", ""))
+                    && (e.Token.Replace("\n", "") != Instruct.ThinkingStart.Replace("\n", ""))
+                    && (e.Token.Length > 3 && !Instruct.ThinkingStart.StartsWith(e.Token))
+                    )
                 {
                     StreamingTextProgress = new StringBuilder(Instruct.ThinkingStart);
                     token = Instruct.ThinkingStart + token;

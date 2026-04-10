@@ -150,7 +150,7 @@ namespace LetheAISharp.Files
         {
             var res = string.Empty;
 
-            if (PrefillThinking && !string.IsNullOrEmpty(ThinkingStart) && LLMEngine.Client?.AllowPrefill == true)
+            if (PrefillThinking && !string.IsNullOrEmpty(ThinkingStart) && (LLMEngine.Settings.BackendChatAllowPrefill ?? LLMEngine.Client?.AllowPrefill == true))
             {
                 res = ThinkingStart;
                 if (!string.IsNullOrWhiteSpace(ThinkingForcedThought))
