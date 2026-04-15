@@ -314,22 +314,14 @@ namespace LetheAISharp.Files
         /// role, timestamp, and cleaned message content.</returns>
         public SingleMessage LogMessage(AuthorRole role, string msg, BasePersona user, BasePersona bot)
         {
-            if (Sessions.Count == 0)
-                Sessions.Add(CreateChatSession());
-
-            // Remove thinking block if any
-            var stringfix = msg;
-            if (!string.IsNullOrEmpty(LLMEngine.Instruct.ThinkingStart) && stringfix.Contains(LLMEngine.Instruct.ThinkingStart) && stringfix.Contains(LLMEngine.Instruct.ThinkingEnd))
-            {
-                // remove everything before the thinking end tag (included)
-                var idx = stringfix.IndexOf(LLMEngine.Instruct.ThinkingEnd);
-                stringfix = stringfix[(idx + LLMEngine.Instruct.ThinkingEnd.Length)..].CleanupAndTrim();
-            }
-            var single = new SingleMessage(role, DateTime.Now, stringfix, bot.GetIdentifier(), user.GetIdentifier());
-            OnBeforeMessageAdded?.Invoke(this, single);
-            CurrentSession.Messages.Add(single);
-            OnMessageAdded?.Invoke(this, single);
-            return single;
+            var message = new SingleMessage(
+                role, 
+                DateTime.Now,
+                msg.RemoveThinkingBlocks(LLMEngine.Instruct.ThinkingStart, LLMEngine.Instruct.ThinkingEnd), 
+                bot.GetIdentifier(), 
+                user.GetIdentifier());
+            LogMessage(message);
+            return message;
         }
 
         /// <summary>
@@ -345,6 +337,7 @@ namespace LetheAISharp.Files
             OnBeforeMessageAdded?.Invoke(this, single);
             CurrentSession.Messages.Add(single);
             OnMessageAdded?.Invoke(this, single);
+            LLMEngine.RaiseOnHistoryLogged(single);
         }
 
         /// <summary>

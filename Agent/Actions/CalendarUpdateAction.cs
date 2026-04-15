@@ -36,6 +36,7 @@ namespace LetheAISharp.Agent.Actions
             await promptbuilder.SetStructuredOutput(result);
             var fullprompt = promptbuilder.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.5) ? 0.5 : LLMEngine.Sampler.Temperature, 1200);
             var response = await LLMEngine.SimpleQuery(fullprompt, ct).ConfigureAwait(false);
+            response = response.RemoveThinkingBlocks();
 
             try
             {

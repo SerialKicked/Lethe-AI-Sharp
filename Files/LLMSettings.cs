@@ -57,6 +57,13 @@ namespace LetheAISharp.Files
         public bool? BackendChatAllowPrefill { get; set; } = null;
 
         /// <summary>
+        /// If set to true, the backend will be responsible for handling the BoS token and formatting the prompt accordingly.
+        /// Otherwise, this library will handle the BoS token based on the instruction template being used.
+        /// </summary>
+        /// <remarks> This is only relevant for text completion mode. </remarks>
+        public bool BackendHandlesBoSToken { get; set; } = true;
+
+        /// <summary>
         /// Set to true only if llama-server was launched with the "--props" option which allows for some minor additional functionalities.
         /// </summary>
         [Obsolete("This setting is no longer used as samplers are handled at the request level on llama.cpp now.")]
@@ -162,7 +169,6 @@ namespace LetheAISharp.Files
         public bool ToolCallsAlwaysManualConfirm { get; set; } = false;
 
         public bool ToolCallsAddSystemPromptNote { get; set; } = true;
-
 
         #endregion
 

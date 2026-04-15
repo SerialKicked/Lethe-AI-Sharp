@@ -57,6 +57,7 @@ namespace LetheAISharp.Agent.Actions
             var query = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, replyln);
 
             var finalstr = await LLMEngine.SimpleQuery(query, ct).ConfigureAwait(false);
+            finalstr = finalstr.RemoveThinkingBlocks();
             try
             {
                 searchlookup = JsonConvert.DeserializeObject<TopicSearch>(finalstr);

@@ -165,6 +165,7 @@ namespace LetheAISharp.Files
             await promptbuild.SetStructuredOutput(session);
             var ct = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, replyln);
             var finalstr = await LLMEngine.SimpleQuery(ct).ConfigureAwait(false);
+            finalstr = finalstr.RemoveThinkingBlocks();
             try
             {
                 session = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);

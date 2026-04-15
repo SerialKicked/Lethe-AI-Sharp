@@ -31,6 +31,13 @@ namespace LetheAISharp
         public int AddMessage(SingleMessage message)
         {
             _prompt.Add(message);
+            if (_prompt.Count == 1 && message.Role == AuthorRole.System)
+            {
+                var testbuddy = message.Clone();
+                var modified = LLMEngine.Instruct.UpdateSysPromptForThinking(testbuddy);
+                if (modified)
+                    return GetTokenCount(testbuddy);
+            }
             var cost = GetTokenCount(message);
             return cost;
         }
@@ -151,6 +158,8 @@ namespace LetheAISharp
                         !(idx < foundID && (m.Role == AuthorRole.Tool || (m.Role == AuthorRole.Assistant && m.ToolCalls.Count > 0))))];
                 }
             }
+            LLMEngine.Instruct.UpdateSysPromptForThinking(workingprompt[0]);
+
             var total = GetTokenUsage(workingprompt);
             var max = LLMEngine.MaxContextLength - (responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride) - 15;
             while (total > max && workingprompt.Count > 1)

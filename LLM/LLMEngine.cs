@@ -94,6 +94,8 @@ namespace LetheAISharp.LLM
         public static event EventHandler<InferenceSegment>? OnInferenceSegment;
         /// <summary> Called when a complete inference cycle finishes. Provides structured results including thinking content and tool call records. </summary>
         public static event EventHandler<InferenceResult>? OnInferenceCompleted;
+        /// <summary> Called when this library has generated the full prompt, returns full prompt </summary>
+        public static event EventHandler<SingleMessage>? OnHistoryLogged;
 
         /// <summary> Set to true if the backend supports text-to-speech </summary>
         public static bool SupportsTTS => Client?.SupportsTTS ?? false;
@@ -126,6 +128,7 @@ namespace LetheAISharp.LLM
         private static void RaiseOnQuickInferenceEnded(string fullprompt) => OnQuickInferenceEnded?.Invoke(Bot, fullprompt);
         private static void RaiseInferenceSegment(InferenceSegment segment) => OnInferenceSegment?.Invoke(Bot, segment);
         private static void RaiseInferenceCompleted(InferenceResult result) => OnInferenceCompleted?.Invoke(Bot, result);
+        internal static void RaiseOnHistoryLogged(SingleMessage message) => OnHistoryLogged?.Invoke(Bot, message);
 
         /// <summary> List of loaded context plugins. IContextPlugins must be registered in this list before connecting to a persona</summary>
         public static List<IContextPlugin> ContextPlugins { get; set; } = [];
@@ -863,6 +866,17 @@ namespace LetheAISharp.LLM
                 {
                     StreamingTextProgress = new StringBuilder(Instruct.ThinkingStart);
                     token = Instruct.ThinkingStart + token;
+                }
+                else if (CompletionAPIType == CompletionType.Text 
+                    && StreamingTextProgress.Length == 0 
+                    && Settings.DisableThinking
+                    && Instruct.IsThinkFormat
+                    && Instruct.RequireEmptyThinkBlockWhenThinkingDisabled)
+                {
+                    token = Instruct.GetThinkPrefill() + token;
+                    StreamingTextProgress.Append(token);
+                    RaiseOnInferenceStreamed(token);
+                    return;
                 }
                 StreamingTextProgress.Append(e.Token);
                 _currentChannel = textStreamReceiver.FeedToken(token);

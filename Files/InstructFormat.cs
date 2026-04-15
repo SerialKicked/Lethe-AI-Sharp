@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using OpenAI;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data;
 using System.Linq;
 using System.Text;
@@ -43,79 +44,130 @@ namespace LetheAISharp.Files
         /// <summary>
         /// BoS token, used by some models to indicate the beginning the whole prompt. Can usually be left empty.
         /// </summary>
+        [Description("BoS token, used by some models to indicate the beginning the whole prompt. Can be left empty, or handled by the backend server.")]
         public string BoSToken { get; set; } = string.Empty;
+        
+        #region ** Message Roles **
 
         /// <summary>
         /// User message start sequence. Inserted just before the user message.
         /// </summary>
+        [Description("Prefix to user messages: inserted just before the user message.")]
         public string UserStart { get; set; } = string.Empty;
 
         /// <summary>
         /// User message end sequence. Inserted just after the user message.
         /// </summary>
+        [Description("Suffix to user messages: inserted just after the user message.")]
         public string UserEnd { get; set; } = string.Empty;
 
         /// <summary>
         /// Bot message start sequence. Inserted just before the bot message.
         /// </summary>
+        [Description("Prefix to bot messages: inserted just before the bot message.")]
         public string BotStart { get; set; } = string.Empty;
 
         /// <summary>
         /// Bot message end sequence. Inserted just after the bot message.
         /// </summary>
+        [Description("Suffix to bot messages: inserted just after the bot message.")]
         public string BotEnd { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Force the bot to end generation when encountering this sequence. Contrary to BotEnd, this one won't be added to the prompt.
-        /// This is not a commonly used feature, and can usually be left empty.
-        /// </summary>
-        public string StopSequence { get; set; } = string.Empty;
 
         /// <summary>
         /// Start sequence for the system messages. 
         /// </summary>
+        [Description("Prefix to system prompt and messages: inserted just before the system prompt or message.")]
         public string SystemStart { get; set; } = string.Empty;
-        
+
         /// <summary>
         /// End sequence for the system messages. 
         /// </summary>
+        [Description("Suffix to system prompt and messages: inserted just after the system prompt or message.")]
         public string SystemEnd { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Insert a new line between messages in the prompt. Depends on the instruction format. Some models may like it, while others may not.
-        /// </summary>
-        public bool NewLinesBetweenMessages { get; set; } = false;
+        #endregion
 
-        /// <summary>
-        /// Some badly trained models may require additional stopping strings to properly end generation. This is where you do that.
-        /// </summary>
-        public List<string> StopStrings { get; set; } = [];
+
+        #region ** Thinking / CoT related **
 
         /// <summary>
         /// Start sequence for the thinking prompt block. Only relevant for CoT (or so-called thinking) models.
         /// </summary>
+        [Description("Start sequence for the thinking prompt block. Only relevant for CoT (thinking) models.")]
         public string ThinkingStart { get; set; } = string.Empty;
 
         /// <summary>
         /// End sequence for the thinking prompt block. Only relevant for CoT (or so-called thinking) models.
         /// </summary>
+        [Description("End sequence for the thinking prompt block. Only relevant for CoT (thinking) models.")]
         public string ThinkingEnd { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Tells whether an empty think block is prefilled to bot response when thinking is disabled (Like with Gemma4).
+        /// </summary>
+        [Description("Tells whether an empty think block is prefilled to bot response when thinking is disabled (Like with Gemma4).")]
+        public bool RequireEmptyThinkBlockWhenThinkingDisabled { get; set; } = false;
 
         /// <summary>
         /// Force the thinking prompt to start with a specific thought. Only relevant for CoT (or so-called thinking) models.
         /// </summary>
+        [Description("Force the thinking prompt to start with a specific thought. Only relevant for CoT (thinking) models in text completion mode. \n\n" +
+            "Leave empty unless you know what you're doing.")]
         public string ThinkingForcedThought { get; set; } = string.Empty;
 
         /// <summary>
         /// Some badly trained CoT models need to have the thinking prompt prefilled to properly work. This toggle enables that.
         /// </summary>
+        [Description("Some thinking models need to have the think token prefilled to have the feature enabled. This toggle enables that.\n\n" +
+            "This is only relevant in text completion mode.")]
         public bool PrefillThinking { get; set; } = false;
 
         /// <summary>
-        /// Attempt to insert the RAG entries in the thinking prompt instead of the main prompt. Only relevant for CoT (or so-called thinking) models.
-        /// Highly experimental.
+        /// Gets or sets the prefix inserted into the chain-of-thought prompt to specify the persona for group chat
+        /// scenarios.
         /// </summary>
-        public bool ForceRAGToThinkingPrompt { get; set; } = false;
+        /// <remarks>This property is relevant only when using text completion models in group chat mode.
+        /// It helps guide the model to roleplay as the intended persona within the generated
+        /// chain-of-thought.</remarks>
+        [Description("When in group chat, using a thinking / CoT model, this will be inserted inside the CoT to tell the model which persona it's meant to roleplay.\n\n" +
+            "This is only relevant in text completion mode.")]
+        public string GroupThinkingPrefix { get; set; } = string.Empty;
+
+        /// <summary>
+        /// If thinking is enabled (and this is a CoT model), this will be added at the very start of the system prompt. 
+        /// </summary>
+        [Description("If thinking is enabled (and this is a CoT model), this will be added at the very start of the system prompt.")]
+        public string ThinkingSystemPromptPrefix { get; set; } = string.Empty;
+
+        /// <summary>
+        /// If thinking is enabled (and this is a CoT model), this will be added at the very end of the system prompt. 
+        /// </summary>
+        [Description("If thinking is enabled (and this is a CoT model), this will be added at the very end of the system prompt.")]
+        public string ThinkingSystemPromptSuffix { get; set; } = string.Empty;
+
+        #endregion
+
+
+        /// <summary>
+        /// Force the bot to end generation when encountering this sequence. Contrary to BotEnd, this one won't be added to the prompt.
+        /// This is not a commonly used feature, and can usually be left empty.
+        /// </summary>
+        [Description("Force the bot to end generation when encountering this sequence. Contrary to BotEnd, this one won't be added to the prompt.\n\n" +
+            "This is not a commonly used feature, and can usually be left empty.")]
+        public string StopSequence { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Some badly trained models may require additional stopping strings to properly end generation. This is where you do that.
+        /// </summary>
+        [Description("Some badly trained models may require additional stopping strings to properly end generation. This is where you do that.\n\n" +
+            "Leave empty otherwise.")]
+        public List<string> StopStrings { get; set; } = [];
+
+        /// <summary>
+        /// Insert a new line between messages in the prompt. Depends on the instruction format. Some models may like it, while others may not.
+        /// </summary>
+        [Description("Insert a new line between messages in the prompt. Depends on the instruction format. Some models may like it, while others may not.")]
+        public bool NewLinesBetweenMessages { get; set; } = false;
 
         /// <summary>
         /// Overrides the entirety of the generated bot header with this post generation. This is useful for some modern CoT systems with multi channel formatting.
@@ -127,21 +179,25 @@ namespace LetheAISharp.Files
         // we don't want to store all that as is, this is where BotStartOverride and BotEndOverride come into play, it'll store the actual message between those tags instead
         // [BotStartOverride]{actual message}[BotEndOverride]
         // <|start|>assistant<|channel|>final<|message|>{actual message}<|end|>
+        [Description("Overrides the entirety of the generated bot header with this post generation. This is useful for some modern CoT systems with multi channel formatting.\n\n" +
+            "This will only impact the older messages, not the one being currently generated.")]
         public string BotStartOverride { get; set; } = string.Empty;
 
         /// <summary>
         /// Overrides the entirety of the generated bot footer with this post generation. This is useful for some modern CoT systems with multi channel formatting.
         /// This will only impact the older messages, not the one being currently generated. 
         /// </summary>
+        [Description("Overrides the entirety of the generated bot footer with this post generation. This is useful for some modern CoT systems with multi channel formatting.\n\n" +
+            "This will only impact the older messages, not the one being currently generated.")]
         public string BotEndOverride { get; set; } = string.Empty;
 
         /// <summary>
         /// Normally all Bot/User start and end tags are added to stop strings as "security", however this is not how some instruct format work. 
         /// Setting this to true disables the behavior
         /// </summary>
+        [Description("Normally all Bot/User start and end tags are added to stop strings as \"security\", however this is not how some instruct format work.\n\n" +
+            "Setting this to true disables the behavior. Leave to false unless you know what you're doing.")]
         public bool NoInstructInStopString { get; set; } = false;
-
-        public string GroupThinkingPrefix { get; set; } = string.Empty;
 
         [JsonIgnore] internal bool RealAddNameToPrompt => LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt;
         [JsonIgnore] public bool IsThinkFormat => !string.IsNullOrEmpty(ThinkingEnd);
@@ -149,6 +205,11 @@ namespace LetheAISharp.Files
         public string GetThinkPrefill()
         {
             var res = string.Empty;
+            if (IsThinkFormat && LLMEngine.Settings.DisableThinking && RequireEmptyThinkBlockWhenThinkingDisabled)
+            {
+                res = ThinkingStart + ThinkingEnd;
+                return res;
+            }
 
             if (PrefillThinking && !string.IsNullOrEmpty(ThinkingStart) && (LLMEngine.Settings.BackendChatAllowPrefill ?? LLMEngine.Client?.AllowPrefill == true))
             {
@@ -298,11 +359,28 @@ namespace LetheAISharp.Files
             return res;
         }
 
-        public bool IsThinkingPrompt(string prompt)
+        public bool UpdateSysPromptForThinking(SingleMessage sysPrompt)
         {
-            if (string.IsNullOrEmpty(ThinkingStart) || string.IsNullOrEmpty(ThinkingEnd) || string.IsNullOrEmpty(prompt))
+            if (!IsThinkFormat || LLMEngine.Settings.DisableThinking || sysPrompt.Role != AuthorRole.System)
                 return false;
-            return prompt.Contains(LLMEngine.Instruct.ThinkingStart) && !prompt.Contains(LLMEngine.Instruct.ThinkingEnd);
+            if (string.IsNullOrWhiteSpace(ThinkingSystemPromptPrefix) && string.IsNullOrWhiteSpace(ThinkingSystemPromptSuffix))
+                return false;
+            if (!string.IsNullOrWhiteSpace(ThinkingSystemPromptPrefix) && sysPrompt.Message.StartsWith(ThinkingSystemPromptPrefix))
+                return false;
+            if (!string.IsNullOrWhiteSpace(ThinkingSystemPromptSuffix) && sysPrompt.Message.EndsWith(ThinkingSystemPromptSuffix))
+                return false;
+
+            var rawprompt = sysPrompt.Message;
+            if (!string.IsNullOrWhiteSpace(ThinkingSystemPromptPrefix))
+            {
+                rawprompt = ThinkingSystemPromptPrefix + rawprompt;
+            }
+            if (!string.IsNullOrWhiteSpace(ThinkingSystemPromptSuffix))
+            {
+                rawprompt += Environment.NewLine + ThinkingSystemPromptSuffix;
+            }
+            sysPrompt.Message = rawprompt;
+            return true;
         }
     }
 }

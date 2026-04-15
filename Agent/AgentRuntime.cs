@@ -102,6 +102,8 @@ namespace LetheAISharp.Agent
                 if (!Owner.AgentMode || (DateTime.Now - _lastuseractivity) < LLMEngine.Settings.BackgroundAgentMinInactivityTime || LLMEngine.Status == SystemStatus.NotInit)
                 {
                     await Task.Delay(5000, _cts.Token).ConfigureAwait(false);
+                    if (_cts.Token.IsCancellationRequested && _running)
+                        BuildNewToken();
                     continue;
                 }
                 // Run through all plugins

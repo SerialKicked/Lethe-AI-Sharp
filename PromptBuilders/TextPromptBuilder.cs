@@ -33,16 +33,36 @@ namespace LetheAISharp
             if (message.Role == AuthorRole.Tool || (message.Role == AuthorRole.Assistant && message.ToolCalls?.Count > 0 && string.IsNullOrWhiteSpace(message.Message)))
                 return 1;
             _prompt.Add(message);
+
+            if (_prompt.Count == 1 && message.Role == AuthorRole.System)
+            {
+                var testbuddy = message.Clone();
+                var modified = LLMEngine.Instruct.UpdateSysPromptForThinking(testbuddy);
+                if (modified)
+                    return LLMEngine.GetTokenCount(testbuddy.ToTextCompletion());
+            }
             return LLMEngine.GetTokenCount(message.ToTextCompletion());
         }
 
         public object GetFullPrompt()
         {
             var fullprompt = new StringBuilder();
-            foreach (var prompt in _prompt) 
+            for (int i = 0; i < _prompt.Count; i++)
             {
+                var prompt = _prompt[i];
+                if (i == 0 && prompt.Role == AuthorRole.System)
+                {
+                    var testbuddy = prompt.Clone();
+                    var modified = LLMEngine.Instruct.UpdateSysPromptForThinking(testbuddy);
+                    if (modified)
+                    {
+                        fullprompt.Append(testbuddy.ToTextCompletion());
+                        continue;
+                    }
+                }
                 fullprompt.Append(prompt.ToTextCompletion());
             }
+
             return fullprompt.ToString();
         }
 
@@ -113,6 +133,16 @@ namespace LetheAISharp
                     // System prompts are always added as-is
                     if (prompt.Role == AuthorRole.System)
                     {
+                        // if it's the system prompt (first one)
+                        if (i == 0)
+                        {
+                            var testbuddy = prompt.Clone();
+                            if (LLMEngine.Instruct.UpdateSysPromptForThinking(testbuddy))
+                            {
+                                fullprompt.Insert(0, testbuddy.ToTextCompletion());
+                                continue;
+                            }
+                        }
                         fullprompt.Insert(0, prompt.ToTextCompletion());
                         continue;
                     }
@@ -169,6 +199,11 @@ namespace LetheAISharp
                     }
                 }
             }
+            if (!LLMEngine.Settings.BackendHandlesBoSToken && !string.IsNullOrWhiteSpace(LLMEngine.Instruct.BoSToken))
+            {
+                fullquery = LLMEngine.Instruct.BoSToken + fullquery;
+            }
+
             GenerationInput genparams = LLMEngine.Sampler.GetCopy();
             if (tempoverride >= 0)
                 genparams.Temperature = tempoverride;

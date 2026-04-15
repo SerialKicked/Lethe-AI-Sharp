@@ -50,6 +50,11 @@ namespace LetheAISharp.Files
         {
         }
 
+        public SingleMessage Clone()
+        {
+            return (SingleMessage)this.MemberwiseClone();
+        }
+
         internal string ToTextCompletion()
         {
             return LLMEngine.Instruct.FormatSingleMessage(this);

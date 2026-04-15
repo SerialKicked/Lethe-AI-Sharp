@@ -3,6 +3,7 @@ using LetheAISharp.Files;
 using LetheAISharp.GBNF;
 using LetheAISharp.LLM;
 using Newtonsoft.Json;
+using OpenAI.Responses;
 
 namespace LetheAISharp.Agent.Actions
 {
@@ -58,6 +59,7 @@ namespace LetheAISharp.Agent.Actions
             await promptbuild.SetStructuredOutput(searchlookup);
             var query = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, replyln);
             var finalstr = await LLMEngine.SimpleQuery(query, ct).ConfigureAwait(false);
+            finalstr = finalstr.RemoveThinkingBlocks();
             try
             {
                 searchlookup = JsonConvert.DeserializeObject<TopicLookup>(finalstr);
