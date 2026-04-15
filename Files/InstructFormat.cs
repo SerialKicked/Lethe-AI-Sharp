@@ -205,12 +205,14 @@ namespace LetheAISharp.Files
         public string GetThinkPrefill()
         {
             var res = string.Empty;
-            if (IsThinkFormat && LLMEngine.Settings.DisableThinking && RequireEmptyThinkBlockWhenThinkingDisabled)
+            if (IsThinkFormat && LLMEngine.Settings.DisableThinking)
             {
-                res = ThinkingStart + ThinkingEnd;
+                if (RequireEmptyThinkBlockWhenThinkingDisabled)
+                {
+                    res = ThinkingStart + ThinkingEnd;
+                }
                 return res;
             }
-
             if (PrefillThinking && !string.IsNullOrEmpty(ThinkingStart) && (LLMEngine.Settings.BackendChatAllowPrefill ?? LLMEngine.Client?.AllowPrefill == true))
             {
                 res = ThinkingStart;
@@ -341,7 +343,11 @@ namespace LetheAISharp.Files
                 res.Add(UserEnd);
             if (!string.IsNullOrEmpty(StopSequence))
                 res.Add(StopSequence);
-            res.AddRange(StopStrings);
+            foreach (var item in StopStrings)
+            {
+                if (!string.IsNullOrWhiteSpace(item))
+                    res.Add(item);
+            }
             if (LLMEngine.Settings.StopGenerationOnFirstParagraph)
                 res.Add(LLMEngine.NewLine);
 
