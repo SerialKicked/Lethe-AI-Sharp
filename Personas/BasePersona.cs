@@ -231,9 +231,9 @@ namespace LetheAISharp.LLM
             if (ExampleDialogs.Count == 0)
                 return string.Empty;
             var str = new StringBuilder();
-            str.AppendLinuxLine($"Here are some guidelines for {Name}'s writing style:");
+            str.AppendLinuxLine($"Important guidelines for {Name} to follow:");
             foreach (var item in ExampleDialogs)
-                str.AppendLinuxLine("- " + item.Replace("{{user}}", othername).Replace("{{char}}", Name));
+                str.AppendLinuxLine("- " + item.Replace("{{user}}", othername).Replace("{{char}}", Name).Replace("{{mchar}}", Name));
             return str.ToString().CleanupAndTrim();
         }
 

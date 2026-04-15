@@ -105,7 +105,7 @@ namespace LetheAISharp.Files
                 }
 
                 // Extract and store facts about the user for the fact-based retrieval layer
-                if (LLMEngine.Settings.FactRetrievalEnabled && meta.ExtractedFacts.Count > 0 && !meta.IsRoleplaySession)
+                if (LLMEngine.Settings.FactRetrievalEnabled && meta.ExtractedFacts.Count > 0 && (!meta.IsRoleplaySession || LLMEngine.Settings.RecordFactsDuringRoleplay))
                 {
                     foreach (var fact in meta.ExtractedFacts)
                     {

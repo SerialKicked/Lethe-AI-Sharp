@@ -983,7 +983,7 @@ namespace LetheAISharp.Memory
 
             // no previous user message, nothing to do either, chat just started
             var lastmsg = LLMEngine.History.GetLastMessageFrom(LLMEngine.User);
-            if (lastmsg == null)
+            if (lastmsg == null || ((DateTime.Now - lastmsg.Date) < TimeSpan.FromHours(HoursBeforeAFK) && !forced))
                 return null;
 
             // check if we have a previous message in current session, and if it's already a system msg, gtfo
@@ -993,41 +993,31 @@ namespace LetheAISharp.Memory
             if (!Owner.SenseOfTime && !MoodHandling && Inserts.Count == 0 && !forced)
                 return null;
 
-            var totalmessage = string.Empty;
-
-            var timeSinceLast = (DateTime.Now - lastmsg.Date);
-            if (timeSinceLast < TimeSpan.FromHours(HoursBeforeAFK) && !forced)
-                return null;
-
-
+            var totalmessage = new StringBuilder();
             if (Owner.SenseOfTime)
             {
-                var awaystr = GetTimeSinceLastMessage();
-                if (!string.IsNullOrWhiteSpace(awaystr))
+                var res = GetTimeSinceLastMessage();
+                if (!string.IsNullOrEmpty(res))
                 {
-                    totalmessage = awaystr;
+                    totalmessage.AppendLinuxLine(res);
+                    totalmessage.AppendLinuxLine();
                 }
 
-                var dayschedule = GetDailySchedule(DateTime.Now.DayOfWeek);
-                if (!string.IsNullOrWhiteSpace(dayschedule))
+                res = GetDailySchedule(DateTime.Now.DayOfWeek);
+                if (!string.IsNullOrWhiteSpace(res))
                 {
-                    if (!string.IsNullOrWhiteSpace(totalmessage))
-                        totalmessage += " ";
-                    totalmessage += $"{DailySchedulePrefix} {dayschedule}";
-                    // add ". " if the message doesn't end by a dot.
-                    if (!totalmessage.EndsWith('.'))
-                        totalmessage += ".";
+                    totalmessage.AppendLinuxLine($"{DailySchedulePrefix} {res}");
+                    totalmessage.AppendLinuxLine();
                 }
             }
 
             if (MoodHandling)
             {
-                var moodstr = Mood.Describe();
-                if (!string.IsNullOrWhiteSpace(moodstr))
+                var res = Mood.Describe();
+                if (!string.IsNullOrWhiteSpace(res))
                 {
-                    if (!string.IsNullOrWhiteSpace(totalmessage))
-                        totalmessage += " ";
-                    totalmessage += moodstr;
+                    totalmessage.AppendLinuxLine(res);
+                    totalmessage.AppendLinuxLine();
                 }
             }
 
@@ -1035,7 +1025,8 @@ namespace LetheAISharp.Memory
             {
                 foreach (var item in Inserts)
                 {
-                    totalmessage += " " + item.Info;
+                    totalmessage.AppendLinuxLine(item.Info);
+                    totalmessage.AppendLinuxLine();
                 }
                 Inserts.Clear();
             }
@@ -1043,16 +1034,17 @@ namespace LetheAISharp.Memory
             var InsertMems = Memories.FindAll(m => m.Insertion == MemoryInsertion.UserReturn && m.Added <= DateTime.Now);
             foreach (var mem in InsertMems)
             {
-                totalmessage += LLMEngine.NewLine + mem.Content.Trim();
+                totalmessage.AppendLinuxLine(mem.ToSnippet(TitleInsertType.None, false, false, false));
+                totalmessage.AppendLinuxLine();
                 mem.Touch();
                 mem.Insertion = MemoryInsertion.None;
             }
 
-            if (string.IsNullOrWhiteSpace(totalmessage))
+            if (totalmessage.Length == 0)
                 return null;
 
-            totalmessage = Owner.ReplaceMacros(totalmessage).CleanupAndTrim();
-            var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, totalmessage, Owner.GetIdentifier(), LLMEngine.User.GetIdentifier(), true);
+            var final = Owner.ReplaceMacros(totalmessage.ToString()).CleanupAndTrim();
+            var tosend = new SingleMessage(AuthorRole.System, DateTime.Now, final, Owner.GetIdentifier(), LLMEngine.User.GetIdentifier(), true);
             return tosend;
         }
 
@@ -1068,7 +1060,7 @@ namespace LetheAISharp.Memory
 
             var timespan = DateTime.Now - lastusermsg.Date;
 
-            var msgtxt = (DateTime.Now.Date != lastusermsg.Date.Date) || (timespan > new TimeSpan(12, 0, 0)) ?
+            var msgtxt = (DateTime.Now.Date != lastusermsg.Date.Date) || (timespan > new TimeSpan(6, 0, 0)) ?
                 $"We're {DateTime.Now.DayOfWeek} {StringExtensions.DateToHumanString(DateTime.Now)}." : string.Empty;
             if (timespan.Days > 1)
                 msgtxt += $" The last chat was {timespan.Days} days ago. " + "It is {{time}} now.";
