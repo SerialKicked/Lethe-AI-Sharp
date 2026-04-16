@@ -552,10 +552,17 @@ namespace LetheAISharp.Files
             return sb.ToString();
         }
 
-
         public virtual bool ContainsPersona(BasePersona? persona)
         {
             return Messages.Find(e => e.Sender?.UniqueName == persona?.UniqueName) != null;
+        }
+
+        public virtual bool CompatibleWithMemoryMode(MemoryMode? mode = null)
+        {
+            var selmode = mode ?? LLMEngine.Settings.RecallMemoryMode;
+            if (selmode == MemoryMode.Normal)
+                return true;
+            return (selmode == MemoryMode.RPOnly && MetaData.IsRoleplaySession) || (selmode == MemoryMode.NonRPOnly && !MetaData.IsRoleplaySession);
         }
 
     }

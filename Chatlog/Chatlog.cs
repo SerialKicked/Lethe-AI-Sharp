@@ -115,7 +115,7 @@ namespace LetheAISharp.Files
         /// <param name="ignoreList">An optional set of session GUIDs to ignore when compiling the summary. Sessions with GUIDs in this list will be skipped.</param>
         /// <returns>A string containing the formatted summaries of previous sessions, up to the specified token limit.  Returns
         /// an empty string if no valid sessions are found or if the token limit is too restrictive.</returns>
-        public string GetPreviousSummaries(int maxTokens, string sectionHeader = "##", bool allowRP = true, int maxCount = int.MaxValue, HashSet<Guid>? ignoreList = null)
+        public string GetPreviousSummaries(int maxTokens, string sectionHeader = "##", MemoryMode allowRP = MemoryMode.Normal, int maxCount = int.MaxValue, HashSet<Guid>? ignoreList = null)
         {
             if (lastSessionID == -1 && Sessions.Count >= 2)
             {
@@ -136,7 +136,7 @@ namespace LetheAISharp.Files
 
             // Add the sticky sessions first
             var SelectedSessions = new List<ChatSession>();
-            SelectedSessions.AddRange(Sessions.FindAll(e => e.Sticky));
+            SelectedSessions.AddRange(Sessions.FindAll(e => e.Sticky && e.CompatibleWithMemoryMode()));
             foreach (var item in SelectedSessions)
                 usedGuid.Add(item.Guid);
 
@@ -151,7 +151,7 @@ namespace LetheAISharp.Files
                 var session = Sessions[i];
                 if (usedGuid.Contains(session.Guid) || string.IsNullOrWhiteSpace(session.Content))
                     continue;
-                if (!allowRP && session.MetaData.IsRoleplaySession)
+                if (!session.CompatibleWithMemoryMode(allowRP))
                     continue;
                 // if we're dealing with group conversation, and we're having a secondary persona playing we have more checks
                 if (LLMEngine.IsGroupConversation && LLMEngine.Bot is GroupPersonaBase group && group.CurrentBotId != group.PrimaryPersonaName && LLMEngine.Settings.GroupSecondaryPersonaSeePastSessions == GroupChatPastSessionMode.ActiveOnly)
@@ -208,6 +208,8 @@ namespace LetheAISharp.Files
                         if (i != curSessionID && !Sessions[i].ContainsPersona(group.GetCurrentPersona()))
                             continue;
                     }
+                    if (!Sessions[i].CompatibleWithMemoryMode() && i != curSessionID)
+                        continue;
 
                     foreach (var msg in Sessions[i].Messages)
                         messagelist.Add((i, msg));

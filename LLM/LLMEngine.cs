@@ -955,7 +955,7 @@ namespace LetheAISharp.LLM
 
             if (Settings.SessionMemorySystem && History.Sessions.Count > 1)
             {
-                var shistory = History.GetPreviousSummaries(Settings.SessionReservedTokens - GetTokenCount(Bot.ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator, ignoreList: dataInserts.GetGuids());
+                var shistory = History.GetPreviousSummaries(Settings.SessionReservedTokens - GetTokenCount(Bot.ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator, allowRP: Settings.RecallMemoryMode, ignoreList: dataInserts.GetGuids());
                 if (!string.IsNullOrEmpty(shistory))
                 {
                     rawprompt.AppendLinuxLine(NewLine + Bot.ReplaceMacros(SystemPrompt.SessionHistoryTitle) + NewLine);
@@ -1131,7 +1131,7 @@ namespace LetheAISharp.LLM
             var genparams = await GenerateFullPrompt(message, pluginmessage).ConfigureAwait(false);
 
             ResetStreamingState();
-            if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart) && !ToolCallsLoaded && Client.AllowPrefill)
+            if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart) && !ToolCallsLoaded && Client.AllowPrefill && message.Role == AuthorRole.Assistant)
             {
                 var prefill = Instruct.GetThinkPrefill();
                 if (!string.IsNullOrWhiteSpace(prefill))

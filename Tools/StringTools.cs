@@ -218,6 +218,7 @@ namespace LetheAISharp
             // Turn weird quotes into normal quotes
             workstring = workstring.Replace("“", "\"");
             workstring = workstring.Replace("”", "\"");
+            workstring = workstring.Replace("\\(\\rightarrow\\)", "➡️");
             //workstring = workstring.Replace("—", " - ");
             if (fix.RemoveAllBoldedText)
             {
