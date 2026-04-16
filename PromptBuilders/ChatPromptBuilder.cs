@@ -2,6 +2,7 @@
 using LetheAISharp.API;
 using LetheAISharp.Files;
 using LetheAISharp.LLM;
+using LLama.Sampling;
 using OpenAI;
 using OpenAI.Chat;
 using System;
@@ -118,10 +119,7 @@ namespace LetheAISharp
             if (talker.IsUser)
                 return res;
 
-            if (addthink)
-            {
-                res += LLMEngine.Instruct.GetThinkPrefill();
-            }
+            res += LLMEngine.Instruct.GetThinkPrefill();
             return res;
         }
 
@@ -129,6 +127,12 @@ namespace LetheAISharp
         {
             // Let's make sure we don't overshoot token limits.
             var workingprompt = new List<SingleMessage>(_prompt);
+            var think = LLMEngine.Settings.DisableThinking;
+            if (_currentSchema is not null)
+            {
+                LLMEngine.Settings.DisableThinking = true;
+                LLMEngine.NamesInPromptOverride = false;
+            }
 
             if (LLMEngine.Settings.ToolCallChainLimit > 0 && workingprompt.Count > LLMEngine.Settings.ToolCallChainLimit)
             {
@@ -242,6 +246,8 @@ namespace LetheAISharp
                         }
                 };
                 req.ImportFromGenerationInput(LLMEngine.Sampler);
+                LLMEngine.Settings.DisableThinking = think;
+                LLMEngine.NamesInPromptOverride = null;
                 return req;
             }
             else
@@ -270,6 +276,8 @@ namespace LetheAISharp
                     req.add_generation_prompt = null;
                 }
                 req.ImportFromGenerationInput(LLMEngine.Sampler);
+                LLMEngine.Settings.DisableThinking = think;
+                LLMEngine.NamesInPromptOverride = null;
                 return req;
             }
 

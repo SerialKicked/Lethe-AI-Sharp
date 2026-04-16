@@ -3,6 +3,7 @@ using LetheAISharp.Files;
 using LetheAISharp.GBNF;
 using LetheAISharp.LLM;
 using LetheAISharp.LLM.GBNF;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Globalization;
 using System.Text;
@@ -26,11 +27,6 @@ namespace LetheAISharp.Agent.Actions
         {
             if (ct.IsCancellationRequested)
                 return null;
-
-            LLMEngine.NamesInPromptOverride = false;
-            var prefill = LLMEngine.Instruct.PrefillThinking;
-            LLMEngine.Instruct.PrefillThinking = false;
-
             var result = new CalendarUpdateResult(calendar);
             var promptbuilder = GetSystemPromt(calendar, result.GetQuery());
             await promptbuilder.SetStructuredOutput(result);
@@ -42,10 +38,9 @@ namespace LetheAISharp.Agent.Actions
             {
                 result = JsonConvert.DeserializeObject<CalendarUpdateResult>(response);
             }
-            finally
+            catch (Exception e)
             {
-                LLMEngine.NamesInPromptOverride = null;
-                LLMEngine.Instruct.PrefillThinking = prefill;
+                LLMEngine.Logger?.LogError("Error Updating calendar: {mess}", e.Message);
             }
             return result;
         }

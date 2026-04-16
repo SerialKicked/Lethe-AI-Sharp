@@ -22,10 +22,6 @@ namespace LetheAISharp.Agent.Actions
             if (ct.IsCancellationRequested)
                 return null;
             var searchlookup = new TopicSearch();
-
-            LLMEngine.NamesInPromptOverride = false;
-            var prefill = LLMEngine.Instruct.PrefillThinking;
-            LLMEngine.Instruct.PrefillThinking = false;
             var replyln = 2048;
             var availtokens = LLMEngine.MaxContextLength - replyln - 20;
 
@@ -64,8 +60,6 @@ namespace LetheAISharp.Agent.Actions
             }
             finally
             {
-                LLMEngine.NamesInPromptOverride = null;
-                LLMEngine.Instruct.PrefillThinking = prefill;
             }
             return searchlookup;
         }

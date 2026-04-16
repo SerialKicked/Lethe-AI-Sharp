@@ -116,6 +116,13 @@ namespace LetheAISharp
 
         public object PromptToQuery(AuthorRole responserole = AuthorRole.Assistant, double tempoverride = -1, int responseoverride = -1, bool? overridePrefill = null, bool forceAltRoles = false)
         {
+            var think = LLMEngine.Settings.DisableThinking;
+            if (!string.IsNullOrWhiteSpace(grammar))
+            {
+                LLMEngine.Settings.DisableThinking = true;
+                LLMEngine.NamesInPromptOverride = false;
+            }
+
             string fullquery;
             if (!forceAltRoles)
             {
@@ -169,7 +176,6 @@ namespace LetheAISharp
                 fullquery = fullprompt.ToString();
             }
 
-
             if (responserole == AuthorRole.User)
             {
                 fullquery += LLMEngine.Instruct.GetResponseStart(LLMEngine.User, overridePrefill);
@@ -178,7 +184,6 @@ namespace LetheAISharp
             {
                 fullquery += LLMEngine.Instruct.GetResponseStart(LLMEngine.Bot, overridePrefill);
             }
-
 
             vlm_pictures = [];
             if (LLMEngine.Client?.SupportsVision ?? false)
@@ -216,6 +221,10 @@ namespace LetheAISharp
             genparams.Images = [.. vlm_pictures];
             if (!string.IsNullOrWhiteSpace(grammar))
                 genparams.Grammar = grammar;
+
+            LLMEngine.Settings.DisableThinking = think;
+            LLMEngine.NamesInPromptOverride = null;
+
             return genparams;
         }
 

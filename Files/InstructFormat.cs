@@ -202,18 +202,19 @@ namespace LetheAISharp.Files
         [JsonIgnore] internal bool RealAddNameToPrompt => LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt;
         [JsonIgnore] public bool IsThinkFormat => !string.IsNullOrEmpty(ThinkingEnd);
 
-        public string GetThinkPrefill()
+        public string GetThinkPrefill(bool? overrideprefill = null)
         {
+            var doprefill = overrideprefill ?? PrefillThinking;
             var res = string.Empty;
             if (IsThinkFormat && LLMEngine.Settings.DisableThinking)
             {
                 if (RequireEmptyThinkBlockWhenThinkingDisabled)
                 {
-                    res = ThinkingStart + ThinkingEnd;
+                    res = ThinkingStart + ThinkingEnd + "\n";
                 }
                 return res;
             }
-            if (PrefillThinking && !string.IsNullOrEmpty(ThinkingStart) && (LLMEngine.Settings.BackendChatAllowPrefill ?? LLMEngine.Client?.AllowPrefill == true))
+            if (doprefill && !string.IsNullOrEmpty(ThinkingStart) && (LLMEngine.Settings.BackendChatAllowPrefill ?? LLMEngine.Client?.AllowPrefill == true))
             {
                 res = ThinkingStart;
                 if (!string.IsNullOrWhiteSpace(ThinkingForcedThought))
@@ -274,15 +275,14 @@ namespace LetheAISharp.Files
             var res = talker.ReplaceMacros(BotStart);
             if (LLMEngine.Settings.DisableThinking && doprefill && RealAddNameToPrompt && IsThinkFormat)
             {
-                res += GetThinkPrefill();
+                res += GetThinkPrefill(doprefill);
                 res += talker.Name + ":";
                 return res;
             }
             if ((RealAddNameToPrompt && (!IsThinkFormat || LLMEngine.Settings.DisableThinking)) || 
                 (LLMEngine.NamesInPromptBotOnlyOverride == true && !talker.IsUser))
                 res += talker.Name + ":";
-            if (doprefill)
-                res += GetThinkPrefill();
+            res += GetThinkPrefill(doprefill);
             return res;
         }
 

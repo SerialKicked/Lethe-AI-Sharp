@@ -135,9 +135,6 @@ namespace LetheAISharp.Files
         protected virtual async Task<SessionMetaInfo> GetSessionInfo()
         {
             var session = new SessionMetaInfo();
-            LLMEngine.NamesInPromptOverride = false;
-            var prefill = LLMEngine.Instruct.PrefillThinking;
-            LLMEngine.Instruct.PrefillThinking = false;
             var replyln = 2048;
             var availtokens = LLMEngine.MaxContextLength - replyln - 20;
 
@@ -170,8 +167,6 @@ namespace LetheAISharp.Files
             {
                 session = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
                 session?.ClampRelevance();
-                LLMEngine.NamesInPromptOverride = null;
-                LLMEngine.Instruct.PrefillThinking = prefill;
                 return session!;
             }
             catch (Exception ex)
