@@ -7,8 +7,6 @@ using LetheAISharp.Moods;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
-using System.Drawing;
-using System.Globalization;
 using System.Text;
 using static LetheAISharp.SearchAPI.WebSearchAPI;
 

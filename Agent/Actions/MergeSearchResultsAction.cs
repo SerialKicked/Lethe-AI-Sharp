@@ -1,9 +1,6 @@
 ﻿using LetheAISharp.Files;
-using LetheAISharp.GBNF;
 using LetheAISharp.LLM;
 using Microsoft.Extensions.Logging;
-using System.Drawing;
-using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using static LetheAISharp.SearchAPI.WebSearchAPI;
 
