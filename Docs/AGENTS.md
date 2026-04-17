@@ -516,24 +516,30 @@ Toolsets (and agent tasks/actions) can be distributed as plain .NET class librar
 
 **Loading a single DLL:**
 ```csharp
-LLMEngine.ToolManager.RegisterDll("/path/to/MyPlugin.dll");
-// or via AgentRuntime (also registers IAgentTask / IAgentAction types):
-AgentRuntime.RegisterDll("/path/to/MyPlugin.dll");
+LLMEngine.RegisterPlugin("/path/to/MyPlugin.dll");
 ```
 
 **Loading a whole folder:**
 ```csharp
 // Safe to call even if the directory doesn't exist yet
-LLMEngine.ToolManager.RegisterPluginsFromDirectory(
+LLMEngine.RegisterPluginsFromDirectory(
     Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Plugins"));
-// or:
-AgentRuntime.RegisterPluginsFromDirectory("Plugins");
 ```
 
 **What happens during loading:**
 1. The assembly is loaded with `Assembly.LoadFrom`.
 2. Any class implementing `IPluginEntry` has its `Register()` method called first — use this for custom constructor logic or ordering control.
-3. All remaining classes implementing `IToolList` (and, when using `AgentRuntime`, `IAgentTask` / `IAgentAction<,>`) are auto-discovered and registered.
+3. All remaining classes implementing `IAgentTask`, `IAgentAction<,>`, `IToolList`, and `IMoodlet` are auto-discovered and registered.
+
+Legacy per-subsystem methods are still available for backward compatibility, but are deprecated:
+
+```csharp
+// Deprecated:
+AgentRuntime.RegisterDll("/path/to/MyPlugin.dll");
+AgentRuntime.RegisterPluginsFromDirectory("Plugins");
+LLMEngine.ToolManager.RegisterDll("/path/to/MyPlugin.dll");
+LLMEngine.ToolManager.RegisterPluginsFromDirectory("Plugins");
+```
 
 **`IPluginEntry` (optional):**
 

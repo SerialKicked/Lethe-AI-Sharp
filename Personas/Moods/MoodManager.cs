@@ -98,5 +98,26 @@ namespace LetheAISharp.Moods
             Moodlets["Curiosity"] = new MoodCuriosity();
             Moodlets["Energy"] = new MoodEnergy();
         }
+
+        /// <summary>
+        /// Scans an already-loaded assembly and auto-discovers and registers all
+        /// <see cref="IMoodlet"/> implementations.
+        /// </summary>
+        /// <param name="assembly">Assembly to scan for moodlet plugin types.</param>
+        public static void RegisterFromAssembly(Assembly assembly)
+        {
+            ArgumentNullException.ThrowIfNull(assembly);
+            var dllName = assembly.GetName().Name ?? assembly.FullName ?? "unknown";
+
+            foreach (var type in assembly.GetTypes()
+                         .Where(t => typeof(IMoodlet).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
+            {
+                var instance = (IMoodlet)Activator.CreateInstance(type)!;
+                if (Moodlets.ContainsKey(instance.Id))
+                    continue;
+                Moodlets[instance.Id] = instance;
+                LLMEngine.Logger?.LogInformation("Auto-registered moodlet plugin: {name} from {dll}", instance.Id, dllName);
+            }
+        }
     }
 }

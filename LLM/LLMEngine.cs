@@ -7,6 +7,7 @@ using LetheAISharp.Moods;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
+using System.Reflection;
 using System.Text;
 using static LetheAISharp.SearchAPI.WebSearchAPI;
 
@@ -202,9 +203,73 @@ namespace LetheAISharp.LLM
         /// Used to register / unregister tools (for function calling persona) in a unified way across the system. 
         /// </summary>
         public static ToolManager ToolManager { get; } = new();
+        private static readonly HashSet<string> _loadedPluginPaths = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary> Shortcut to the chat history of the currently loaded bot. </summary>
         public static Chatlog History => Bot.History;
+
+        /// <summary>
+        /// Loads and registers a plugin assembly once, then delegates type discovery
+        /// to each subsystem (agent, tools, moods) from the already-loaded assembly.
+        /// Any <see cref="IPluginEntry"/> implementations are invoked once before subsystem scans.
+        /// </summary>
+        /// <param name="dllPath">Absolute or relative path to the plugin DLL.</param>
+        /// <exception cref="FileNotFoundException">Thrown when the DLL file does not exist.</exception>
+        public static void RegisterPlugin(string dllPath)
+        {
+            if (!File.Exists(dllPath))
+                throw new FileNotFoundException($"Plugin DLL not found: {dllPath}", dllPath);
+
+            var fullPath = Path.GetFullPath(dllPath);
+            if (!_loadedPluginPaths.Add(fullPath))
+                return;
+
+            var assembly = Assembly.LoadFrom(fullPath);
+            var dllName = Path.GetFileName(fullPath);
+
+            foreach (var type in assembly.GetTypes()
+                         .Where(t => typeof(IPluginEntry).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
+            {
+                try
+                {
+                    var entry = (IPluginEntry)Activator.CreateInstance(type)!;
+                    entry.Register();
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogError(ex, "Failed to invoke IPluginEntry on type {type} from {dll}", type.FullName, dllName);
+                }
+            }
+
+            AgentRuntime.RegisterFromAssembly(assembly);
+            ToolManager.RegisterFromAssembly(assembly);
+            MoodManager.RegisterFromAssembly(assembly);
+        }
+
+        /// <summary>
+        /// Loads all plugin DLLs from a directory, calling <see cref="RegisterPlugin"/> for each match.
+        /// Returns silently if the directory does not exist. Errors for individual DLLs are logged
+        /// and do not prevent other DLLs from loading.
+        /// </summary>
+        /// <param name="directoryPath">Path to the plugins folder.</param>
+        /// <param name="searchPattern">File search pattern; defaults to <c>*.dll</c>.</param>
+        public static void RegisterPluginsFromDirectory(string directoryPath, string searchPattern = "*.dll")
+        {
+            if (!Directory.Exists(directoryPath))
+                return;
+
+            foreach (var dll in Directory.GetFiles(directoryPath, searchPattern))
+            {
+                try
+                {
+                    RegisterPlugin(dll);
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogError(ex, "Failed to load plugin DLL: {dll}", Path.GetFileName(dll));
+                }
+            }
+        }
 
         /// <summary> Language models use this character to mark a new line which is different than the one used on Windows.</summary>
         public static readonly string NewLine = "\n";
