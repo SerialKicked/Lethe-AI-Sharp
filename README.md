@@ -6,11 +6,11 @@
 
 ## 🚀 What Is It?
 
-Lethe AI Sharp is a modular, object‑oriented C# library that connects local or remote Large Language Model (LLM) backends to your applications (desktop tools, game engines, services). It also comes with its own light backend, allowing you to run a local LLM in the GGUF format directly without even having to rely on anything else.
+Lethe AI Sharp is a modular, object‑oriented C# library centered around **persona-driven AI entities**: define a creative roleplay companion, a pragmatic research assistant, or an autonomous background agent, each with its own personality, memory, tools, mood behavior, and task system, then switch between them at runtime.
 
-It unifies: chat personas, conversation/session management, streaming inference, long‑term memory, RAG (retrieval augmented generation), background agentic tasks, web search tools, TTS, and structured output generation.
+It also connects local or remote Large Language Model (LLM) backends to your applications (desktop tools, game engines, services), and comes with its own light backend so you can run local GGUF models directly without relying on external servers.
 
-It is extensible, documented, and backend-agnostic, *you write the same code no matter which backend is being used*.
+It unifies chat personas, conversation/session management, streaming inference, long‑term memory, RAG (retrieval augmented generation), background agentic tasks, web search tools, TTS, and structured output generation in one backend-agnostic system.
 
 ### No Python Dependencies
 Pure .NET 10 C# implementation. No Python runtime, no conda environments, no pip hell.
@@ -133,10 +133,20 @@ Place it into `data/classifiers/` (configure their *build action* to “Copy if 
 
 **New users**: Start with the [Quick Start Guide](Docs/QUICKSTART.md) to get running in 5 minutes!
 
+### Learning Pathways
+
+- **I just want to query an LLM** → [Quick Start Guide](Docs/QUICKSTART.md) + `SimpleQuery` examples (you can ignore personas, memory, and agents).
+- **I want a chatbot with persistent history** → [Quick Start Guide](Docs/QUICKSTART.md) + [Personas](Docs/PERSONAS.md) + `SendMessageToBot`.
+- **I want long-term memory and RAG** → previous pathway + [Memory System](Docs/MEMORY.md).
+- **I want the bot to use tools** → previous pathway + tool-calling sections in [AGENTS.md](Docs/AGENTS.md).
+- **I want autonomous background behavior** → previous pathway + task system sections in [AGENTS.md](Docs/AGENTS.md).
+- **I want multiple distinct AI personas** → previous pathway + [Persona Cookbook](Docs/PERSONA_COOKBOOK.md).
+
 For comprehensive documentation, check the `Docs/` folder:
 - [LLM System Documentation](Docs/LLMSYSTEM.md) - Core LLMEngine functionality, personas, and chat management
 - [Instruction Format Guide](Docs/INSTRUCTFORMAT.md) - Configuring message formatting for different models
 - [Personas](Docs/PERSONAS.md) - Create and customize personas
+- [Persona Cookbook](Docs/PERSONA_COOKBOOK.md) - Side-by-side persona designs and runtime switching patterns
 - [Memory System](Docs/MEMORY.md) - Understand the various memory systems and how they interact
 - [Examples](Docs/Examples/) - Working code samples and tutorials
 
