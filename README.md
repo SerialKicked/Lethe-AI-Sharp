@@ -8,7 +8,7 @@
 
 Lethe AI Sharp is a modular, object‑oriented C# library connecting local or remote Large Language Model (LLM) backends to your applications. It is centered around **persona-driven AI entities**: define a pragmatic research assistant, an autonomous background agent, or even a creative roleplay companion, each with its own personality, memory, tools, mood behavior, and task system, then switch between them at runtime.
 
-It unifies chat personas, conversation/session management, streaming inference, long‑term memory, RAG (retrieval augmented generation), background agentic tasks, web search tools, TTS, and structured output generation in one backend-agnostic system. *No matter the backend, setup, or model, you wrote the exact same code*.
+It unifies chat personas, conversation/session management, streaming inference, long‑term memory, RAG (retrieval augmented generation), background agentic tasks, web search tools, TTS, and structured output generation in one backend-agnostic system. *No matter the backend, setup, or model, you write the exact same code*.
 
 It can connect to local or remote Large Language Model (LLM) backends, and also and comes with its own light backend so you can run local GGUF models directly without relying on external servers.
 
