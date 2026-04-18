@@ -50,8 +50,6 @@ var creativeRoleplayPersona = new BasePersona
         "Stay in roleplay mode and avoid practical assistant behavior unless explicitly requested.",
         "React to emotional tone shifts naturally (playful, gentle, supportive)."
     },
-    SystemPrompt = "You are {{char}}. Prioritize roleplay consistency, personality, and mood continuity over factual utility.",
-
     // Deliberately disable autonomous and tool behavior:
     AgentMode = false,
     AgentTasks = new List<string>(),
