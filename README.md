@@ -135,13 +135,6 @@ Place it into `data/classifiers/` (configure their *build action* to “Copy if 
 
 ### Learning Pathways
 
-- **I just want to query an LLM** → [Quick Start Guide](Docs/QUICKSTART.md) + `SimpleQuery` examples (you can ignore personas, memory, and agents).
-- **I want a chatbot with persistent history** → [Quick Start Guide](Docs/QUICKSTART.md) + [Personas](Docs/PERSONAS.md) + `SendMessageToBot`.
-- **I want long-term memory and RAG** → previous pathway + [Memory System](Docs/MEMORY.md).
-- **I want the bot to use tools** → previous pathway + tool-calling sections in [AGENTS.md](Docs/AGENTS.md).
-- **I want autonomous background behavior** → previous pathway + task system sections in [AGENTS.md](Docs/AGENTS.md).
-- **I want multiple distinct AI personas** → previous pathway + [Persona Cookbook](Docs/PERSONA_COOKBOOK.md).
-
 For comprehensive documentation, check the `Docs/` folder:
 - [LLM System Documentation](Docs/LLMSYSTEM.md) - Core LLMEngine functionality, personas, and chat management
 - [Instruction Format Guide](Docs/INSTRUCTFORMAT.md) - Configuring message formatting for different models
