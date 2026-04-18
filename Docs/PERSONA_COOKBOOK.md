@@ -6,23 +6,9 @@ If you need tool/task APIs, read [AGENTS.md](AGENTS.md).
 
 ---
 
-## Why this matters
-
-The key idea is simple: each `BasePersona` is its **own AI entity**.
-
-- Different personality and tone
-- Different tool access
-- Different background tasks
-- Different memory behavior
-- Same engine, switchable at runtime
-
-```csharp
-LLMEngine.Bot = creativeRoleplayPersona;
-// ... later ...
-LLMEngine.Bot = researchAssistantPersona;
-```
-
-`LLMEngine.Bot = ...` automatically ends the previous persona chat and begins the new one.
+Each `BasePersona` is a distinct AI entity with its own behavior, memory style, and capabilities.
+You can switch active personas at runtime with `LLMEngine.Bot = ...`.
+Setting `LLMEngine.Bot` ends the previous persona chat and starts the new one.
 
 ---
 
@@ -45,7 +31,7 @@ LLMEngine.ToolManager.RegisterToolList(webSearchTools);
 
 ---
 
-## Persona A — Creative / Roleplay Character (capabilities intentionally OFF)
+## Persona A — Creative / Roleplay Character (tools/tasks intentionally OFF)
 
 ```csharp
 var creativeRoleplayPersona = new BasePersona
@@ -82,9 +68,24 @@ var creativeRoleplayPersona = new BasePersona
 ```
 
 Why this setup:
-- **No tools** (`OverrideDefaultToolset = true`, `Tools = []`) keeps the persona from breaking immersion.
-- **No agent tasks** keeps behavior reactive and in-session only.
-- **Mood-reactive personality** comes from expressive bio/scenario/examples + normal guidance inserts.
+- No tools (`OverrideDefaultToolset = true`, `Tools = []`) to preserve immersion.
+- No agent tasks to keep behavior reactive and in-session.
+- Guidance remains enabled so memory/mood inserts can steer tone.
+
+Mood setup for this persona:
+
+```csharp
+MoodManager.LoadDefaultMoods(); // registers MoodCheer, MoodCuriosity, MoodEnergy
+
+creativeRoleplayPersona.Brain.MoodHandling = true;
+creativeRoleplayPersona.Brain.StaticMood = false; // set true to freeze mood values
+```
+
+Moodlets are `0.0–1.0` axes tracked by `MoodManager`.
+Each moodlet evolves over time (`OnTimePassed`), reacts to user input (`InterpretMessage`), and outputs adjectives at thresholds (`GetAdjective`).
+`MoodManager.Describe()` builds a line such as `"{{mchar}} is currently feeling happy, curious."` (`{{mchar}}` is the character-name template placeholder), which is inserted into prompt context when mood handling is active.
+Default moodlets are Cheer (`sad → moody → happy → joyful`), Curiosity (`disinterested → curious → inquisitive`), and Energy (similar low→high adjective range).
+`IMoodlet` is an interface (`Id`, `Description`, `NaturalChangeRate`, `NaturalValue`, `StartingValue`, `GetAdjective`, `InterpretMessage`, `OnTimePassed`, `ProcessNewSession`), so you can add domain-specific mood axes.
 
 ---
 
@@ -131,33 +132,11 @@ LLMEngine.Settings.FactRetrievalEnabled = true;
 ```
 
 Why this setup:
-- **`MemoryTools`** gives the assistant self-memory editing (`SaveMemory`, reminders, daily schedules).
-- **`WebSearchTools` + research tasks** enable autonomous info gathering between user turns.
-- **Time-aware settings** improve reminders and planning quality.
+- `MemoryTools` enables self-memory edits, reminders, and schedules.
+- `WebSearchTools` + research tasks enable autonomous info gathering between turns.
+- Time-aware settings improve reminder/planning quality.
 
 Weekly schedule/reminder behavior is enabled through memory tools (for example, via `SetSchedule(DayOfWeek.Monday, "...")` and `SetReminder(...)` calls made by the model).
-
----
-
-## Persona C — Minimal One-Purpose Bot (lightweight extractor)
-
-```csharp
-var extractorPersona = new BasePersona
-{
-    Name = "Extractor",
-    UniqueName = "extractor_minimal",
-    Bio = "A minimal assistant that transforms user text into clean structured extraction output.",
-    Scenario = "Return concise, structured extraction results only. Do not roleplay.",
-
-    AgentMode = false,
-    OverrideDefaultToolset = true,
-    Tools = new HashSet<string>() // no tools needed for this one-purpose bot
-};
-```
-
-Why this setup:
-- Minimal fields, no autonomous behavior, no tools.
-- Good for narrow workflows where personality depth is unnecessary.
 
 ---
 
@@ -177,23 +156,18 @@ LLMEngine.Bot = creativeRoleplayPersona;
 
 // ... later switch to productivity mode
 LLMEngine.Bot = researchAssistantPersona;
-
-// ... then switch to extraction mode
-LLMEngine.Bot = extractorPersona;
 ```
 
 You can switch whenever your app context changes (chat tab, command mode, time of day, user intent, etc.).
 
 ---
 
-## Composition model: tools, moodlets, tasks, memory are per persona
+## Composition model: capabilities are per persona
 
 Treat these systems as **composable persona capabilities**, not a single global mode:
 
-- Persona A: no tools, no tasks, roleplay-centric behavior
-- Persona B: memory + web tools, background research tasks, fact retrieval workflow
-- Persona C: almost no extras, focused single-purpose output
+- Persona A: roleplay-centric behavior, no tools/tasks, mood handling enabled.
+- Persona B: memory + web tools, background research tasks, fact retrieval workflow.
 
 In other words, you are not turning one monolithic “agent mode” on for the entire app.  
 You are designing **multiple AI entities** and selecting the right one by setting `LLMEngine.Bot`.
-
