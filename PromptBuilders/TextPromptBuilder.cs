@@ -132,7 +132,7 @@ namespace LetheAISharp
             {
                 // Use alternate roles for group conversations so it needs to end with User if responserole is Assistant
                 var fullprompt = new StringBuilder();
-                var currentrole = responserole == AuthorRole.Assistant ? AuthorRole.User : AuthorRole.Assistant;
+                var currentrole = AuthorRole.User; // responserole == AuthorRole.Assistant ? AuthorRole.User : AuthorRole.Assistant;
                 // let's go in reverse to flip roles
                 for (int i = _prompt.Count - 1; i >= 0; i--)
                 {
@@ -178,7 +178,14 @@ namespace LetheAISharp
 
             if (responserole == AuthorRole.User)
             {
-                fullquery += LLMEngine.Instruct.GetResponseStart(LLMEngine.User, overridePrefill);
+                if (!forceAltRoles)
+                    fullquery += LLMEngine.Instruct.GetResponseStart(LLMEngine.User, overridePrefill);
+                else
+                {
+                    LLMEngine.Settings.DisableThinking = true;
+                    LLMEngine.NamesInPromptOverride = true;
+                    fullquery += LLMEngine.Instruct.GetResponseStart(LLMEngine.User, overridePrefill, true);
+                }
             }
             else
             {

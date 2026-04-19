@@ -262,10 +262,10 @@ namespace LetheAISharp.Files
             return res;
         }
 
-        public string GetResponseStart(BasePersona talker, bool? overridePrefill = null)
+        public string GetResponseStart(BasePersona talker, bool? overridePrefill = null, bool forcedassistantrole = false)
         {
             var doprefill = overridePrefill ?? PrefillThinking;
-            if (talker.IsUser)
+            if (talker.IsUser && !forcedassistantrole)
             {
                 var userres = talker.ReplaceMacros(UserStart);
                 if (RealAddNameToPrompt)
@@ -280,7 +280,7 @@ namespace LetheAISharp.Files
                 return res;
             }
             if ((RealAddNameToPrompt && (!IsThinkFormat || LLMEngine.Settings.DisableThinking)) || 
-                (LLMEngine.NamesInPromptBotOnlyOverride == true && !talker.IsUser))
+                (LLMEngine.NamesInPromptBotOnlyOverride == true))
                 res += talker.Name + ":";
             res += GetThinkPrefill(doprefill);
             return res;
