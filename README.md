@@ -6,11 +6,11 @@
 
 ## 🚀 What Is It?
 
-Lethe AI Sharp is a modular, object‑oriented C# library that connects local or remote Large Language Model (LLM) backends to your applications (desktop tools, game engines, services). It also comes with its own light backend, allowing you to run a local LLM in the GGUF format directly without even having to rely on anything else.
+Lethe AI Sharp is a modular, object‑oriented C# library connecting local or remote Large Language Model (LLM) backends to your applications. It is centered around **persona-driven AI entities**: define a pragmatic research assistant, an autonomous background agent, or even a creative roleplay companion, each with its own personality, memory, tools, mood behavior, and task system, then switch between them at runtime.
 
-It unifies: chat personas, conversation/session management, streaming inference, long‑term memory, RAG (retrieval augmented generation), background agentic tasks, web search tools, TTS, and structured output generation.
+It unifies chat personas, conversation/session management, streaming inference, long‑term memory, RAG (retrieval augmented generation), background agentic tasks, web search tools, TTS, and structured output generation in one backend-agnostic system. *No matter the backend, setup, or model, you write the exact same code*.
 
-It is extensible, documented, and backend-agnostic (you write the same code no matter which backend is being used)
+It can connect to local or remote Large Language Model (LLM) backends, and also and comes with its own light backend so you can run local GGUF models directly without relying on external servers.
 
 ### No Python Dependencies
 Pure .NET 10 C# implementation. No Python runtime, no conda environments, no pip hell.
@@ -133,10 +133,13 @@ Place it into `data/classifiers/` (configure their *build action* to “Copy if 
 
 **New users**: Start with the [Quick Start Guide](Docs/QUICKSTART.md) to get running in 5 minutes!
 
+### Learning Pathways
+
 For comprehensive documentation, check the `Docs/` folder:
 - [LLM System Documentation](Docs/LLMSYSTEM.md) - Core LLMEngine functionality, personas, and chat management
 - [Instruction Format Guide](Docs/INSTRUCTFORMAT.md) - Configuring message formatting for different models
 - [Personas](Docs/PERSONAS.md) - Create and customize personas
+- [Persona Cookbook](Docs/PERSONA_COOKBOOK.md) - Side-by-side persona designs and runtime switching patterns
 - [Memory System](Docs/MEMORY.md) - Understand the various memory systems and how they interact
 - [Examples](Docs/Examples/) - Working code samples and tutorials
 
