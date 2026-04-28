@@ -345,37 +345,16 @@ namespace LetheAISharp.Agent
         }
 
         /// <summary>
-        /// Loads a plugin DLL and auto-discovers and registers all
+        /// Scans an already-loaded assembly and auto-discovers and registers all
         /// <see cref="IAgentTask"/> and <see cref="IAgentAction{TResult,TParam}"/> implementations.
-        /// Any class implementing <see cref="IPluginEntry"/> is invoked first so the plugin
-        /// can perform its own registration logic before automatic discovery runs.
         /// </summary>
-        /// <param name="dllPath">Absolute path to the plugin DLL.</param>
-        /// <exception cref="FileNotFoundException">Thrown when the DLL file does not exist.</exception>
-        public static void RegisterDll(string dllPath)
+        /// <param name="assembly">Assembly to scan for agent task/action plugin types.</param>
+        public static void RegisterFromAssembly(Assembly assembly)
         {
-            if (!File.Exists(dllPath))
-                throw new FileNotFoundException($"Plugin DLL not found: {dllPath}", dllPath);
+            ArgumentNullException.ThrowIfNull(assembly);
+            var dllName = assembly.GetName().Name ?? assembly.FullName ?? "unknown";
 
-            var assembly = Assembly.LoadFrom(dllPath);
-            var dllName = Path.GetFileName(dllPath);
-
-            // 1) Invoke any explicit entry points first (gives plugin authors full control)
-            foreach (var type in assembly.GetTypes()
-                         .Where(t => typeof(IPluginEntry).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
-            {
-                try
-                {
-                    var entry = (IPluginEntry)Activator.CreateInstance(type)!;
-                    entry.Register();
-                }
-                catch (Exception ex)
-                {
-                    LLMEngine.Logger?.LogError(ex, "Failed to invoke IPluginEntry on type {type} from {dll}", type.FullName, dllName);
-                }
-            }
-
-            // 2) Auto-discover IAgentTask implementations
+            // 1) Auto-discover IAgentTask implementations
             foreach (var type in assembly.GetTypes()
                          .Where(t => typeof(IAgentTask).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
             {
@@ -387,7 +366,7 @@ namespace LetheAISharp.Agent
                 LLMEngine.Logger?.LogInformation("Auto-registered task plugin: {id} from {dll}", instance.Id, dllName);
             }
 
-            // 3) Auto-discover IAgentAction<,> implementations
+            // 2) Auto-discover IAgentAction<,> implementations
             foreach (var type in assembly.GetTypes()
                          .Where(t => !t.IsAbstract && !t.IsInterface
                                      && t.GetInterfaces().Any(i => i.IsGenericType
@@ -400,18 +379,17 @@ namespace LetheAISharp.Agent
                 _actions[id] = instance;
                 LLMEngine.Logger?.LogInformation("Auto-registered action plugin: {id} from {dll}", id, dllName);
             }
+        }
 
-            // 4) Auto-discover IMoodlet implementations
-            foreach (var type in assembly.GetTypes()
-                         .Where(t => typeof(IMoodlet).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
-            {
-                var instance = (IMoodlet)Activator.CreateInstance(type)!;
-                if (MoodManager.Moodlets.ContainsKey(instance.Id))
-                    continue;
-                var capturedType = type;
-                MoodManager.Moodlets[instance.Id] = (IMoodlet)Activator.CreateInstance(capturedType)!;
-                LLMEngine.Logger?.LogInformation("Auto-registered moodlet plugin: {name} from {dll}", instance.Id, dllName);
-            }
+        /// <summary>
+        /// Loads a plugin DLL.
+        /// </summary>
+        /// <param name="dllPath">Absolute path to the plugin DLL.</param>
+        /// <exception cref="FileNotFoundException">Thrown when the DLL file does not exist.</exception>
+        [Obsolete("Use LLMEngine.RegisterPlugin() instead.")]
+        public static void RegisterDll(string dllPath)
+        {
+            LLMEngine.RegisterPlugin(dllPath);
         }
 
         /// <summary>
@@ -421,22 +399,10 @@ namespace LetheAISharp.Agent
         /// </summary>
         /// <param name="directoryPath">Path to the plugins folder.</param>
         /// <param name="searchPattern">File search pattern; defaults to <c>*.dll</c>.</param>
+        [Obsolete("Use LLMEngine.RegisterPluginsFromDirectory() instead.")]
         public static void RegisterPluginsFromDirectory(string directoryPath, string searchPattern = "*.dll")
         {
-            if (!Directory.Exists(directoryPath))
-                return;
-
-            foreach (var dll in Directory.GetFiles(directoryPath, searchPattern))
-            {
-                try
-                {
-                    RegisterDll(dll);
-                }
-                catch (Exception ex)
-                {
-                    LLMEngine.Logger?.LogError(ex, "Failed to load plugin DLL: {dll}", Path.GetFileName(dll));
-                }
-            }
+            LLMEngine.RegisterPluginsFromDirectory(directoryPath, searchPattern);
         }
 
         #endregion

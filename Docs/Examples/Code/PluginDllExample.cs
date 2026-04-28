@@ -7,7 +7,7 @@
 // it into your host app's Plugins/ folder.
 //
 // Host-app registration (one line at startup):
-//   AgentRuntime.RegisterPluginsFromDirectory(
+//   LLMEngine.RegisterPluginsFromDirectory(
 //       Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Plugins"));
 // =============================================================================
 
@@ -161,10 +161,14 @@ namespace LetheAISharp.Examples
             // Load every *.dll in the Plugins/ subfolder next to the executable.
             // Safe to call even if the folder doesn't exist yet.
             var pluginsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Plugins");
-            AgentRuntime.RegisterPluginsFromDirectory(pluginsDir);
+            LLMEngine.RegisterPluginsFromDirectory(pluginsDir);
 
             // Or load a single, known DLL directly:
-            // AgentRuntime.RegisterDll("/absolute/path/to/MyPlugin.dll");
+            // LLMEngine.RegisterPlugin("/absolute/path/to/MyPlugin.dll");
+
+            // Legacy paths still work but are deprecated:
+            // AgentRuntime.RegisterPluginsFromDirectory(pluginsDir);
+            // LLMEngine.ToolManager.RegisterPluginsFromDirectory(pluginsDir);
         }
     }
 }

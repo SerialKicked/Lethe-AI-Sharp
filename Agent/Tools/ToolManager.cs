@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.HighPerformance.Helpers;
+using CommunityToolkit.HighPerformance.Helpers;
 using LetheAISharp.LLM;
 using Microsoft.Extensions.Logging;
 using OpenAI;
@@ -135,47 +135,35 @@ namespace LetheAISharp.Agent.Tools
         }
 
         /// <summary>
-        /// Loads a plugin DLL and auto-discovers and registers all
-        /// <see cref="IAgentTask"/> and <see cref="IAgentAction{TResult,TParam}"/> implementations.
-        /// Any class implementing <see cref="IPluginEntry"/> is invoked first so the plugin
-        /// can perform its own registration logic before automatic discovery runs.
+        /// Scans an already-loaded assembly and auto-discovers and registers all
+        /// <see cref="IToolList"/> implementations.
         /// </summary>
-        /// <param name="dllPath">Absolute path to the plugin DLL.</param>
-        /// <exception cref="FileNotFoundException">Thrown when the DLL file does not exist.</exception>
-        public void RegisterDll(string dllPath)
+        /// <param name="assembly">Assembly to scan for toolset plugin types.</param>
+        public void RegisterFromAssembly(Assembly assembly)
         {
-            if (!File.Exists(dllPath))
-                throw new FileNotFoundException($"Plugin DLL not found: {dllPath}", dllPath);
+            ArgumentNullException.ThrowIfNull(assembly);
+            var dllName = assembly.GetName().Name ?? assembly.FullName ?? "unknown";
 
-            var assembly = Assembly.LoadFrom(dllPath);
-            var dllName = Path.GetFileName(dllPath);
-
-            // 1) Invoke any explicit entry points first (gives plugin authors full control)
-            foreach (var type in assembly.GetTypes()
-                         .Where(t => typeof(IPluginEntry).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
-            {
-                try
-                {
-                    var entry = (IPluginEntry)Activator.CreateInstance(type)!;
-                    entry.Register();
-                }
-                catch (Exception ex)
-                {
-                    LLMEngine.Logger?.LogError(ex, "Failed to invoke IPluginEntry on type {type} from {dll}", type.FullName, dllName);
-                }
-            }
-
-            // 2) Auto-discover IToolList implementations
             foreach (var type in assembly.GetTypes()
                          .Where(t => typeof(IToolList).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface))
             {
                 var instance = (IToolList)Activator.CreateInstance(type)!;
                 if (_toolLists.ContainsKey(instance.Id))
                     continue;
-                var capturedType = type;
-                RegisterToolList((IToolList)Activator.CreateInstance(capturedType)!);
+                RegisterToolList(instance);
                 LLMEngine.Logger?.LogInformation("Auto-registered toolset plugin: {id} from {dll}", instance.Id, dllName);
             }
+        }
+
+        /// <summary>
+        /// Loads a plugin DLL.
+        /// </summary>
+        /// <param name="dllPath">Absolute path to the plugin DLL.</param>
+        /// <exception cref="FileNotFoundException">Thrown when the DLL file does not exist.</exception>
+        [Obsolete("Use LLMEngine.RegisterPlugin() instead.")]
+        public void RegisterDll(string dllPath)
+        {
+            LLMEngine.RegisterPlugin(dllPath);
         }
 
         /// <summary>
@@ -185,22 +173,10 @@ namespace LetheAISharp.Agent.Tools
         /// </summary>
         /// <param name="directoryPath">Path to the plugins folder.</param>
         /// <param name="searchPattern">File search pattern; defaults to <c>*.dll</c>.</param>
+        [Obsolete("Use LLMEngine.RegisterPluginsFromDirectory() instead.")]
         public void RegisterPluginsFromDirectory(string directoryPath, string searchPattern = "*.dll")
         {
-            if (!Directory.Exists(directoryPath))
-                return;
-
-            foreach (var dll in Directory.GetFiles(directoryPath, searchPattern))
-            {
-                try
-                {
-                    RegisterDll(dll);
-                }
-                catch (Exception ex)
-                {
-                    LLMEngine.Logger?.LogError(ex, "Failed to load plugin DLL: {dll}", Path.GetFileName(dll));
-                }
-            }
+            LLMEngine.RegisterPluginsFromDirectory(directoryPath, searchPattern);
         }
 
     }
