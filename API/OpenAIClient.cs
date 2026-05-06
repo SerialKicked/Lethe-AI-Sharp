@@ -150,49 +150,17 @@ namespace LetheAISharp.API
                             // Build updated message list: original messages + assistant tool-call message + tool results.
                             // The assistant message is included as-is (thinking/CoT content, if any, is preserved
                             // since Message properties are not publicly mutable in this library version).
-                            var updatedMessages = new List<OpenAI.Chat.Message>(currentRequest.Messages)
+                            var toadd = new List<OpenAI.Chat.Message>()
                             {
                                 partialResponse.FirstChoice.Message
                             };
-                            updatedMessages.AddRange(toolmsgs);
-
-                            if (toolRound < maxToolRounds)
-                            {
-                                // Create a new request preserving all original parameters
-                                currentRequest = new ChatRequest(
-                                    messages: updatedMessages,
-                                    tools: currentRequest.Tools,
-                                    toolChoice: toolRound < maxToolRounds ? "auto" : "none",
-                                    model: currentRequest.Model,
-                                    frequencyPenalty: currentRequest.FrequencyPenalty,
-                                    maxTokens: currentRequest.MaxCompletionTokens,
-                                    presencePenalty: currentRequest.PresencePenalty,
-                                    responseFormat: currentRequest.ResponseFormat,
-                                    seed: currentRequest.Seed,
-                                    stops: currentRequest.Stops,
-                                    temperature: currentRequest.Temperature,
-                                    topP: currentRequest.TopP,
-                                    jsonSchema: currentRequest.ResponseFormatObject?.JsonSchema,
-                                    user: currentRequest.User
-                                );
-                            }
-                            else
-                            {
-                                currentRequest = new ChatRequest(
-                                    messages: updatedMessages,
-                                    model: currentRequest.Model,
-                                    frequencyPenalty: currentRequest.FrequencyPenalty,
-                                    maxTokens: currentRequest.MaxCompletionTokens,
-                                    presencePenalty: currentRequest.PresencePenalty,
-                                    responseFormat: currentRequest.ResponseFormat,
-                                    seed: currentRequest.Seed,
-                                    stops: currentRequest.Stops,
-                                    temperature: currentRequest.Temperature,
-                                    topP: currentRequest.TopP,
-                                    jsonSchema: currentRequest.ResponseFormatObject?.JsonSchema,
-                                    user: currentRequest.User
-                                );
-                            }
+                            toadd.AddRange(toolmsgs);
+                            var updatedMessages = TokenTools.MaintainRoughTokenCount(currentRequest.Messages, toadd, LLMEngine.Instruct);
+                            currentRequest.Messages = updatedMessages;
+                            currentRequest.ToolChoice = toolRound < maxToolRounds ? "auto" : "none";
+                            if (toolRound >= maxToolRounds)
+                                currentRequest.Tools = null;
+                            LLMEngine.StreamingTextProgress.Clear();
                             // keep this here, otherwise the model doesn't receive a warning that tool calls have ended, and it'll imagine them instead.
                             toolRound++;
                             // --

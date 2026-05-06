@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using LetheAISharp.Files;
 using LetheAISharp.LLM;
+using OpenAI;
+using OpenAI.Chat;
 using SharpToken;
 
 namespace LetheAISharp
@@ -84,6 +86,77 @@ namespace LetheAISharp
             var consecutiveNewlinesCount = text.CountSubstring("\n\n");
             // Round up and add a small safety margin
             return (text.Length / 4) - consecutiveNewlinesCount;
+        }
+
+        public static List<Message> MaintainRoughTokenCount(IList<Message> messages, List<Message> toadd, InstructFormat? format = null)
+        {
+            var res = new List<Message>(messages);
+
+            var totalTokens = CountTokens(messages, format);
+            res.AddRange(toadd);
+            while (CountTokens(res, format) > totalTokens && res.Count > 0)
+            {
+                if (res.Count <= 1)
+                    break;
+                res.RemoveAt(1);
+            }
+            return res;
+        }
+
+        public static int CountTokens(IList<Message> messages, InstructFormat? format = null)
+        {
+            if (format == null)
+            {
+                return messages.Sum(m => CountTokens(m.Content.ToString()));
+            }
+            var total = 0;
+            foreach (var message in messages)
+            {
+                var charcnt = 0;
+                var imgcnt = 0;
+                switch (message.Role)
+                {
+                    case OpenAI.Role.System:
+                    case OpenAI.Role.Developer:
+                        charcnt += CountTokens(format.SystemStart) + CountTokens(format.SystemEnd);
+                        break;
+                    case OpenAI.Role.Tool:
+                    case OpenAI.Role.Assistant:
+                        charcnt += CountTokens(format.BotStart) + CountTokens(format.BotEnd);
+                        break;
+                    case OpenAI.Role.User:
+                        charcnt += CountTokens(format.UserStart) + CountTokens(format.UserEnd);
+                        break;
+                    default:
+                        charcnt += CountTokens(format.SystemStart) + CountTokens(format.SystemEnd);
+                        break;
+                }
+                if (format.NewLinesBetweenMessages)
+                {
+                    charcnt += 2; // For the newlines
+                }
+
+                if (message.Content is string strContent)
+                {
+                    charcnt += strContent.Length;
+                }
+                else if (message.Content is IEnumerable<object> enumez)
+                {
+                    foreach (var item in enumez)
+                    {
+                        if (item is string strItem)
+                        {
+                            charcnt += strItem.Length;
+                        }
+                        else if (item is ImageUrl || item is ImageFile)
+                        {
+                            imgcnt++;
+                        }
+                    }
+                }
+                total += (charcnt / 4) + (imgcnt * LLMEngine.Settings.ImageEmbeddingSize) + 10; // Approximate token count with a safety margin
+            }
+            return total;
         }
 
         internal static OpenAI.Role InternalRoleToChatRole(AuthorRole role)

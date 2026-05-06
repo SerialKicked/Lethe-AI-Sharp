@@ -537,7 +537,8 @@ namespace LetheAISharp.Files
             var sb = new StringBuilder();
             foreach (var message in messagesCopy)
             {
-                sb.Append(message.ToTextCompletion());
+                if (!message.Hidden)
+                    sb.Append(message.ToTextCompletion());
             }
             var tokencount = LLMEngine.GetTokenCount(sb.ToString());
             var duration = CurrentSession.Messages.Last().Date - CurrentSession.Messages.First().Date;

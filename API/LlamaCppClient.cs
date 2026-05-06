@@ -256,11 +256,12 @@ namespace LetheAISharp.API
                             // Build updated message list: original messages + assistant tool-call message + tool results.
                             // The assistant message is included as-is (thinking/CoT content, if any, is preserved
                             // since Message properties are not publicly mutable in this library version).
-                            var updatedMessages = new List<OpenAI.Chat.Message>(currentRequest.Messages)
+                            var toadd = new List<OpenAI.Chat.Message>()
                             {
                                 partialResponse.FirstChoice.Message
                             };
-                            updatedMessages.AddRange(toolmsgs);
+                            toadd.AddRange(toolmsgs);
+                            var updatedMessages = TokenTools.MaintainRoughTokenCount(currentRequest.Messages, toadd, LLMEngine.Instruct);
                             currentRequest.Messages = updatedMessages;
                             currentRequest.ToolChoice = toolRound < maxToolRounds ? "auto" : "none";
                             if (toolRound >= maxToolRounds)
