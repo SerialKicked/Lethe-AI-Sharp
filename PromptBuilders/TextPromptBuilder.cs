@@ -5,6 +5,7 @@ using LetheAISharp.LLM;
 using LLama.Native;
 using Microsoft.Extensions.Logging;
 using OpenAI;
+using OpenAI.Chat;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,6 +23,8 @@ namespace LetheAISharp
         private string grammar = string.Empty;
 
         public int Count => _prompt.Count;
+
+        public object? LastQuery { get; set; }
 
         public int AddMessage(AuthorRole role, string message)
         {
@@ -113,6 +116,22 @@ namespace LetheAISharp
         {
             grammar = string.Empty;
         }
+
+        public object? RegenLastQuery()
+        {
+            if (LastQuery is null || LastQuery is not GenerationInput req)
+                return null;
+            GenerationInput genparams = LLMEngine.Sampler.GetCopy();
+            genparams.Temperature = (LLMEngine.ForceTemperature >= 0) ? LLMEngine.ForceTemperature : LLMEngine.Sampler.Temperature;
+            genparams.Max_context_length = req.Max_context_length;
+            genparams.Max_length = req.Max_length;
+            genparams.Stop_sequence = req.Stop_sequence;
+            genparams.Prompt = req.Prompt;
+            genparams.Images = req.Images;
+            genparams.Grammar =req.Grammar;
+            return genparams;
+        }
+
 
         public object PromptToQuery(AuthorRole responserole = AuthorRole.Assistant, double tempoverride = -1, int responseoverride = -1, bool? overridePrefill = null, bool forceAltRoles = false)
         {
@@ -257,6 +276,7 @@ namespace LetheAISharp
 
         public void Clear()
         {
+            LastQuery = null;
             _prompt.Clear();
         }
 

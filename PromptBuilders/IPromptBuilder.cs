@@ -21,6 +21,10 @@ namespace LetheAISharp
         /// </summary>
         int Count { get; }
 
+        object? LastQuery { get; set; }
+
+        object? RegenLastQuery(); 
+
         /// <summary>
         /// Clear the prompt of all messages
         /// </summary>

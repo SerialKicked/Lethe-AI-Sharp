@@ -568,7 +568,26 @@ namespace LetheAISharp.LLM
             if (History.CurrentSession.Messages.Count == 0 || History.LastMessage()?.Role != AuthorRole.Assistant || Client == null || PromptBuilder == null)
                 return;
             History.RemoveLast(true);
-            if (PromptBuilder.Count == 0)
+            var oldquery = (PromptBuilder.LastQuery != null) ? PromptBuilder.RegenLastQuery() : null;
+
+            // last prompt doesn't understand change in sampler settings yet, so it's disabled until fixed.
+            if (oldquery != null)
+            {
+                using var _ = await AcquireModelSlotAsync(CancellationToken.None).ConfigureAwait(false);
+                if (Status == SystemStatus.Busy)
+                    return;
+                Status = SystemStatus.Busy;
+                ResetStreamingState();
+                if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart) && !ToolCallsLoaded && Client.AllowPrefill)
+                {
+                    var prefill = Instruct.GetThinkPrefill();
+                    if (!string.IsNullOrWhiteSpace(prefill))
+                        Client_StreamingMessageReceived(_, new LLMTokenStreamingEventArgs(prefill, null, null));
+                }
+                RaiseOnFullPromptReady(PromptBuilder.PromptToText());
+                await Client.GenerateTextStreaming(oldquery).ConfigureAwait(false);
+            }
+            else if (PromptBuilder.Count == 0)
             {
                 await StartGeneration(new SingleMessage(AuthorRole.Assistant, string.Empty)).ConfigureAwait(false);
             }
@@ -1196,6 +1215,8 @@ namespace LetheAISharp.LLM
             Status = SystemStatus.Busy;
 
             var genparams = await GenerateFullPrompt(message, pluginmessage).ConfigureAwait(false);
+            PromptBuilder.LastQuery = (message.Role != AuthorRole.User) ? genparams : null;
+            
 
             ResetStreamingState();
             if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart) && !ToolCallsLoaded && Client.AllowPrefill && message.Role == AuthorRole.Assistant)

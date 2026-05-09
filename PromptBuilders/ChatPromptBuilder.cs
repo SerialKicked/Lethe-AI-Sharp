@@ -19,6 +19,8 @@ namespace LetheAISharp
         private readonly List<SingleMessage> _prompt = [];
         private OpenAI.JsonSchema? _currentSchema = null;
         private List<string> imagefilepath = [];
+        
+        public object? LastQuery { get; set; }
 
         public int Count => _prompt.Count;
 
@@ -79,6 +81,21 @@ namespace LetheAISharp
             }
             return total;
         }
+
+        public object? RegenLastQuery()
+        {
+            if (LastQuery is null || LastQuery is not ChatRequest req)
+                return null;
+            double temp = (LLMEngine.ForceTemperature >= 0) ? LLMEngine.ForceTemperature : LLMEngine.Sampler.Temperature;
+            int? setseed = LLMEngine.Sampler.Sampler_seed != -1 ? LLMEngine.Sampler.Sampler_seed : LLMEngine.RNG.Next(int.MaxValue);
+
+            req.Seed = setseed;
+            req.TopP = LLMEngine.Sampler.Top_p;
+            req.FrequencyPenalty = LLMEngine.Client is OpenAIAdapter ? LLMEngine.Sampler.Rep_pen - 1 : null;
+            req.ImportFromGenerationInput(LLMEngine.Sampler);
+            return req;
+        }
+
 
         public int InsertMessage(int index, AuthorRole role, string message)
         {
@@ -206,7 +223,7 @@ namespace LetheAISharp
                 }
             }
 
-            var isLlamaCpp = LLMEngine.Client is LlamaCppAdapter;
+            var DoFrequence = LLMEngine.Client is OpenAIAdapter;
             var prefill = overridePrefill ?? (LLMEngine.Instruct.PrefillThinking || LLMEngine.IsGroupConversation);
 
             if (LLMEngine.Client?.AllowPrefill == false && LLMEngine.Settings.BackendChatAllowPrefill != true)
@@ -231,7 +248,7 @@ namespace LetheAISharp
                     tools: LLMEngine.ToolManager.GetToolList(),
                     toolChoice: "auto",
                     topP: LLMEngine.Sampler.Top_p,
-                    frequencyPenalty: isLlamaCpp ? null : LLMEngine.Sampler.Rep_pen - 1,
+                    frequencyPenalty: DoFrequence ? LLMEngine.Sampler.Rep_pen - 1 : null,
                     seed: setseed,
                     user: LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt ? LLMEngine.User.Name : null,
                     stops: [.. LLMEngine.Instruct.GetStoppingStrings(LLMEngine.User, LLMEngine.Bot)],
@@ -254,7 +271,7 @@ namespace LetheAISharp
             {
                 var req = new ChatRequest(finalprompt,
                     topP: LLMEngine.Sampler.Top_p,
-                    frequencyPenalty: isLlamaCpp ? null : LLMEngine.Sampler.Rep_pen - 1,
+                    frequencyPenalty: DoFrequence ? LLMEngine.Sampler.Rep_pen - 1 : null,
                     seed: setseed,
                     user: LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt ? LLMEngine.User.Name : null,
                     stops: [.. LLMEngine.Instruct.GetStoppingStrings(LLMEngine.User, LLMEngine.Bot)],
@@ -285,6 +302,7 @@ namespace LetheAISharp
 
         public void Clear()
         {
+            LastQuery = null;
             _prompt.Clear();
         }
 

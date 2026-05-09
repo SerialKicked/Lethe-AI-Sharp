@@ -253,7 +253,7 @@ namespace OpenAI.Chat
         /// </summary>
         [JsonPropertyName("frequency_penalty")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public double? FrequencyPenalty { get; }
+        public double? FrequencyPenalty { get; set; }
 
         /// <summary>
         /// Modify the likelihood of specified tokens appearing in the completion.
@@ -305,7 +305,7 @@ namespace OpenAI.Chat
         /// </summary>
         [JsonPropertyName("max_completion_tokens")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public int? MaxCompletionTokens { get; }
+        public int? MaxCompletionTokens { get; set; }
 
         /// <summary>
         /// How many chat completion choices to generate for each input message.<br/>
@@ -343,7 +343,7 @@ namespace OpenAI.Chat
         /// </summary>
         [JsonPropertyName("presence_penalty")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public double? PresencePenalty { get; }
+        public double? PresencePenalty { get; set; }
 
         [JsonPropertyName("response_format")]
         [JsonConverter(typeof(TextResponseFormatConfigurationConverter))]
@@ -372,7 +372,7 @@ namespace OpenAI.Chat
         /// </summary>
         [JsonPropertyName("seed")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public int? Seed { get; }
+        public int? Seed { get; set;  }
 
         /// <summary>
         /// Specifies the latency tier to use for processing the request. This parameter is relevant for customers subscribed to the scale tier service:<br/>
@@ -415,7 +415,7 @@ namespace OpenAI.Chat
         /// </summary>
         [JsonPropertyName("temperature")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public double? Temperature { get; }
+        public double? Temperature { get; set;  }
 
         /// <summary>
         /// An alternative to sampling with temperature, called nucleus sampling,
@@ -426,7 +426,7 @@ namespace OpenAI.Chat
         /// </summary>
         [JsonPropertyName("top_p")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public double? TopP { get; }
+        public double? TopP { get; set;  }
 
         /// <summary>
         /// A list of tools the model may call. Currently, only functions are supported as a tool.
