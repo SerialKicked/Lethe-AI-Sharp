@@ -363,7 +363,7 @@ namespace LetheAISharp.Memory
         /// <see langword="false"/>.</returns>
         public bool CheckKeywords(string message)
         {
-            if (!Enabled || (KeyWordsMain.Count == 0 && KeyWordsSecondary.Count == 0) || string.IsNullOrEmpty(message))
+            if (!IsKeyword || string.IsNullOrEmpty(message))
                 return false;
 
             var comparison = CaseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase;
@@ -383,5 +383,7 @@ namespace LetheAISharp.Memory
                 _ => false
             };
         }
+
+        public bool IsKeyword => Enabled && (KeyWordsMain.Count > 0 || KeyWordsSecondary.Count > 0);
     }
 }

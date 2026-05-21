@@ -286,20 +286,13 @@ namespace LetheAISharp.Memory
             }
 
             var brainmemories = Memories.FindAll(m => m.Added <= DateTime.Now && m.Insertion == MemoryInsertion.Trigger && m.EmbedSummary.Length > 0 && !LLMEngine.Settings.DisableRAG.Contains(m.Category));
-            foreach (var doc in brainmemories)
-            {
-                vectors.Add(doc);
-            }
+            vectors.AddRange(brainmemories);
 
             foreach (var world in Owner.MyWorlds)
             {
                 if (!world.DoEmbeds)
                     continue;
-                foreach (var entry in world.Entries)
-                {
-                    if (entry.Enabled && entry.EmbedSummary?.Length > 0)
-                        vectors.Add(entry);
-                }
+                vectors.AddRange(world.Entries.FindAll(e => e.Enabled && e.EmbedSummary?.Length > 0));
             }
 
             try
@@ -337,51 +330,64 @@ namespace LetheAISharp.Memory
             // Check for RAG entries and refresh the textual inserts
             target.DecreaseDuration();
 
-            var searchmessage = string.IsNullOrWhiteSpace(searchstring) ?
-                (Owner.History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty) : searchstring;
-            searchmessage = Owner.ReplaceMacros(searchmessage);
-
             var ragentries = ragResCount == -1 ? LLMEngine.Settings.RAGMaxEntries : ragResCount;
             var wientries = ragResCount == -1 ? LLMEngine.Settings.WorldInfoMaxEntries : ragResCount;
 
             // Embed the search message once so both standard RAG and fact retrieval can reuse it.
-            float[] searchEmbed = [];
-            if (LLMEngine.Settings.RAGEnabled)
-            {
-                var searchForEmbed = LLMEngine.Settings.RAGConvertTo3rdPerson ? searchmessage.ConvertToThirdPerson() : searchmessage;
-                searchEmbed = await EmbedTools.EmbeddingText(searchForEmbed).ConfigureAwait(false);
+            var searchmessage = string.IsNullOrWhiteSpace(searchstring) ? (Owner.History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty) : searchstring;
+            searchmessage = Owner.ReplaceMacros(searchmessage);
+            var searchString = LLMEngine.Settings.RAGConvertTo3rdPerson ? searchmessage.ConvertToThirdPerson() : searchmessage;
+            var searchEmbed = await EmbedTools.EmbeddingText(searchString).ConfigureAwait(false);
 
-                var search = Search(searchEmbed, ragentries, ragDistance);
-                target.AddMemories(search);
-            }
 
-            // Fact-boosted retrieval: compare against short fact embeddings for two-hop memory access.
-            // Facts embed cleanly as single-sentence statements, giving much better recall than comparing
-            // user input directly against long multi-topic session summaries.
-            if (LLMEngine.Settings.RAGEnabled && LLMEngine.Settings.FactRetrievalEnabled &&
-                searchEmbed.Length > 0 && ExtractedFacts.Count > 0)
+            if (LLMEngine.Settings.RAGEnabled && searchEmbed.Length > 0)
             {
-                var factThreshold = LLMEngine.Settings.FactRetrievalThreshold;
-                foreach (var fact in ExtractedFacts)
+                var ragfindings = new List<VaultResult>();
+
+                // Add memories from direct RAG search
+                var foundstuff = await Search(searchString, ragentries, ragDistance);
+                ragfindings.AddRange(foundstuff);
+
+                // Fact-boosted retrieval: compare against short fact embeddings for two-hop memory access.
+                // Facts embed cleanly as single-sentence statements, giving much better recall than comparing
+                // user input directly against long multi-topic session summaries.
+                if (LLMEngine.Settings.FactRetrievalEnabled && ExtractedFacts.Count > 0)
                 {
-                    if (fact.Superseded || fact.EmbedSummary.Length == 0 || fact.SourceMemories.Count == 0)
-                        continue;
-                    var dist = EmbedTools.GetDistance(searchEmbed, fact.EmbedSummary);
-                    if (dist > factThreshold)
-                        continue;
-                    // Fact matched — pull in its source MemoryUnits directly by GUID
-                    foreach (var sourceGuid in fact.SourceMemories)
+                    var factThreshold = LLMEngine.Settings.FactRetrievalThreshold;
+                    foreach (var fact in ExtractedFacts)
                     {
-                        if (target.Contains(sourceGuid))
+                        if (fact.Superseded || fact.EmbedSummary.Length == 0 || fact.SourceMemories.Count == 0)
                             continue;
-                        var mem = GetMemoryByID(sourceGuid);
-                        if (mem != null)
-                            target.AddInsert(mem);
+                        var dist = EmbedTools.GetDistance(searchEmbed, fact.EmbedSummary);
+                        if (dist > factThreshold)
+                            continue;
+                        // Fact matched — pull in its source MemoryUnits directly by GUID
+                        foreach (var sourceGuid in fact.SourceMemories)
+                        {
+                            var mem = GetMemoryByID(sourceGuid);
+                            if (mem != null && mem.Insertion != MemoryInsertion.None) 
+                            {
+                                if (!ragfindings.Contains(mem))
+                                    ragfindings.Add(new VaultResult(mem, dist));
+                                else
+                                {
+                                    // If the memory is already in the findings from direct RAG, check if this fact match is closer and update the distance
+                                    var existing = ragfindings.Find(r => r.Memory == mem);
+                                    if (existing != null && dist < existing.Distance)
+                                        existing.Distance = dist;
+                                }
+                            }
+                        }
                     }
                 }
+                ragfindings.Sort((a, b) => a.Distance.CompareTo(b.Distance));
+                // keep only ragentries first entries
+                if (ragfindings.Count > ragentries)
+                    ragfindings = [.. ragfindings.Take(ragentries)];
+                target.AddMemories(ragfindings);
             }
 
-            // add sticky
+            // always add sticky
             var stickies = Memories.FindAll(e => e.Sticky && e.Added <= DateTime.Now && !DisableRAG.Contains(e.Category));
             foreach (var item in stickies)
             {
@@ -760,27 +766,6 @@ namespace LetheAISharp.Memory
         public List<MemoryUnit> GetMemories(MemoryType? category)
         {
             return Memories.FindAll(m => category == null || m.Category == category);
-        }
-
-        /// <summary>
-        /// Searches the memory vault for the closest matches to the specified embedding.
-        /// </summary>
-        /// <remarks>If the memory vault is uninitialized or empty, it will be reloaded before performing
-        /// the search.</remarks>
-        /// <param name="embed">An array of floating-point values representing the embedding to search for.</param>
-        /// <param name="count">The maximum number of results to return. Must be greater than zero.</param>
-        /// <param name="maxDist">The maximum allowable distance for a result to be considered a match.</param>
-        /// <returns>A list of <see cref="VaultResult"/> objects representing the closest matches to the specified embedding. 
-        /// Returns an empty list if no matches are found or if the memory vault is empty.</returns>
-        public virtual List<VaultResult> Search(float[] embed, int count, float maxDist)
-        {
-            if (MindPalace is null || MindPalace.Count == 0)
-            {
-                ReloadMemories();
-                if (MindPalace!.Count == 0)
-                    return [];
-            }
-            return MindPalace.Search(embed, count, maxDist);
         }
 
         /// <summary>

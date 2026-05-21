@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -34,6 +35,11 @@ namespace LetheAISharp.Memory
     {
         public MemoryUnit Memory { get; set; } = memory;
         public float Distance { get; set; } = dist;
+    }
+
+    public static class VaultResultExtensions
+    {
+        public static bool Contains(this List<VaultResult> list, MemoryUnit mem) => list.Find(e => e.Memory == mem) != null;
     }
 
     public class MemoryVault
