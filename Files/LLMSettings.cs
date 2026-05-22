@@ -317,7 +317,7 @@ namespace LetheAISharp.Files
         [Description("Allow keyword-activated contextual information to be inserted in the prompt (see WorldInfo / Lorebooks).\n" +
             "When enabled, the system will insert relevant information based on keywords found in the user input, providing dynamic context that can\n" +
             "enhance the model's understanding and response generation.")]
-        public bool AllowWorldInfo { get; set; } = true;
+        public bool RAGKeywordEnabled { get; set; } = true;
 
         #endregion
 
@@ -326,8 +326,8 @@ namespace LetheAISharp.Files
 
         /// <summary> Toggle RAG functionalities on/off </summary>
         [Description("Toggle RAG functionalities on/off.\n" +
-            "When enabled, the system will retrieve relevant information based on text embedding similarity, allowing the model\n" +
-            "to access past interactions and contextual data that may not be explicitly included in the prompt.")]
+            "When enabled, the system will retrieve relevant information based on a variety of systems, including text embedding similarity,\n" +
+            "allowing the model to access past interactions and contextual data that may not be explicitly included in the prompt.")]
         public bool RAGEnabled { get; set; } = true;
 
         /// <summary> 
@@ -355,16 +355,16 @@ namespace LetheAISharp.Files
         public bool RAGConvertTo3rdPerson { get; set; } = true;
 
         /// <summary> Maximum number of entries to be retrieved with RAG </summary>
-        [Description("Maximum number of entries to be retrieved with RAG.\n" +
+        [Description("Maximum number of entries to be retrieved with embedding distance RAG.\n" +
             "This limits the number of relevant past interactions and contextual data that be inserted into the prompt at the same time,\n" +
             "helping to manage token usage and maintain focus on the most pertinent information.")]
         public int RAGMaxEntries { get; set; } = 3;
 
-        /// <summary> Maximum number of entries to be retrieved from WorldInfo </summary>
-        [Description("Maximum number of entries to be retrieved from Lorebooks.\n" +
+        /// <summary> Maximum number of entries to be retrieved from RAG keyword searches </summary>
+        [Description("Maximum number of keyword activated entries to be retrieved from RAG keyword searches.\n" +
             "This limits the amount of keyword-activated contextual information that can be included in the prompt, ensuring that only the most relevant\n" +
             "information is provided to the model based on the user's input.")]
-        public int WorldInfoMaxEntries { get; set; } = 3;
+        public int RAGKeywordMaxEntries { get; set; } = 3;
 
         /// <summary> Index at which RAG entries will be inserted in the chatlog. -1 to insert in system prompt. </summary>
         [Description("Index at which RAG entries will be inserted in the chatlog. Set to -1 to insert in the system prompt.\n" +

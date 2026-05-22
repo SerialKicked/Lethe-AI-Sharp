@@ -25,6 +25,88 @@ namespace LetheAISharp
         public bool ParenthesizeToItalic = parenthesizeToItalic;
     }
 
+    public static class EmojiFilter
+    {
+        // Don't ask. It works.
+        private const string EmojiBasePattern =
+            @"(?:" +
+            @"[\u00A9\u00AE\u203C\u2049\u2122\u2139\u3030\u303D\u3297\u3299]" +
+            @"|[\u2194-\u2199\u21A9-\u21AA]" +
+            @"|[\u231A-\u231B\u2328\u23CF\u23E9-\u23F3\u23F8-\u23FA\u24C2]" +
+            @"|[\u25AA-\u25AB\u25B6\u25C0\u25FB-\u25FE]" +
+            @"|[\u2600-\u2604\u260E\u2611\u2614-\u2615\u2618\u261D\u2620\u2622-\u2623\u2626\u262A\u262E-\u262F\u2638-\u263A]" +
+            @"|[\u2640\u2642\u2648-\u2653\u265F-\u2660\u2663\u2665-\u2666\u2668\u267B\u267E-\u267F]" +
+            @"|[\u2692-\u2697\u2699\u269B-\u269C\u26A0-\u26A1\u26A7\u26AA-\u26AB\u26B0-\u26B1\u26BD-\u26BE\u26C4-\u26C5\u26C8\u26CE\u26CF\u26D1\u26D3-\u26D4\u26E9-\u26EA\u26F0-\u26F5\u26F7-\u26FA\u26FD]" +
+            @"|[\u2702\u2705\u2708-\u270D\u270F\u2712\u2714\u2716\u271D\u2721\u2728\u2733-\u2734\u2744\u2747\u274C\u274E\u2753-\u2755\u2757\u2763-\u2764\u2795-\u2797\u27A1\u27B0\u27BF]" +
+            @"|[\u2934-\u2935\u2B05-\u2B07\u2B1B-\u2B1C\u2B50\u2B55]" +
+            @"|\uD83C[\uDC04\uDCCF\uDD70-\uDD71\uDD7E-\uDD7F\uDE02\uDE1A\uDE2F\uDE32-\uDE3A\uDE50-\uDE51\uDF00-\uDFFF]" +
+            @"|\uD83D[\uDC00-\uDE4F\uDE80-\uDEF6\uDF00-\uDFFF]" +
+            @"|\uD83E[\uDD00-\uDDFF\uDE70-\uDEFF]" +
+            @")";
+        // same, it just works (tm)
+        private static readonly Regex EmojiPattern = new Regex(
+            @"(?:[0-9#*]\uFE0F?\u20E3|(?:\uD83C[\uDDE6-\uDDFF]){2}|" +
+            EmojiBasePattern +
+            @"(?:\uFE0F)?(?:\uD83C[\uDFFB-\uDFFF])?(?:\u200D" + EmojiBasePattern + @"(?:\uFE0F)?(?:\uD83C[\uDFFB-\uDFFF])?)*)",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant
+        );
+
+        public static string RemoveAllEmojis(string input)
+            => EmojiPattern.Replace(input, string.Empty);
+
+        public static string RemovePercentageOfEmojis(string input, float removalChance)
+        {
+            return EmojiPattern.Replace(input, m =>
+                LLMEngine.RNG.NextSingle() < removalChance ? string.Empty : m.Value);
+        }
+
+        public static string RemoveEscalatingEmojis(string input, float baseChance = 0.0f, float escalation = 0.25f)
+        {
+            int count = 0;
+            return EmojiPattern.Replace(input, m =>
+            {
+                float chance = Math.Min(1.0f, baseChance + escalation * count);
+                count++;
+                return LLMEngine.RNG.NextSingle() < chance ? string.Empty : m.Value;
+            });
+        }
+
+        public static string RemoveEscalatingPerParagraphEmojis(string input, float baseChance = 0.0f, float escalation = 0.25f)
+        {
+            // Split into paragraphs, preserving the separators so we can rejoin losslessly
+            string[] paragraphs = input.Split("\n\n");
+            int paragraphIndex = 0;
+
+            var result = new System.Text.StringBuilder();
+            foreach (string paragraph in paragraphs)
+            {
+                if (string.IsNullOrWhiteSpace(paragraph)) 
+                { 
+                    result.Append("\n\n"); 
+                    continue; 
+                }
+                paragraphIndex++; // 1-based so first paragraph multiplier = 1
+                int emojiCount = 0;
+
+                string processed = EmojiPattern.Replace(paragraph, m =>
+                {
+                    float chance = Math.Min(1.0f, baseChance * paragraphIndex + escalation * emojiCount);
+                    emojiCount++;
+                    return LLMEngine.RNG.NextSingle() < chance ? string.Empty : m.Value;
+                });
+
+                result.Append(processed);
+                result.Append("\n\n");
+            }
+
+            // Trim the trailing newline we added if the original didn't end with one
+            if (!input.EndsWith("\n\n"))
+                result.Length -= 2;
+
+            return result.ToString();
+        }
+    }
+
     public static class StringExtensions
     {
 

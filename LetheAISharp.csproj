@@ -16,15 +16,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="HNSW" Version="26.1.63669" />
-    <PackageReference Include="LLamaSharp" Version="0.26.0" />
-    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.26.0" />
-    <PackageReference Include="LLamaSharp.Backend.Cuda12" Version="0.26.0" />
-    <PackageReference Include="LLamaSharp.Backend.Vulkan" Version="0.26.0" />
-    <PackageReference Include="MessagePack" Version="3.1.4" />
+    <PackageReference Include="HNSW" Version="26.4.177" />
+    <PackageReference Include="LLamaSharp" Version="0.27.0" />
+    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.27.0" />
+    <PackageReference Include="LLamaSharp.Backend.Cuda12" Version="0.27.0" />
+    <PackageReference Include="LLamaSharp.Backend.Vulkan" Version="0.27.0" />
+    <PackageReference Include="MessagePack" Version="3.1.6" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Newtonsoft.Json.Schema" Version="4.0.1" />
-    <PackageReference Include="SharpToken" Version="2.0.4" />
+    <PackageReference Include="SharpToken" Version="2.0.6" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
   <ItemGroup>

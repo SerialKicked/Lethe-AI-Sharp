@@ -244,10 +244,10 @@ For thinking/reasoning models (e.g., Qwen3 with thinking mode). When `true`, the
 
 ---
 
-### `AllowWorldInfo`
+### `RAGKeywordEnabled`
 **Type:** `bool` | **Default:** `true`
 
-Enables the WorldInfo system: keyword-activated text snippets that get automatically injected into the prompt when their trigger keywords appear in the conversation. See the persona documentation for details on how to define WorldInfo entries.
+Enables keyword detection to retrieve memories from the Brain and WorldInfo classes.
 
 ---
 
@@ -480,10 +480,10 @@ Maximum number of RAG entries retrieved from the memory vault per query. Increas
 
 ---
 
-### `WorldInfoMaxEntries`
+### `RAGKeywordMaxEntries`
 **Type:** `int` | **Default:** `3`
 
-Maximum number of WorldInfo entries that can be injected into the prompt at once (when `AllowWorldInfo` is `true`).
+Maximum number of keyword-triggered entries that can be injected into the prompt at once (when `RAGKeywordEnabled` is `true`).
 
 ---
 
@@ -631,7 +631,7 @@ When `true`, a note identifying the currently speaking persona is prepended insi
 | `ScenarioOverride` | `string` | `""` | Replaces the character's scenario field |
 | `StopGenerationOnFirstParagraph` | `bool` | `false` | Stop generating after the first paragraph |
 | `DisableThinking` | `bool` | `false` | Suppress thinking block on reasoning models |
-| `AllowWorldInfo` | `bool` | `true` | Enable keyword-triggered WorldInfo snippets |
+| `RAGKeywordEnabled` | `bool` | `true` | Enable keyword-triggered memory retrieval |
 | `MoveAllInsertsToSysPrompt` | `bool` | `false` | Force all RAG/WI/memory inserts into the system prompt |
 | `DisableDateAndMoodIfNotLastSession` | `bool` | `true` | Suppress date/mood modifiers when viewing historical sessions |
 | `AddNamesToPrompt` | `bool` | `false` | Prefix each message with the speaker's name |

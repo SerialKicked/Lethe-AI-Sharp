@@ -185,6 +185,10 @@ namespace LetheAISharp
             var max = LLMEngine.MaxContextLength - (responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride) - 15;
             while (total > max && workingprompt.Count > 1)
             {
+                if (total > max + 2048)
+                {
+                    workingprompt.RemoveAt(1);
+                }
                 workingprompt.RemoveAt(1);
                 total = GetTokenUsage(workingprompt);
             }

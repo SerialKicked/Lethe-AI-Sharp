@@ -331,7 +331,7 @@ namespace LetheAISharp.Memory
             target.DecreaseDuration();
 
             var ragentries = ragResCount == -1 ? LLMEngine.Settings.RAGMaxEntries : ragResCount;
-            var wientries = ragResCount == -1 ? LLMEngine.Settings.WorldInfoMaxEntries : ragResCount;
+            var wientries = ragResCount == -1 ? LLMEngine.Settings.RAGKeywordMaxEntries : ragResCount;
 
             // Embed the search message once so both standard RAG and fact retrieval can reuse it.
             var searchmessage = string.IsNullOrWhiteSpace(searchstring) ? (Owner.History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty) : searchstring;
@@ -343,7 +343,6 @@ namespace LetheAISharp.Memory
             if (LLMEngine.Settings.RAGEnabled && searchEmbed.Length > 0)
             {
                 var ragfindings = new List<VaultResult>();
-
                 // Add memories from direct RAG search
                 var foundstuff = await Search(searchString, ragentries, ragDistance);
                 ragfindings.AddRange(foundstuff);
@@ -380,23 +379,21 @@ namespace LetheAISharp.Memory
                         }
                     }
                 }
+                // sort by distance and keep only X first entries
                 ragfindings.Sort((a, b) => a.Distance.CompareTo(b.Distance));
-                // keep only ragentries first entries
                 if (ragfindings.Count > ragentries)
                     ragfindings = [.. ragfindings.Take(ragentries)];
                 target.AddMemories(ragfindings);
             }
 
-            // always add sticky
+            // always add sticky stuff
             var stickies = Memories.FindAll(e => e.Sticky && e.Added <= DateTime.Now && !DisableRAG.Contains(e.Category));
             foreach (var item in stickies)
             {
-                if (!target.Contains(item))
-                    target.AddInsert(item);
+                target.AddInsert(item);
             }
 
-            // Check for keyword-activated world info entries
-            if (LLMEngine.Settings.AllowWorldInfo)
+            if (LLMEngine.Settings.RAGKeywordEnabled)
             {
                 var _currentWorldEntries = new List<MemoryUnit>();
 
@@ -434,7 +431,6 @@ namespace LetheAISharp.Memory
                     }
                 }
 
-                var usedguid = target.GetGuids();
                 // sort by decreasing prio (higher = first)
                 _currentWorldEntries.Sort((a, b) => 
                 {
