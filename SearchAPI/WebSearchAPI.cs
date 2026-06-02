@@ -3,6 +3,7 @@ using LetheAISharp.GBNF;
 using LetheAISharp.LLM;
 using Microsoft.Extensions.Logging;
 using OpenAI.Responses;
+using System.Text;
 
 namespace LetheAISharp.SearchAPI
 {
@@ -77,6 +78,28 @@ namespace LetheAISharp.SearchAPI
             public string FullContent { get; set; } = string.Empty;
             public bool ContentExtracted { get; set; }
             public string SearchProvider { get; set; } = string.Empty;
+
+            public string ToMarkDown(bool includeTitle = true, bool includeLink = true)
+            {
+                var str = new StringBuilder();
+                if (includeTitle)
+                {
+                    str.AppendLinuxLine($"# {Title}");
+                    str.AppendLinuxLine();
+                }
+                if (includeLink)
+                {
+                    str.AppendLinuxLine($"[Source]({Url})");
+                    str.AppendLinuxLine();
+                }
+                str.AppendLinuxLine(Description);
+                if (ContentExtracted)
+                {
+                    str.AppendLinuxLine();
+                    str.AppendLinuxLine(FullContent);
+                }
+                return str.ToString();
+            }
         }
 
         public async Task<List<EnrichedSearchResult>> SearchAndEnrichAsync(string query, int maxResults = 5, bool extractContent = true)
