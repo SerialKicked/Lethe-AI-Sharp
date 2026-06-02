@@ -147,7 +147,7 @@ namespace LetheAISharp.API
                 {
                     if (!string.IsNullOrEmpty(item.Url) && string.IsNullOrEmpty(item.FullContent))
                     {
-                        item.FullContent = await webSearchClient.ExtractContentWithJinaAsync(item.Url).ConfigureAwait(false);
+                        item.FullContent = await webSearchClient.ExtractContentLocallyAsync(item.Url).ConfigureAwait(false);
                     }
                     item.ContentExtracted = !string.IsNullOrEmpty(item.FullContent);
                 }

@@ -2,6 +2,7 @@
 using LetheAISharp.GBNF;
 using LetheAISharp.LLM;
 using Microsoft.Extensions.Logging;
+using OpenAI;
 using OpenAI.Responses;
 using System.Text;
 
@@ -125,7 +126,7 @@ namespace LetheAISharp.SearchAPI
 
                     if (extractContent && !string.IsNullOrEmpty(result.Url) && WebSearchAPI.SearchAPI != BackendSearchAPI.DuckDuckGo)
                     {
-                        enriched.FullContent = await ExtractContentWithJinaAsync(result.Url).ConfigureAwait(false);
+                        enriched.FullContent = await ExtractContentLocallyAsync(result.Url).ConfigureAwait(false);
                         enriched.ContentExtracted = !string.IsNullOrEmpty(enriched.FullContent);
                     }
 
@@ -141,6 +142,43 @@ namespace LetheAISharp.SearchAPI
             {
                 LLMEngine.Logger?.LogError(ex, "[WebSearch API] Error in SearchAndEnrichAsync: {Message}", ex.Message);
                 return [];
+            }
+        }
+
+        public async Task<string> ExtractContentLocallyAsync(string url)
+        {
+            var article = await SmartReader.Reader.ParseArticleAsync(url);
+            if (article.IsReadable)
+            {
+                var cleanHtml = article.Content; // nav/ads stripped
+                var converter = new ReverseMarkdown.Converter(new ReverseMarkdown.Config()
+                {
+                    RemoveComments = true,
+                    CleanupUnnecessarySpaces = true,
+                    Base64Images = ReverseMarkdown.Config.Base64ImageHandling.Skip,
+                });
+                var markdown = converter.Convert(article.Content);
+                // content is in markdown, remove all links completely (including the text or image or whatever is linked)
+                markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"\[.*?\]\(.*?\)", string.Empty); // Remove links
+                // remove lines that contains no text, no letter a-Z
+                markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"^\s*$\n|\r", string.Empty, System.Text.RegularExpressions.RegexOptions.Multiline);
+                // remove lines with only a * (and leading/trailing spaces)
+                markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"^\s*\*\s*$\n|\r", string.Empty, System.Text.RegularExpressions.RegexOptions.Multiline);
+                // remove special characters like : < > | \ / that can cause issues in file names or markdown rendering
+                markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"[:<>|\\\/]", " ");
+
+
+                if (LLMEngine.Settings.WebSearchDetailedMaxLength > 0 && markdown.Length > LLMEngine.Settings.WebSearchDetailedMaxLength)
+                {
+                    markdown = markdown[..LLMEngine.Settings.WebSearchDetailedMaxLength] + "... (cut content)";
+                    LLMEngine.Logger?.LogInformation("[WebSearch API] Jina extraction for {Url} was too long and got truncated to {MaxLength} characters", url, LLMEngine.Settings.WebSearchDetailedMaxLength);
+                }
+
+                return markdown;
+            }
+            else
+            {
+                return await ExtractContentWithJinaAsync(url).ConfigureAwait(false);
             }
         }
 
