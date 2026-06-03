@@ -412,11 +412,13 @@ namespace LetheAISharp.Agent
 
         internal static void LoadDefaultActions()
         {
-            RegisterAction(new WebSearchAction());
-            RegisterAction(new MergeSearchResultsAction());
+            RegisterAction(new CalendarUpdateAction());
+            RegisterAction(new DeepSearchAction());
             RegisterAction(new FindResearchTopicsAction());
-            RegisterAction(new SessionAnalysisAction());
             RegisterAction(new FindSingleTopicSearchAction());
+            RegisterAction(new MergeSearchResultsAction());
+            RegisterAction(new SessionAnalysisAction());
+            RegisterAction(new WebSearchAction());
         }
 
         public static void RegisterAction<TResult, TParam>(IAgentAction<TResult, TParam> action)

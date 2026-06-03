@@ -55,9 +55,6 @@ namespace LetheAISharp.Agent.Research
             if (string.IsNullOrWhiteSpace(question))
                 return new DeepResearchResult() { Success = false, Error = "Research question cannot be empty.", Question = question };
 
-            if (LLMEngine.Status != SystemStatus.Ready)
-                return new DeepResearchResult() { Success = false, Error = "LLMEngine must be ready before running deep research.", Question = question };
-
             if (!LLMEngine.SupportsWebSearch)
                 return new DeepResearchResult() { Success = false, Error = "The current backend does not support web search.", Question = question };
 
@@ -142,8 +139,8 @@ namespace LetheAISharp.Agent.Research
                 FinalReport = finalReport,
                 CompletedRounds = EstimateCompletedRounds(),
                 Duration = DateTime.UtcNow - _startedUtc,
-                QueriesUsed = _queriesUsed.ToList(),
-                UrlsVisited = _urlsVisited.ToList(),
+                QueriesUsed = [.. _queriesUsed],
+                UrlsVisited = [.. _urlsVisited],
                 Findings = [.. _findings]
             };
 
@@ -158,53 +155,41 @@ namespace LetheAISharp.Agent.Research
         /// </summary>
         private async Task<DeepSearchPlan> CreateResearchPlanAsync(string question, CancellationToken ct)
         {
-            var prompt = $"""
-                Before searching, you need to analyze this question and create a research plan.
+            var searchplan = new DeepSearchPlan();
+            var meta = new SessionMetaInfo();
 
-                **Question:** {question}
-                """ 
-                +
-                """
-                Break this question down:
-                1. What are the key sub-topics that need to be covered for a comprehensive answer?
-                2. What specific data points, facts, or perspectives should we look for?
-                3. What would a complete, high-quality answer include?
-
-                Return a JSON object with:
-                - "sub_questions": Array of 3-6 specific sub-questions to investigate
-                - "key_topics": Array of key topics/angles to cover
-                - "success_criteria": One sentence describing what a complete answer looks like
-
-                Example:
-                { 
-                  "sub_questions": ["What is the cost of living in X?", "How is the healthcare system?"],
-                  "key_topics": ["economy", "healthcare", "safety", "culture"],
-                  "success_criteria": "A balanced comparison covering cost, quality of life, and practical considerations."
-                }
-                """;
-
-            var res = new DeepSearchPlan();
+            var prompt = new StringBuilder("You are a research strategist designed to overview deep web searches.");
+            prompt.AppendLinuxLine();
+            prompt.AppendLinuxLine($"Before searching, you need to analyze the question and create a research plan.");
+            prompt.AppendLinuxLine();
+            prompt.AppendLinuxLine($"**Question:** {question}");
+            prompt.AppendLinuxLine();
+            prompt.AppendLinuxLine($"Your task is to break down the question:");
+            prompt.AppendLinuxLine("1. What are the key sub-topics that need to be covered for a comprehensive answer?");
+            prompt.AppendLinuxLine("2. What specific data points, facts, or perspectives should we look for?");
+            prompt.AppendLinuxLine("3. What would a complete, high-quality answer include?");
+            prompt.AppendLinuxLine();
 
             var pb = LLMEngine.GetPromptBuilder();
             pb.Clear();
 
             // Keep the system prompt simple here.
             // You can make this smarter later if you want category-specific behavior.
-            pb.AddMessage(AuthorRole.System, "You are a research strategist.");
-            pb.AddMessage(AuthorRole.User, prompt);
-            await pb.SetStructuredOutput(pb);
-
-            var query = pb.PromptToQuery();
+            pb.AddMessage(AuthorRole.System, prompt.ToString());
+            pb.AddMessage(AuthorRole.User, searchplan.GetQuery());
+            await pb.SetStructuredOutput(searchplan);
+            var query = pb.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, 2048);
             var raw = await LLMEngine.SimpleQuery(query, ct).ConfigureAwait(false);
+            raw = raw.RemoveThinkingBlocks();
 
             try
             {
-                res = JsonConvert.DeserializeObject<DeepSearchPlan>(raw);
+                searchplan = JsonConvert.DeserializeObject<DeepSearchPlan>(raw);
             }
             finally
             {
             }
-            return res ?? new DeepSearchPlan();
+            return searchplan ?? new DeepSearchPlan();
         }
 
         private string Getinstruction(int round)
@@ -262,9 +247,9 @@ namespace LetheAISharp.Agent.Research
             // You can make this smarter later if you want category-specific behavior.
             pb.AddMessage(AuthorRole.System, "You are a high-quality research assistant.");
             pb.AddMessage(AuthorRole.User, prompt);
-            await pb.SetStructuredOutput(pb);
+            await pb.SetStructuredOutput(res);
 
-            var query = pb.PromptToQuery();
+            var query = pb.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, 2048);
             var raw = await LLMEngine.SimpleQuery(query, ct).ConfigureAwait(false);
 
             try
@@ -275,7 +260,7 @@ namespace LetheAISharp.Agent.Research
             {
             }
 
-            var parsed = res?.web_search ?? [];
+            var parsed = res?.WebQueries ?? [];
 
             // De-duplicate across all previous rounds
             var unique = parsed
@@ -391,7 +376,7 @@ namespace LetheAISharp.Agent.Research
                 **Question:** {question}
 
                 **Success criteria for a complete answer:**
-                {plan.success_criteria}
+                {plan.SuccessCriteria}
 
                 **Current report:**
                 {currentReport}
@@ -546,7 +531,7 @@ namespace LetheAISharp.Agent.Research
             // You can make this smarter later if you want category-specific behavior.
             pb.AddMessage(AuthorRole.System, "You are a precise research assistant.");
             pb.AddMessage(AuthorRole.User, prompt);
-            var query = pb.PromptToQuery();
+            var query = pb.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, 2048);
             var raw = await LLMEngine.SimpleQuery(query, ct).ConfigureAwait(false);
 
             return raw ?? string.Empty;

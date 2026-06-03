@@ -32,6 +32,8 @@ namespace LetheAISharp.Agent.Tools
                 Tool.ClearRegisteredTools();
             }
             toolList.Add(Tool.GetOrCreateTool(this, nameof(WebSearch), "Performs a web search for the given query and returns a summary of the results."));
+            // Disabled because right now, the LLM can't call itself recursively when in a tool loop.
+            //toolList.Add(Tool.GetOrCreateTool(this, nameof(DeepSearch), "Performs a deep search for the given query and returns a detailed report of the findings. Only use this if the user explicitly mentions that you need to do a deep search."));
             toolList.Add(Tool.GetOrCreateTool(this, nameof(GetCurrentDate), "Gets the current date and time."));
         }
 
@@ -62,7 +64,6 @@ namespace LetheAISharp.Agent.Tools
                 SearchQueries = [query]
             };
             var serchresults = await searchaction.Execute(param, CancellationToken.None).ConfigureAwait(false);
-            // This is a placeholder implementation. In a real implementation, you would call a news API to get the actual news data.
             var result = new StringBuilder();
             result.AppendLinuxLine($"Search results for query: '{query}'");
             foreach (var item in serchresults)
@@ -80,6 +81,24 @@ namespace LetheAISharp.Agent.Tools
             return result.ToString();
         }
 
+        // ---
+        // Disabled because right now, the LLM can't call itself recursively when in a tool loop.
+        // ---
+        //public async Task<string> DeepSearch(string query)
+        //{
+        //    var searchaction = new DeepSearchAction();
+        //    var searchresults = await searchaction.Execute(query, CancellationToken.None).ConfigureAwait(false);
+
+        //    var response = new StringBuilder();
+        //    response.AppendLinuxLine($"**Results regarding the user's query.");
+        //    response.AppendLinuxLine();
+        //    if (searchresults.Success)
+        //        response.AppendLinuxLine(searchresults.FinalReport);
+        //    else
+        //        response.AppendLinuxLine($"Error: Failed to retrieve deep search results. {searchresults.Error}");
+        //    return response.ToString();
+        //}
+
         public bool RequiresConfirmation(string functionName)
         {
             // StartWith is used here because many backends append random strings to the function name to avoid name collisions,
@@ -94,6 +113,11 @@ namespace LetheAISharp.Agent.Tools
                 // Web search might be a more impactful action, so we require confirmation before allowing the agent to call it.
                 return true;
             }
+            //else if (functionName.StartsWith(nameof(DeepSearch)))
+            //{
+            //    // Deep search might be a more impactful action, so we require confirmation before allowing the agent to call it.
+            //    return true;
+            //}
             // Tools not in the toolset should return false for RequiresConfirmation.
             // They either aren't called, or are handled by another toolset that may or may not require confirmation.
             return false;
