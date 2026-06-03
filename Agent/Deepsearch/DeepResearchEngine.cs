@@ -38,10 +38,7 @@ namespace LetheAISharp.Agent.Research
         private DateTime _startedUtc;
         private static int EstimatedMaxResponseTokens = 4096;
 
-        public DeepResearchEngine(
-            DeepResearchOptions? options = null,
-            ILogger? logger = null,
-            Action<DeepResearchProgress>? progress = null)
+        public DeepResearchEngine(DeepResearchOptions? options = null, ILogger? logger = null, Action<DeepResearchProgress>? progress = null)
         {
             _options = options ?? new DeepResearchOptions();
             _logger = logger ?? LLMEngine.Logger;
@@ -398,7 +395,6 @@ namespace LetheAISharp.Agent.Research
                 """;
 
             var raw = await RunPromptAsync(prompt, ct).ConfigureAwait(false);
-            raw = raw.RemoveThinkingBlocks().CleanupAndTrim();
             return raw.TrimStart().StartsWith("YES", StringComparison.OrdinalIgnoreCase);
         }
 
@@ -445,11 +441,7 @@ namespace LetheAISharp.Agent.Research
         /// If your search results already contain good enriched content,
         /// you may skip the LLM extraction step and map directly to finding objects.
         /// </summary>
-        private async Task<DeepResearchFinding?> ExtractFindingAsync(
-            string question,
-            EnrichedSearchResult result,
-            string sourceText,
-            CancellationToken ct)
+        private async Task<DeepResearchFinding?> ExtractFindingAsync(string question, EnrichedSearchResult result, string sourceText, CancellationToken ct)
         {
             // Simple first-pass extraction prompt.
             // Later you can enforce JSON and parse title/summary/evidence/rationale separately.
@@ -540,6 +532,7 @@ namespace LetheAISharp.Agent.Research
             pb.AddMessage(AuthorRole.User, prompt);
             var query = pb.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.8) ? 0.8 : LLMEngine.Sampler.Temperature, EstimatedMaxResponseTokens);
             var raw = await LLMEngine.SimpleQuery(query, ct).ConfigureAwait(false);
+            raw = raw.RemoveThinkingBlocks().CleanupAndTrim();
 
             return raw ?? string.Empty;
         }
@@ -548,12 +541,7 @@ namespace LetheAISharp.Agent.Research
 
         #region Misc helpers
 
-        private void Emit(
-            DeepResearchPhase phase,
-            int round,
-            string? message = null,
-            string? queryPreview = null,
-            string? url = null)
+        private void Emit(DeepResearchPhase phase, int round, string? message = null, string? queryPreview = null, string? url = null)
         {
             if (!_options.EnableProgressEvents || _progress == null)
                 return;
