@@ -39,20 +39,11 @@ namespace LetheAISharp.Agent.Plugins
 
             var question = "Research the most important unfamiliar topic from the last archived session.";
 
-            var engine = new DeepResearchEngine(
-                new DeepResearchOptions
-                {
-                    MaxRounds = 4,
-                    MinRounds = 2,
-                    MaxQueriesPerRound = 3,
-                    MaxResultsPerQuery = 3
-                },
+            var engine = new DeepResearchEngine(LLMEngine.Settings.DeepResearch,
                 LLMEngine.Logger,
                 progress: p =>
                 {
-                    LLMEngine.Logger?.LogInformation(
-                        "DeepResearch [{Phase}] round={Round} msg={Message}",
-                        p.Phase, p.Round, p.Message);
+                    LLMEngine.Logger?.LogInformation("DeepResearch [{Phase}] round={Round} msg={Message}", p.Phase, p.Round, p.Message);
                 });
 
             var result = await engine.ResearchAsync(question, ct).ConfigureAwait(false);

@@ -137,7 +137,7 @@ namespace LetheAISharp.API
                 return string.Empty;
             if (LLMEngine.Settings.WebSearchAPI == BackendSearchAPI.Brave || (LLMEngine.Settings.WebSearchAPI == BackendSearchAPI.DuckDuckGo && !koboldDDGAvailable))
             {
-                var res = await webSearchClient.SearchAndEnrichAsync(query, 3, LLMEngine.Settings.WebSearchDetailedResults).ConfigureAwait(false);
+                var res = await webSearchClient.SearchAndEnrichAsync(query, LLMEngine.Settings.WebSearchResultsPerQuery, LLMEngine.Settings.WebSearchDetailedResults).ConfigureAwait(false);
                 return JsonConvert.SerializeObject(res);
             }
             else

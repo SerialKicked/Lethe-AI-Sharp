@@ -10,16 +10,13 @@ namespace LetheAISharp.Agent.Research
     public sealed class DeepResearchOptions
     {
         /// <summary>Maximum number of iterative search/synthesis rounds.</summary>
-        public int MaxRounds { get; set; } = 6;
+        public int MaxRounds { get; set; } = 5;
 
         /// <summary>Minimum number of rounds before the engine is allowed to stop early.</summary>
         public int MinRounds { get; set; } = 2;
 
         /// <summary>Maximum number of search queries generated per round.</summary>
         public int MaxQueriesPerRound { get; set; } = 3;
-
-        /// <summary>Maximum number of search results to retain per query.</summary>
-        public int MaxResultsPerQuery { get; set; } = 3;
 
         /// <summary>
         /// Maximum number of findings to send into the synthesis prompt each round.
@@ -28,7 +25,7 @@ namespace LetheAISharp.Agent.Research
         public int SynthesisWindow { get; set; } = 8;
 
         /// <summary>Maximum total runtime for a research execution.</summary>
-        public TimeSpan MaxDuration { get; set; } = TimeSpan.FromMinutes(5);
+        public TimeSpan MaxDuration { get; set; } = TimeSpan.FromMinutes(15);
 
         /// <summary>
         /// Optional category hint, if you want to force output style later

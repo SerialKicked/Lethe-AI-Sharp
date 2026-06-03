@@ -36,6 +36,7 @@ namespace LetheAISharp.Agent.Research
         private DeepSearchPlan _researchPlan = new DeepSearchPlan();
         private string _evolvingReport = string.Empty;
         private DateTime _startedUtc;
+        private static int EstimatedMaxResponseTokens = 4096;
 
         public DeepResearchEngine(
             DeepResearchOptions? options = null,
@@ -64,6 +65,10 @@ namespace LetheAISharp.Agent.Research
             _queriesUsed.Clear();
             _urlsVisited.Clear();
             _findings.Clear();
+
+            EstimatedMaxResponseTokens = LLMEngine.MaxContextLength / 2;
+            if (EstimatedMaxResponseTokens > 6158)
+                EstimatedMaxResponseTokens = 6158;
 
             Emit(DeepResearchPhase.Planning, 0, "Creating research plan...");
 
@@ -178,7 +183,7 @@ namespace LetheAISharp.Agent.Research
             pb.AddMessage(AuthorRole.System, prompt.ToString());
             pb.AddMessage(AuthorRole.User, searchplan.GetQuery());
             await pb.SetStructuredOutput(searchplan);
-            var query = pb.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, 2048);
+            var query = pb.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, EstimatedMaxResponseTokens);
             var raw = await LLMEngine.SimpleQuery(query, ct).ConfigureAwait(false);
             raw = raw.RemoveThinkingBlocks();
 
@@ -227,11 +232,11 @@ namespace LetheAISharp.Agent.Research
                 """
 
                 Return a JSON object with:
-                - "web_search": Array of specific web search queries.
+                - "WebQueries": Array of specific web search queries.
 
                 Example:
                 {
-                  "web_search": [
+                  "WebQueries": [
                     "cost of living in X 2024",
                     "quality of healthcare in X",
                     "safety and crime rates in X"
@@ -249,8 +254,9 @@ namespace LetheAISharp.Agent.Research
             pb.AddMessage(AuthorRole.User, prompt);
             await pb.SetStructuredOutput(res);
 
-            var query = pb.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, 2048);
+            var query = pb.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.9) ? 0.9 : LLMEngine.Sampler.Temperature, EstimatedMaxResponseTokens);
             var raw = await LLMEngine.SimpleQuery(query, ct).ConfigureAwait(false);
+            raw = raw.RemoveThinkingBlocks();
 
             try
             {
@@ -300,7 +306,7 @@ namespace LetheAISharp.Agent.Research
                 if (results.Count == 0)
                     continue;
 
-                foreach (var result in results.Take(_options.MaxResultsPerQuery))
+                foreach (var result in results)
                 {
                     ct.ThrowIfCancellationRequested();
 
@@ -392,6 +398,7 @@ namespace LetheAISharp.Agent.Research
                 """;
 
             var raw = await RunPromptAsync(prompt, ct).ConfigureAwait(false);
+            raw = raw.RemoveThinkingBlocks().CleanupAndTrim();
             return raw.TrimStart().StartsWith("YES", StringComparison.OrdinalIgnoreCase);
         }
 
@@ -531,7 +538,7 @@ namespace LetheAISharp.Agent.Research
             // You can make this smarter later if you want category-specific behavior.
             pb.AddMessage(AuthorRole.System, "You are a precise research assistant.");
             pb.AddMessage(AuthorRole.User, prompt);
-            var query = pb.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.75) ? 0.75 : LLMEngine.Sampler.Temperature, 2048);
+            var query = pb.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.8) ? 0.8 : LLMEngine.Sampler.Temperature, EstimatedMaxResponseTokens);
             var raw = await LLMEngine.SimpleQuery(query, ct).ConfigureAwait(false);
 
             return raw ?? string.Empty;

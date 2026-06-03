@@ -334,6 +334,8 @@ namespace LetheAISharp.LLM
                 return;
             // Create the appropriate client based on the selected backend
             var httpClient = new HttpClient();
+            httpClient.Timeout = new TimeSpan(0, 5, 0);
+
             Client = Settings.BackendAPI switch
             {
                 BackendAPI.KoboldAPI => new KoboldCppAdapter(httpClient),

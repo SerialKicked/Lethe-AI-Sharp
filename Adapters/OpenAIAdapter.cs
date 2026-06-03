@@ -179,7 +179,7 @@ namespace LetheAISharp.API
         {
             if (!SupportsWebSearch)
                 return string.Empty;
-            var res = await webSearchClient.SearchAndEnrichAsync(query, 3, LLMEngine.Settings.WebSearchDetailedResults).ConfigureAwait(false);
+            var res = await webSearchClient.SearchAndEnrichAsync(query, LLMEngine.Settings.WebSearchResultsPerQuery, LLMEngine.Settings.WebSearchDetailedResults).ConfigureAwait(false);
             // Convert results to a common format
             return JsonConvert.SerializeObject(res);
         }

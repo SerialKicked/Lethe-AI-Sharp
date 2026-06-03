@@ -26,13 +26,7 @@ namespace LetheAISharp.Agent.Actions
             if (ct.IsCancellationRequested)
                 return new DeepResearchResult() { Success = false, Error = "Operation cancelled." };
 
-            var engine = new DeepResearchEngine(new DeepResearchOptions
-                {
-                    MaxRounds = 4,
-                    MinRounds = 2,
-                    MaxQueriesPerRound = 3,
-                    MaxResultsPerQuery = 3
-                },
+            var engine = new DeepResearchEngine(LLMEngine.Settings.DeepResearch,
                 LLMEngine.Logger,
                 progress: p =>
                 {

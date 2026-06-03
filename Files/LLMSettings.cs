@@ -1,4 +1,5 @@
 ﻿using HNSW.Net;
+using LetheAISharp.Agent.Research;
 using LetheAISharp.API;
 using LetheAISharp.LLM;
 using LetheAISharp.Memory;
@@ -504,6 +505,16 @@ namespace LetheAISharp.Files
         [Description("Limits the length of the extracted content from web search results to prevent making the context too long.\n" +
             "Set to 0 to disable this limit.")]
         public int WebSearchDetailedMaxLength { get; set; } = 5000;
+
+        /// <summary>
+        /// Maximum number of url to retrieve and potentially scrape for content. 
+        /// Setting this to a higher number can provide more information but will increase response time and token usage, especially if WebSearchDetailedResults is enabled.
+        /// </summary>
+        [Description("Maximum number of URLs to retrieve and potentially scrape for content.\n" +
+            "Setting this to a higher number can provide more information but will increase response time and token usage, especially if WebSearchDetailedResults is enabled.")]
+        public int WebSearchResultsPerQuery { get; set; } = 3;
+
+        public DeepResearchOptions DeepResearch { get; set; } = new();
 
         #endregion
 
