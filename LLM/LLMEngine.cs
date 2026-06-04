@@ -310,35 +310,6 @@ namespace LetheAISharp.LLM
         public static PromptInserts dataInserts = [];
         internal static readonly Random RNG = new();
 
-        #region *** Semaphore for model access control (Internal) ***
-
-        private static readonly SemaphoreSlim ModelSemaphore = new(1, 1);
-
-        internal sealed class ModelSlotGuard : IDisposable
-        {
-            private bool _disposed;
-            public void Dispose()
-            {
-                if (_disposed) return;
-                _disposed = true;
-                ModelSemaphore.Release();
-            }
-        }
-
-        internal static async Task<ModelSlotGuard> AcquireModelSlotAsync(CancellationToken ct)
-        {
-            await ModelSemaphore.WaitAsync(ct).ConfigureAwait(false);
-            return new ModelSlotGuard();
-        }
-
-        internal static async Task<ModelSlotGuard?> TryAcquireModelSlotAsync(TimeSpan timeout, CancellationToken ct)
-        {
-            var ok = await ModelSemaphore.WaitAsync(timeout, ct).ConfigureAwait(false);
-            return ok ? new ModelSlotGuard() : null;
-        }
-
-        #endregion
-
         #region *** Initialization and Loading ***
 
         private static void LoadBackendClient()
@@ -592,11 +563,9 @@ namespace LetheAISharp.LLM
             History.RemoveLast(true);
             var oldquery = (PromptBuilder.LastQuery != null) ? PromptBuilder.RegenLastQuery() : null;
 
-            // last prompt doesn't understand change in sampler settings yet, so it's disabled until fixed.
             if (oldquery != null)
             {
-                using var _ = await AcquireModelSlotAsync(CancellationToken.None).ConfigureAwait(false);
-                if (Status == SystemStatus.Busy)
+                if (Status == SystemStatus.Busy || LLMBusy)
                     return;
                 Status = SystemStatus.Busy;
                 ResetStreamingState();
@@ -604,7 +573,7 @@ namespace LetheAISharp.LLM
                 {
                     var prefill = Instruct.GetThinkPrefill();
                     if (!string.IsNullOrWhiteSpace(prefill))
-                        Client_StreamingMessageReceived(_, new LLMTokenStreamingEventArgs(prefill, null, null));
+                        Client_StreamingMessageReceived(Bot, new LLMTokenStreamingEventArgs(prefill, null, null));
                 }
                 RaiseOnFullPromptReady(PromptBuilder.PromptToText());
                 try
@@ -615,16 +584,18 @@ namespace LetheAISharp.LLM
                 finally
                 {
                     LLMBusy = false;
+                    Status = SystemStatus.Ready;
                 }
             }
             else if (PromptBuilder.Count == 0)
             {
+                if (Status == SystemStatus.Busy || LLMBusy)
+                    return;
                 await StartGeneration(new SingleMessage(AuthorRole.Assistant, string.Empty)).ConfigureAwait(false);
             }
             else
             {
-                using var _ = await AcquireModelSlotAsync(CancellationToken.None).ConfigureAwait(false);
-                if (Status == SystemStatus.Busy)
+                if (Status == SystemStatus.Busy || LLMBusy)
                     return;
                 Status = SystemStatus.Busy;
                 ResetStreamingState();
@@ -632,7 +603,7 @@ namespace LetheAISharp.LLM
                 {
                     var prefill = Instruct.GetThinkPrefill();
                     if (!string.IsNullOrWhiteSpace(prefill))
-                        Client_StreamingMessageReceived(_, new LLMTokenStreamingEventArgs(prefill, null, null));
+                        Client_StreamingMessageReceived(Bot, new LLMTokenStreamingEventArgs(prefill, null, null));
                 }
                 RaiseOnFullPromptReady(PromptBuilder.PromptToText());
                 try
@@ -643,6 +614,7 @@ namespace LetheAISharp.LLM
                 finally
                 {
                     LLMBusy = false;
+                    Status = SystemStatus.Ready;
                 }
             }
         }
@@ -658,8 +630,6 @@ namespace LetheAISharp.LLM
             try
             {
                 var success = Client.AbortGenerationSync();
-                if (success)
-                    Status = SystemStatus.Ready;
                 return success;
             }
             catch (Exception ex)
@@ -694,6 +664,12 @@ namespace LetheAISharp.LLM
         {
             if (Client == null)
                 throw new InvalidOperationException("LLMEngine not initialized. Call Setup() and Connect() first.");
+            if (LLMBusy)
+            {
+                logger?.LogError("[Core] Cannot perform SimpleQuery: LLM is currently busy.");
+                return string.Empty;
+            }                
+
             var oldst = status;
             Status = SystemStatus.Busy;
             _isSimpleQuery = true;
@@ -707,8 +683,8 @@ namespace LetheAISharp.LLM
             {
                 LLMBusy = false;
                 _isSimpleQuery = false;
+                Status = oldst;
             }
-            Status = oldst;
             RaiseOnQuickInferenceEnded(result);
             return string.IsNullOrEmpty(result) ? string.Empty : result;
         }
@@ -722,7 +698,12 @@ namespace LetheAISharp.LLM
             if (Client == null)
                 throw new InvalidOperationException("LLMEngine not initialized. Call Setup() and Connect() first.");
 
-            using var _ = await AcquireModelSlotAsync(ctx).ConfigureAwait(false);
+            if (LLMBusy)
+            {
+                logger?.LogError("[Core] Cannot perform SimpleQueryStreaming: LLM is currently busy.");
+                return;
+            }
+            var oldst = status;
             Status = SystemStatus.Busy;
             ResetStreamingState();
             _isSimpleQuery = true;
@@ -735,6 +716,7 @@ namespace LetheAISharp.LLM
             {
                 LLMBusy = false;
                 _isSimpleQuery = false;
+                Status = oldst;
             }
         }
 
@@ -958,7 +940,6 @@ namespace LetheAISharp.LLM
                 }
                 if (e.FinishReason != "tool_calls")
                 {
-                    Status = SystemStatus.Ready;
                     RaiseOnInferenceEnded(response);
 
                     var (ThinkContent, TalkContent) = textStreamReceiver.GetCurrentBuffers();
@@ -1258,7 +1239,8 @@ namespace LetheAISharp.LLM
                 await actbot.Brain.HandleMessages(message).ConfigureAwait(false);
             }
 
-            using var _ = await AcquireModelSlotAsync(CancellationToken.None).ConfigureAwait(false);
+            if (LLMBusy)
+                return;
             Status = SystemStatus.Busy;
 
             var genparams = await GenerateFullPrompt(message, pluginmessage).ConfigureAwait(false);
@@ -1270,7 +1252,7 @@ namespace LetheAISharp.LLM
             {
                 var prefill = Instruct.GetThinkPrefill();
                 if (!string.IsNullOrWhiteSpace(prefill))
-                    Client_StreamingMessageReceived(_, new LLMTokenStreamingEventArgs(prefill, null, null));
+                    Client_StreamingMessageReceived(Bot, new LLMTokenStreamingEventArgs(prefill, null, null));
             }
 
 
@@ -1292,6 +1274,7 @@ namespace LetheAISharp.LLM
             finally
             {
                 LLMBusy = false;
+                Status = SystemStatus.Ready;
             }
         }
 
