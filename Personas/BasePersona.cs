@@ -339,7 +339,7 @@ namespace LetheAISharp.LLM
         /// </summary>
         /// <param name="path">directory where the chatlog is located (optional if no deletion)</param>
         /// <param name="deletefile">delete file or not</param>
-        public void ClearChatHistory(string path, bool deletefile = true)
+        public virtual void ClearChatHistory(string path, bool deletefile = true)
         {
             History.ClearHistory();
             if (!deletefile)
@@ -351,7 +351,7 @@ namespace LetheAISharp.LLM
                 selpath += Path.DirectorySeparatorChar;
             var f = selpath + UniqueName;
 
-            if (File.Exists(f + ".json")) File.Delete(f + ".json");
+            if (File.Exists(f + ".log")) File.Delete(f + ".log");
         }
 
         /// <summary>

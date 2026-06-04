@@ -140,7 +140,7 @@ namespace LetheAISharp.Files
                 case ".webp":
                     content.Add(new(ContentType.ImageUrl, $"data:image/webp;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
                     break;
-                case ".tiff ":
+                case ".tiff":
                     content.Add(new(ContentType.ImageUrl, $"data:image/tiff;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
                     break;
                 default:

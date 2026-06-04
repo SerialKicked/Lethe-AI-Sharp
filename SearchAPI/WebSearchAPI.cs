@@ -171,7 +171,7 @@ namespace LetheAISharp.SearchAPI
                 if (LLMEngine.Settings.WebSearchDetailedMaxLength > 0 && markdown.Length > LLMEngine.Settings.WebSearchDetailedMaxLength)
                 {
                     markdown = markdown[..LLMEngine.Settings.WebSearchDetailedMaxLength] + "... (cut content)";
-                    LLMEngine.Logger?.LogInformation("[WebSearch API] Jina extraction for {Url} was too long and got truncated to {MaxLength} characters", url, LLMEngine.Settings.WebSearchDetailedMaxLength);
+                    LLMEngine.Logger?.LogInformation("[WebSearch API] page content extraction for {Url} was too long and got truncated from {CurLength} to {MaxLength} characters", url, markdown.Length, LLMEngine.Settings.WebSearchDetailedMaxLength);
                 }
 
                 return markdown;
