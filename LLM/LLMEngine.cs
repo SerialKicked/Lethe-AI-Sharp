@@ -145,6 +145,19 @@ namespace LetheAISharp.LLM
             }
         }
 
+        /// <summary>
+        /// True while a wire call to the backend is in flight
+        /// (i.e. <see cref="ILLMServiceClient.GenerateText(object)"/> or
+        /// <see cref="ILLMServiceClient.GenerateTextStreaming(object)"/> is on the stack,
+        /// including the in-adapter tool-call loop for chat-completion backends).
+        /// Distinct from <see cref="Status"/>: Status reflects library-user interactivity,
+        /// LLMBusy reflects model-slot occupancy.
+        /// Agents should consult this in their main loop and skip their tick when true.
+        /// In-engine sub-calls (plugins calling <see cref="SimpleQuery(object, CancellationToken)"/>
+        /// from a plugin pre-pass) do NOT need to consult it - those happen before the wire call.
+        /// </summary>
+        public static bool LLMBusy { get; private set; } = false;
+
         /// <summary> The currently loaded bot persona. You can change it here. </summary>
         /// <seealso cref="BasePersona"/>"
         public static BasePersona Bot { get => bot; set => ChangeBot(value); }
@@ -594,7 +607,15 @@ namespace LetheAISharp.LLM
                         Client_StreamingMessageReceived(_, new LLMTokenStreamingEventArgs(prefill, null, null));
                 }
                 RaiseOnFullPromptReady(PromptBuilder.PromptToText());
-                await Client.GenerateTextStreaming(oldquery).ConfigureAwait(false);
+                try
+                {
+                    LLMBusy = true;
+                    await Client.GenerateTextStreaming(oldquery).ConfigureAwait(false);
+                }
+                finally
+                {
+                    LLMBusy = false;
+                }
             }
             else if (PromptBuilder.Count == 0)
             {
@@ -614,7 +635,15 @@ namespace LetheAISharp.LLM
                         Client_StreamingMessageReceived(_, new LLMTokenStreamingEventArgs(prefill, null, null));
                 }
                 RaiseOnFullPromptReady(PromptBuilder.PromptToText());
-                await Client.GenerateTextStreaming(PromptBuilder.PromptToQuery(AuthorRole.Assistant, forceAltRoles: IsGroupConversation && Settings.GroupInstructFormatAdapter)).ConfigureAwait(false);
+                try
+                {
+                    LLMBusy = true;
+                    await Client.GenerateTextStreaming(PromptBuilder.PromptToQuery(AuthorRole.Assistant, forceAltRoles: IsGroupConversation && Settings.GroupInstructFormatAdapter)).ConfigureAwait(false);
+                }
+                finally
+                {
+                    LLMBusy = false;
+                }
             }
         }
 
@@ -671,10 +700,12 @@ namespace LetheAISharp.LLM
             string result;
             try
             {
+                LLMBusy = true;
                 result = await Client.GenerateText(chatlog).ConfigureAwait(false);
             }
             finally
             {
+                LLMBusy = false;
                 _isSimpleQuery = false;
             }
             Status = oldst;
@@ -697,10 +728,12 @@ namespace LetheAISharp.LLM
             _isSimpleQuery = true;
             try
             {
+                LLMBusy = true;
                 await Client.GenerateTextStreaming(chatlog).ConfigureAwait(false);
             }
             finally
             {
+                LLMBusy = false;
                 _isSimpleQuery = false;
             }
         }
@@ -1249,11 +1282,16 @@ namespace LetheAISharp.LLM
             RaiseOnFullPromptReady(PromptBuilder.PromptToText());
             try
             {
+                LLMBusy = true;
                 await Client.GenerateTextStreaming(genparams).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
                 logger?.LogError(ex, "[Core] Error during generation: {Message}", ex.Message);
+            }
+            finally
+            {
+                LLMBusy = false;
             }
         }
 

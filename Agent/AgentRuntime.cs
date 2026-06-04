@@ -98,6 +98,14 @@ namespace LetheAISharp.Agent
 
             while (_running && !_cts.Token.IsCancellationRequested)
             {
+                // Skip this tick if the model is currently producing tokens for a live chat.
+                if (LLMEngine.LLMBusy)
+                {
+                    await Task.Delay(5000, _cts.Token).ConfigureAwait(false);
+                    if (_cts.Token.IsCancellationRequested && _running)
+                        BuildNewToken();
+                    continue;
+                }
                 // don't do anything if not in agent mode, or if user was active recently
                 if (!Owner.AgentMode || (DateTime.Now - _lastuseractivity) < LLMEngine.Settings.BackgroundAgentMinInactivityTime || LLMEngine.Status == SystemStatus.NotInit)
                 {
