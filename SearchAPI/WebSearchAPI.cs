@@ -250,38 +250,4 @@ namespace LetheAISharp.SearchAPI
             return allResults;
         }
     }
-
-
-    // Usage example showing how to switch between providers
-    public static class SearchUsageExample
-    {
-        public static async Task ExampleUsage()
-        {
-            using var httpClient = new HttpClient();
-
-            // Start with DuckDuckGo (since you prefer their summaries)
-            WebSearchAPI.SearchAPI = BackendSearchAPI.DuckDuckGo;
-            var searchService = new WebSearchAPI();
-
-            Console.WriteLine($"Using {searchService.CurrentProviderName} provider");
-
-            // Search with DuckDuckGo
-            var results = await searchService.SearchAndEnrichAsync("C# async programming", 3).ConfigureAwait(false);
-
-            // Switch to Brave if needed
-            searchService.SwitchProvider(BackendSearchAPI.Brave, WebSearchAPI.BraveAPIKey);
-            
-            Console.WriteLine($"Switched to {searchService.CurrentProviderName} provider");
-
-            // Same search with Brave
-            var braveResults = await searchService.SearchAndEnrichAsync("C# async programming", 3).ConfigureAwait(false);
-
-            foreach (var result in braveResults)
-            {
-                Console.WriteLine($"[{result.SearchProvider}] {result.Title}");
-                Console.WriteLine($"Description: {result.Description}");
-                Console.WriteLine("---");
-            }
-        }
-    }
 }
