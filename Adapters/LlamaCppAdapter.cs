@@ -223,7 +223,7 @@ namespace LetheAISharp.API
         {
             if (CompletionType == CompletionType.Chat)
             {
-                OpenAI.JsonSchema jsonSchema = jsonclass.GetType();
+                OpenAI.JsonSchema jsonSchema = jsonclass;
                 var res = jsonSchema.Schema.ToJsonString();
                 return await Task.FromResult(res!).ConfigureAwait(false);
             }

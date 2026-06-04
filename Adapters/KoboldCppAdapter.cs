@@ -220,11 +220,8 @@ namespace LetheAISharp.API
             {
                 schema = JObject.Parse(jsonnewton!)
             };
-            // works
+
             var res = await _client.SchemaToGrammar(apiPayloadNewton).ConfigureAwait(false);
-
-            // I want to use NJsonSchema but it doesn't work because I'm fucking it up, fix.
-
             if (res.success)
             {
                 return res.result;

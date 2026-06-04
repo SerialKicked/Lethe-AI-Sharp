@@ -232,7 +232,7 @@ namespace LetheAISharp
                 {
                     // Min and max - generate options for each count
                     var options = new List<string>();
-                    int cappedMax = Math.Min(max, 20); // Cap at 20 to avoid grammar explosion
+                    int cappedMax = Math.Min(max, 50); // Cap at 50 to avoid grammar explosion
 
                     for (int count = min; count <= cappedMax; count++)
                     {

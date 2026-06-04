@@ -216,7 +216,7 @@ namespace LetheAISharp.API
 
         public async Task<string> SchemaToGrammar(Type jsonclass)
         {
-            OpenAI.JsonSchema jsonSchema = jsonclass.GetType();
+            OpenAI.JsonSchema jsonSchema = jsonclass;
             var res = jsonSchema.Schema.ToJsonString();
             return await Task.FromResult(res!).ConfigureAwait(false);
         }
