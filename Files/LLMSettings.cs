@@ -386,7 +386,16 @@ namespace LetheAISharp.Files
         /// <summary> Max distance for an entry to be retrieved (SmallWorld / HNSW.NET implementation) </summary>
         [Description("Max distance for an entry to be retrieved (SmallWorld / HNSW.NET implementation).\n" +
             "This setting determines the maximum allowable distance between the query and the entries in the vector space for them to be considered relevant.")]
-        public float RAGDistanceCutOff { get; set; } = 0.1f;
+        public float RAGDistanceCutOff { get; set; } = 0.15f;
+
+        /// <summary>
+        /// Cosine distance threshold for RAG entry deduplication. If a new entry's embedding is within this distance of an existing entry, it is treated as the same entry and won't be added to the index.
+        /// </summary>
+        [Description("Cosine distance threshold for RAG entry deduplication.\n" +
+            "If a new entry's embedding is within this distance of an existing entry, it is treated as the same entry and won't be added to the index.\n" +
+            "Cosine distance scale: 0 = identical vectors, 1 = orthogonal, 2 = opposite. Lower = stricter deduplication. Recommended range: 0.05–0.08.")]
+        public float RAGDeduplicationThreshold { get; set; } = 0.075f;
+
 
         /// <summary> Search method. Simple is the most accurate method (but is very slightly slower). </summary>
         [Description("Search method for RAG retrieval:\n" +

@@ -605,7 +605,7 @@ namespace LetheAISharp.Memory
                 }
             }
 
-            if (mindist < 0.07f && bestmatch != null)
+            if (mindist <= LLMEngine.Settings.RAGDeduplicationThreshold && bestmatch != null)
             {
                 var idx = Memories.IndexOf(bestmatch);
                 if (idx != -1)

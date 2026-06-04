@@ -61,7 +61,7 @@ namespace LetheAISharp.Memory
                 ExpandBestSelection = true,
                 NeighbourHeuristic = LLMEngine.Settings.RAGHeuristic == RAGSelectionHeuristic.SelectHeuristic ? NeighbourSelectionHeuristic.SelectHeuristic : NeighbourSelectionHeuristic.SelectSimple,
             };
-            VectorDB = new SmallWorld<float[], float>(Vector.IsHardwareAccelerated ? CosineDistance.SIMDForUnits : CosineDistance.ForUnits, new RNGPlus(), Parameters, false);
+            VectorDB = new SmallWorld<float[], float>(Vector.IsHardwareAccelerated ? CosineDistance.SIMDForUnits : CosineDistance.ForUnits, new ThreadSafeRNG(), Parameters, false);
         }
 
 
@@ -75,7 +75,7 @@ namespace LetheAISharp.Memory
                 ExpandBestSelection = true,
                 NeighbourHeuristic = LLMEngine.Settings.RAGHeuristic == RAGSelectionHeuristic.SelectHeuristic ? NeighbourSelectionHeuristic.SelectHeuristic : NeighbourSelectionHeuristic.SelectSimple,
             };
-            VectorDB = new SmallWorld<float[], float>(Vector.IsHardwareAccelerated ? CosineDistance.SIMDForUnits : CosineDistance.ForUnits, new RNGPlus(), Parameters, false);
+            VectorDB = new SmallWorld<float[], float>(Vector.IsHardwareAccelerated ? CosineDistance.SIMDForUnits : CosineDistance.ForUnits, new ThreadSafeRNG(), Parameters, false);
         }
 
         public void AddMemories(List<MemoryUnit> memories)
@@ -122,23 +122,6 @@ namespace LetheAISharp.Memory
                 res.RemoveAll(e => e.Distance > maxDist);
             res.Sort((a, b) => a.Distance.CompareTo(b.Distance));
             return res;
-        }
-
-        public void ExportVectorDB(string filePath)
-        {
-            var tosave = VectorDB.Items;
-            byte[] bytes = MessagePackSerializer.Serialize(tosave);
-            File.WriteAllBytes(filePath, bytes);
-        }
-
-        public void ImportVectorDB(string filePath)
-        {
-            Clear();
-            byte[] bytes = File.ReadAllBytes(filePath);
-            var x = MessagePackSerializer.Deserialize<IReadOnlyList<float[]>>(bytes);
-            if (x == null || x.Count == 0)
-                return;
-            VectorDB.AddItems(x);
         }
 
         private List<VaultResult> NativeSearch(float[] search, int maxCount, float? maxDist = null)

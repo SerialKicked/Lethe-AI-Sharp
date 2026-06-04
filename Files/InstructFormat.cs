@@ -25,22 +25,6 @@ namespace LetheAISharp.Files
     /// </remarks>
     public class InstructFormat : BaseFile
     {
-        public static readonly string[] Properties = [
-            "SystemPrompt",
-            "SystemStart", "SystemEnd",
-            "UserStart", "UserEnd",
-            "BotStart", "BotEnd",
-            "BotStartOverride", "BotEndOverride",
-            "BoSToken", "StopSequence",
-            "ThinkingStart", "ThinkingEnd",
-            "ThinkingForcedThought",
-            "PrefillThinking",
-            "ForceRAGToThinkingPrompt",
-            "NewLinesBetweenMessages",
-            "NoInstructInStopString",
-            "StopStrings", "GroupThinkingPrefix"
-            ];
-
         /// <summary>
         /// BoS token, used by some models to indicate the beginning the whole prompt. Can usually be left empty.
         /// </summary>

@@ -453,7 +453,7 @@ namespace LetheAISharp.Files
         /// <summary>
         /// Divides a raw chatlog (likely imported from Silly Tavern) into sessions using timestamps and specific messages to determine the start of a new session
         /// </summary>
-        public void DivideChatIntoSessions()
+        public virtual void DivideChatIntoSessions()
         {
             if (CurrentSession.Messages.Count == 0)
                 return;

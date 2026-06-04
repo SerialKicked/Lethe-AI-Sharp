@@ -89,7 +89,7 @@ namespace LetheAISharp.Agent.Plugins
             {
                 if (ct.IsCancellationRequested)
                     return;
-                var wassearchedbefore = await LLMEngine.Bot.Brain.WasSearchedRecently(testtopic.Topic, 0.085f).ConfigureAwait(false);
+                var wassearchedbefore = await LLMEngine.Bot.Brain.WasSearchedRecently(testtopic.Topic, LLMEngine.Settings.RAGDeduplicationThreshold).ConfigureAwait(false);
                 if (!wassearchedbefore)
                     actuallist.Add(testtopic);
             }

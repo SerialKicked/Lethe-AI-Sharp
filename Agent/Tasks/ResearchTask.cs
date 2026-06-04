@@ -68,7 +68,7 @@ namespace LetheAISharp.Agent.Plugins
                 if (ct.IsCancellationRequested)
                     return;
                 // Compare to recent searches to avoid duplicate
-                var wassearchedbefore = await LLMEngine.Bot.Brain.WasSearchedRecently(topic.Topic, 0.085f).ConfigureAwait(false);
+                var wassearchedbefore = await LLMEngine.Bot.Brain.WasSearchedRecently(topic.Topic, LLMEngine.Settings.RAGDeduplicationThreshold).ConfigureAwait(false);
                 if (wassearchedbefore)
                     continue;
                 LLMEngine.Bot.Brain.RecentSearches.Add(topic);

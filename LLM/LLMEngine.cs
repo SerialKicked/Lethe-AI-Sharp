@@ -750,6 +750,11 @@ namespace LetheAISharp.LLM
         {
             if (Client == null || !SupportsWebSearch)
                 return [];
+            if (!BannedSearchWords.IsAllowed(query))
+            {
+                Logger?.LogWarning("Search Query Cancelled: {query}", query);
+                return [];
+            }
             var res = await Client.WebSearch(query).ConfigureAwait(false);
             var webres = JsonConvert.DeserializeObject<List<EnrichedSearchResult>>(res);
             if (webres is null)

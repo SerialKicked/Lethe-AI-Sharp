@@ -48,7 +48,7 @@ namespace LetheAISharp.SearchAPI
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
         public WebSearchAPI()
         {
-            _httpClient = new HttpClient();
+            _httpClient = new HttpClient() { Timeout = TimeSpan.FromSeconds(120) };
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (compatible; MyApp/1.0)");
             SwitchProvider(SearchAPI, BraveAPIKey);
         }
