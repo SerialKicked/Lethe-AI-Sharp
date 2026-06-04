@@ -332,7 +332,10 @@ namespace LetheAISharp.LLM
         {
             if (Status != SystemStatus.NotInit)
                 return;
-            // Create the appropriate client based on the selected backend
+            if (!Settings.ValidateSettings(out var validationError) && !string.IsNullOrEmpty(validationError))
+            {
+                logger?.LogError("[Core] Invalid settings: {Error}", validationError);
+            }            // Create the appropriate client based on the selected backend
             var httpClient = new HttpClient();
             httpClient.Timeout = new TimeSpan(0, 5, 0);
 
@@ -389,6 +392,10 @@ namespace LetheAISharp.LLM
         {
             if (Client == null)
                 return false;
+            if (!Settings.ValidateSettings(out var validationError) && !string.IsNullOrEmpty(validationError))
+            {
+                logger?.LogError("[Core] Invalid settings: {Error}", validationError);
+            }
             return await Client.CheckBackend().ConfigureAwait(false);
         }
 

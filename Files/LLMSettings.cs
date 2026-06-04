@@ -557,5 +557,53 @@ namespace LetheAISharp.Files
 
         #endregion
 
-    }
+        public virtual bool ValidateSettings(out string? errorMessage)
+        {
+            var errMessage = new StringBuilder();
+            var validated = true;
+            if (ToolCallChainLimit < ToolCallLimit)
+            {
+                errMessage.AppendLine("ToolCallChainLimit should be equal or higher than ToolCallLimit to ensure that all tool calls are properly included in the prompt.");
+                validated = false;
+            }
+            if (RAGModelPath != null && !File.Exists(RAGModelPath))
+            {
+                errMessage.AppendLine($"RAG model file not found at path: {RAGModelPath}. Please provide a valid path to the embedding model in GGUF format.");
+                validated = false;
+            }
+            if (MaxTotalTokens <= 0)
+            {
+                errMessage.AppendLine("MaxTotalTokens should be greater than 0.");
+                validated = false;
+            }
+            if (WebSearchDetailedMaxLength <= 0) 
+            {
+                errMessage.AppendLine("WebSearchDetailedMaxLength should be greater than 0.");
+                validated = false;
+            }
+            if (WebSearchResultsPerQuery <= 0)
+            {
+                errMessage.AppendLine("WebSearchResultsPerQuery should be greater than 0.");
+                validated = false;
+            }
+            if (FactDeduplicationThreshold < 0 || FactDeduplicationThreshold >= FactSupersessionThreshold || FactDeduplicationThreshold >= FactRetrievalThreshold)
+            {
+                errMessage.AppendLine("FactDeduplicationThreshold should be above 0 and below FactSupersessionThreshold and FactRetrievalThreshold.");
+                validated = false;
+            }
+            if (FactRetrievalThreshold < 0 || FactRetrievalThreshold <= FactSupersessionThreshold || FactRetrievalThreshold <= FactDeduplicationThreshold)
+            {
+                errMessage.AppendLine("FactRetrievalThreshold should be above 0 and above FactSupersessionThreshold and FactDeduplicationThreshold.");
+                validated = false;
+            }
+            if (SessionReservedTokens < 0 || SessionReservedTokens >= MaxTotalTokens)
+            {
+                errMessage.AppendLine("SessionReservedTokens should be above 0 and below MaxTotalTokens.");
+                validated = false;
+            }
+
+            errorMessage = validated ? null : errMessage.ToString();
+            return validated;
+
+        }
 }
