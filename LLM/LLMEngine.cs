@@ -664,7 +664,7 @@ namespace LetheAISharp.LLM
             }
             catch (Exception ex)
             {
-                logger?.LogError(ex, "Failed to cancel generation");
+                logger?.LogError(ex, "[Core] Failed to cancel generation: {err}", ex.Message);
                 return false;
             }
         }
