@@ -408,10 +408,18 @@ namespace LetheAISharp.LLM
             var rln = SelfEditTokens;
             if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
                 rln += 1024;
-            var finalstr = await LLMEngine.SimpleQuery(promptbuilder.PromptToQuery(AuthorRole.Assistant, -1, rln)).ConfigureAwait(false);
-            LLMEngine.NamesInPromptOverride = null;
+            var finalstr = string.Empty;
+            try
+            {
+                finalstr = await LLMEngine.SimpleQuery(promptbuilder.PromptToQuery(AuthorRole.Assistant, -1, rln)).ConfigureAwait(false);
+            }
+            finally
+            {
+                LLMEngine.NamesInPromptOverride = null;
+            }
+            if (string.IsNullOrEmpty(finalstr))
+                return;
             finalstr = finalstr.RemoveThinkingBlocks();
-
             SelfEditField = finalstr.RemoveUnfinishedSentence().RemoveNewLines().CleanupAndTrim().RemoveTitle();
         }
 

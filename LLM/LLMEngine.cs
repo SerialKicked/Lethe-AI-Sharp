@@ -1242,7 +1242,14 @@ namespace LetheAISharp.LLM
             }
 
             RaiseOnFullPromptReady(PromptBuilder.PromptToText());
-            await Client.GenerateTextStreaming(genparams).ConfigureAwait(false);
+            try
+            {
+                await Client.GenerateTextStreaming(genparams).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogError(ex, "[Core] Error during generation: {Message}", ex.Message);
+            }
         }
 
         #endregion
