@@ -26,7 +26,14 @@ namespace LetheAISharp.API
         /// Populated only on the final completion event (when FinishReason is non-empty).
         /// </summary>
         public List<ToolCallRecord>? ToolCallRecords { get; set; }
-    }   
+        /// <summary>
+        /// Chain-of-thought / reasoning content delivered in a separate streaming field
+        /// (the <c>reasoning_content</c> JSON property emitted by llama.cpp / vLLM and other
+        /// OpenAI-compatible backends). When non-empty, the engine routes it directly to
+        /// the thinking channel rather than the visible response channel.
+        /// </summary>
+        public string? ReasoningToken { get; set; }
+    }
 
     public class OpenAI_APIClient : HttpClientBase
     {
@@ -94,6 +101,19 @@ namespace LetheAISharp.API
                     continueLoop = false;
                     await foreach (var partialResponse in API.ChatEndpoint.StreamCompletionEnumerableAsync(currentRequest, cancellationToken: cancellationToken))
                     {
+                        // Flush any reasoning content that arrived in the final assistant Message
+                        // (typically seen together with tool_calls) so the engine can capture it
+                        // in the thinking channel before we mutate the request and re-issue.
+                        var pendingReasoning = partialResponse.FirstChoice.Message?.ReasoningContent;
+                        if (!string.IsNullOrEmpty(pendingReasoning))
+                        {
+                            RaiseOnStreamingResponse(new OpenTokenResponse
+                            {
+                                Token = string.Empty,
+                                ReasoningToken = pendingReasoning
+                            });
+                        }
+
                         // Handle tool_calls
                         if (partialResponse.FirstChoice.FinishReason == "tool_calls" && partialResponse.FirstChoice.Message?.ToolCalls != null)
                         {
@@ -167,18 +187,40 @@ namespace LetheAISharp.API
                             continueLoop = true;
                             break; // exit foreach — re-enter while loop (or stop if limit reached)
                         }
-                        else if (partialResponse.FirstChoice.Delta?.Content != null)
+                        else if (partialResponse.FirstChoice.Delta?.Content != null || !string.IsNullOrEmpty(partialResponse.FirstChoice.Delta?.ReasoningContent))
                         {
-                            // handle message stuff
-                            cumulativeDelta += partialResponse.FirstChoice.Delta.Content;
+                            var delta = partialResponse.FirstChoice.Delta;
                             var hasFinishReason = !string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason);
-                            RaiseOnStreamingResponse(new OpenTokenResponse
+                            var finishReason = partialResponse.FirstChoice.FinishReason;
+                            var toolRecords = hasFinishReason && toolCallRecords?.Count > 0 ? toolCallRecords : null;
+
+                            // Reasoning (thinking) content from the separate reasoning_content field.
+                            // Routed directly to the engine's thinking channel — does NOT pass through
+                            // the inline-tag splitter.
+                            if (!string.IsNullOrEmpty(delta.ReasoningContent))
                             {
-                                Token = partialResponse.FirstChoice.Delta.Content,
-                                FinishReason = partialResponse.FirstChoice.FinishReason,
-                                ToolCallRecords = hasFinishReason && toolCallRecords?.Count > 0 ? toolCallRecords : null
-                            });
-                            if (hasFinishReason && (partialResponse.FirstChoice.FinishReason == "stop" || partialResponse.FirstChoice.FinishReason == "length"))
+                                RaiseOnStreamingResponse(new OpenTokenResponse
+                                {
+                                    Token = string.Empty,
+                                    ReasoningToken = delta.ReasoningContent,
+                                    FinishReason = finishReason,
+                                    ToolCallRecords = toolRecords
+                                });
+                            }
+
+                            // Visible content from the content field.
+                            if (!string.IsNullOrEmpty(delta.Content))
+                            {
+                                cumulativeDelta += delta.Content;
+                                RaiseOnStreamingResponse(new OpenTokenResponse
+                                {
+                                    Token = delta.Content,
+                                    FinishReason = finishReason,
+                                    ToolCallRecords = toolRecords
+                                });
+                            }
+
+                            if (hasFinishReason && (finishReason == "stop" || finishReason == "length"))
                                 break;
                         }
                         else if (!string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason) && partialResponse.FirstChoice.FinishReason != "null")

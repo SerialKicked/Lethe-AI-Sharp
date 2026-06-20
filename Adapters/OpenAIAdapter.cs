@@ -44,7 +44,7 @@ namespace LetheAISharp.API
             //Hook into the OpenAI streaming event and adapt it to our interface's event
             _client.StreamingMessageReceived += (sender, e) =>
             {
-                TokenReceived?.Invoke(this, new LLMTokenStreamingEventArgs(e.Token, e.FinishReason, e.ToolCallRecords));
+                TokenReceived?.Invoke(this, new LLMTokenStreamingEventArgs(e.Token, e.FinishReason, e.ToolCallRecords, e.ReasoningToken));
             };
 }
 
@@ -104,6 +104,10 @@ namespace LetheAISharp.API
             {
                 var result = await _client.ChatCompletion(param, token).ConfigureAwait(false);
                 var res = result?.Message.Content.ToString();
+                if (!string.IsNullOrEmpty(result?.Message?.ReasoningContent))
+                {
+                    LLMEngine.Logger?.LogInformation("[OpenAI API] Reasoning content: {Reasoning}", result.Message.ReasoningContent.RemoveNewLines());
+                }
                 return res ?? string.Empty;
             }
             catch (Exception ex)

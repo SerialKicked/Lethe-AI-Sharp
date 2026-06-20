@@ -111,6 +111,21 @@ namespace LetheAISharp.LLM
             }
         }
 
+        /// <summary>
+        /// Routes a content delta directly to the requested channel and synchronizes the
+        /// internal state machine so subsequent inline-tag parsing is consistent with the
+        /// last channel we wrote to. Use this when a backend signals the channel through
+        /// a separate JSON field (e.g. <c>reasoning_content</c>) rather than through inline
+        /// <c>&lt;think&gt;</c> tags. After this call, <see cref="FeedToken"/> will look for
+        /// the transition tag of the opposite direction.
+        /// </summary>
+        public void FeedToChannel(InferenceChannel target, string content)
+        {
+            ForceFeed(target, content);
+            _streamBuffer.Clear();
+            currentState = target;
+        }
+
         public (string ThinkContent, string TalkContent) GetCurrentBuffers()
         {
             if (string.IsNullOrEmpty(StartThinkingToken))

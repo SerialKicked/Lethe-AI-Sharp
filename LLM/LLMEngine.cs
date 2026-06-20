@@ -79,12 +79,6 @@ namespace LetheAISharp.LLM
         public static event EventHandler<string>? OnQuickInferenceEnded;
         /// <summary> Called when this library has generated the full prompt, returns full prompt </summary>
         public static event EventHandler<string>? OnFullPromptReady;
-        /// <summary> Called during inference each time the LLM outputs a new token, returns the generated token </summary>
-        [Obsolete("Use OnInferenceSegment for channel-aware streaming. This event only receives Text channel content.")]
-        public static event EventHandler<string>? OnInferenceStreamed;
-        /// <summary> Called once the inference has ended, returns the full string </summary>
-        [Obsolete("Use OnInferenceCompleted for structured results including thinking content and tool calls.")]
-        public static event EventHandler<string>? OnInferenceEnded;
         /// <summary> Called when the system changes states (no init, busy, ready) </summary>
         public static event EventHandler<SystemStatus>? OnStatusChanged;
         /// <summary> Called when the bot persona is changed, returns the new bot (sender is always null) </summary>
@@ -122,8 +116,6 @@ namespace LetheAISharp.LLM
 
         private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(Bot, fullprompt);
         private static void RaiseOnStatusChange(SystemStatus newStatus) => OnStatusChanged?.Invoke(Bot, newStatus);
-        private static void RaiseOnInferenceStreamed(string addedString) => OnInferenceStreamed?.Invoke(Bot, addedString);
-        private static void RaiseOnInferenceEnded(string fullString) => OnInferenceEnded?.Invoke(Bot, fullString);
         private static void RaiseOnQuickInferenceEnded(string fullprompt) => OnQuickInferenceEnded?.Invoke(Bot, fullprompt);
         private static void RaiseInferenceSegment(InferenceSegment segment) => OnInferenceSegment?.Invoke(Bot, segment);
         private static void RaiseInferenceCompleted(InferenceResult result) => OnInferenceCompleted?.Invoke(Bot, result);
@@ -290,6 +282,13 @@ namespace LetheAISharp.LLM
         private static SystemStatus status = SystemStatus.NotInit;
         internal static StringBuilder StreamingTextProgress = new();
         private static InferenceChannel _currentChannel = InferenceChannel.Text;
+        /// <summary>
+        /// True once the current response has produced at least one <c>reasoning_content</c>
+        /// delta. In that mode the visible <c>content</c> deltas are routed directly to the
+        /// talking buffer (bypassing the inline-tag splitter) so the parser state stays
+        /// consistent with the channel the backend actually signaled.
+        /// </summary>
+        private static bool _useSeparateFieldRouting = false;
         private static InstructFormat instruct = new() 
         { 
             SystemStart = "### Instruction:" + NewLine,
@@ -860,10 +859,36 @@ namespace LetheAISharp.LLM
 
             if (e.IsComplete)
             {
+                // If the final delta carries reasoning content (e.g. a reasoning chunk
+                // emitted together with the stop finish_reason), route it to the
+                // thinking buffer before finalizing the response.
+                if (!string.IsNullOrEmpty(e.ReasoningToken))
+                {
+                    _useSeparateFieldRouting = true;
+                    StreamingTextProgress.Append(e.ReasoningToken);
+                    textStreamReceiver.FeedToChannel(InferenceChannel.Thinking, e.ReasoningToken);
+                    RaiseInferenceSegment(new InferenceSegment
+                    {
+                        Channel = InferenceChannel.Thinking,
+                        Text = e.ReasoningToken,
+                        IsComplete = true
+                    });
+                }
+
                 if (!string.IsNullOrEmpty(e.Token))
                 {
                     StreamingTextProgress.Append(e.Token);
-                    _currentChannel = textStreamReceiver.FeedToken(e.Token);
+                    if (_useSeparateFieldRouting)
+                    {
+                        // Backend signaled channels via separate fields; bypass the
+                        // inline-tag parser entirely.
+                        textStreamReceiver.FeedToChannel(InferenceChannel.Text, e.Token);
+                        _currentChannel = InferenceChannel.Text;
+                    }
+                    else
+                    {
+                        _currentChannel = textStreamReceiver.FeedToken(e.Token);
+                    }
                 }
                 var response = textStreamReceiver.GetFormattedText();
                 // We went over the max response length (or reached stop string on some backends) and the backend had to cut the response
@@ -940,8 +965,6 @@ namespace LetheAISharp.LLM
                 }
                 if (e.FinishReason != "tool_calls")
                 {
-                    RaiseOnInferenceEnded(response);
-
                     var (ThinkContent, TalkContent) = textStreamReceiver.GetCurrentBuffers();
 
                     // Build structured result for new event
@@ -965,6 +988,43 @@ namespace LetheAISharp.LLM
             }
             else
             {
+                // Reasoning content delivered through a separate streaming field
+                // (the reasoning_content JSON property) is routed directly into the
+                // thinking channel and bypasses the inline-tag splitter entirely.
+                if (!string.IsNullOrEmpty(e.ReasoningToken))
+                {
+                    _useSeparateFieldRouting = true;
+                    StreamingTextProgress.Append(e.ReasoningToken);
+                    textStreamReceiver.FeedToChannel(InferenceChannel.Thinking, e.ReasoningToken);
+                    _currentChannel = InferenceChannel.Thinking;
+                    RaiseInferenceSegment(new InferenceSegment
+                    {
+                        Channel = InferenceChannel.Thinking,
+                        Text = e.ReasoningToken,
+                        IsComplete = false
+                    });
+                    return;
+                }
+
+                // Once the backend has signaled reasoning via a separate field for this
+                // response, route any subsequent visible deltas directly to the talking
+                // channel rather than running them through the inline-tag parser — the
+                // parser state would otherwise stay in Thinking and silently absorb
+                // visible content into the thinking buffer.
+                if (_useSeparateFieldRouting && !string.IsNullOrEmpty(e.Token))
+                {
+                    StreamingTextProgress.Append(e.Token);
+                    textStreamReceiver.FeedToChannel(InferenceChannel.Text, e.Token);
+                    _currentChannel = InferenceChannel.Text;
+                    RaiseInferenceSegment(new InferenceSegment
+                    {
+                        Channel = InferenceChannel.Text,
+                        Text = e.Token,
+                        IsComplete = false
+                    });
+                    return;
+                }
+
                 var token = e.Token;
                 if (CompletionAPIType == CompletionType.Chat 
                     && StreamingTextProgress.Length == 0 
@@ -985,14 +1045,12 @@ namespace LetheAISharp.LLM
                 {
                     token = Instruct.GetThinkPrefill() + token;
                     StreamingTextProgress.Append(token);
-                    RaiseOnInferenceStreamed(token);
                     return;
                 }
                 StreamingTextProgress.Append(e.Token);
                 _currentChannel = textStreamReceiver.FeedToken(token);
                 if (_currentChannel != InferenceChannel.Unknown)
                     RaiseInferenceSegment(new InferenceSegment { Channel = _currentChannel, Text = token, IsComplete = false });
-                RaiseOnInferenceStreamed(token);
             }
         }
 
@@ -1003,6 +1061,7 @@ namespace LetheAISharp.LLM
         {
             StreamingTextProgress.Clear();
             textStreamReceiver.Reset();
+            _useSeparateFieldRouting = false;
         }
 
         /// <summary>

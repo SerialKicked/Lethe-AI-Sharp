@@ -15,12 +15,20 @@ namespace LetheAISharp.API
     /// <summary>
     /// Arguments for text token streaming events
     /// </summary>
-    public class LLMTokenStreamingEventArgs(string token, string? finishReason, List<ToolCallRecord>? toolCallRecords = null) : EventArgs
+    public class LLMTokenStreamingEventArgs(string token, string? finishReason, List<ToolCallRecord>? toolCallRecords = null, string? reasoningToken = null) : EventArgs
     {
         /// <summary>
-        /// The token text that was generated
+        /// The visible token text that was generated.
         /// </summary>
         public string Token { get; } = token;
+
+        /// <summary>
+        /// Chain-of-thought / reasoning content delivered through a separate streaming field
+        /// (e.g. the <c>reasoning_content</c> property emitted by llama.cpp / vLLM and other
+        /// OpenAI-compatible backends). When populated, the engine routes it directly into
+        /// the thinking channel without running the inline-tag parser.
+        /// </summary>
+        public string? ReasoningToken { get; } = reasoningToken;
 
         /// <summary>
         /// Reason why generation finished (null/empty during streaming, "stop"/"length" when complete)
