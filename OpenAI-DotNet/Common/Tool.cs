@@ -444,10 +444,16 @@ namespace OpenAI
 
         private static string GetFunctionName(Type type, MethodInfo methodInfo)
         {
+            // LetheAISharp modification: the original implementation appended a hashed,
+            // fully-qualified-type-derived suffix (e.g. "readfile_2983265478...") to every
+            // function name to avoid collisions when multiple types expose same-named
+            // methods on the shared static tool/function cache. LetheAISharp is a
+            // near-full-stack, single-instance library where that collision scenario doesn't
+            // occur in practice, and the extra numeric suffix confuses smaller/local models
+            // when they try to call tools. So we just use the plain method name here.
             var baseName = methodInfo.Name.Replace('.', '_');
-            var hashedFullyQualifiedName = $"{type.AssemblyQualifiedName}".GenerateGuid().ToString("N");
-            var nameLength = baseName.Length <= 32 ? baseName.Length : 32;
-            return $"{baseName[..nameLength]}_{hashedFullyQualifiedName}";
+            var nameLength = baseName.Length <= 64 ? baseName.Length : 64;
+            return baseName[..nameLength];
         }
 
         #endregion Tool Cache

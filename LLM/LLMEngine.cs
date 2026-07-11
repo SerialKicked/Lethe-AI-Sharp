@@ -1212,10 +1212,7 @@ namespace LetheAISharp.LLM
 
             // get the full, formated chat history complemented by the data inserts
             var addinserts = string.IsNullOrEmpty(Instruct.ThinkingStart) || !Settings.RAGMoveToThinkBlock;
-
-            var historytokens = (int)((Client?.CompletionType == CompletionType.Chat) ? availtokens * 1.25 : availtokens);
-
-
+            var historytokens = (int)((Client?.CompletionType == CompletionType.Chat) ? availtokens + 2048 : availtokens);
             History.AddHistoryToPrompt(Settings.SessionHandling, historytokens, addinserts ? dataInserts : null);
             if (!string.IsNullOrEmpty(message.Message) || message.Role != AuthorRole.User)
             {
