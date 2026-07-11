@@ -167,6 +167,22 @@ namespace LetheAISharp.API
             return Task.Run(() => GetTokenCountAsync(body)).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
+        /// <summary>
+        /// Applies the model's chat template to a list of chat messages via POST /apply-template, returning
+        /// the fully-formatted prompt string exactly as it would be built for /v1/chat/completions (names,
+        /// roles, template scaffolding included). This does not run inference.
+        /// </summary>
+        public async Task<ApplyTemplateResponse> ApplyTemplateAsync(ApplyTemplateQuery body, CancellationToken cancellationToken = default)
+        {
+            return await SendRequestAsync<ApplyTemplateResponse>(_httpClient!, HttpMethod.Post, "/apply-template", body, cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+
+        public ApplyTemplateResponse ApplyTemplateSync(ApplyTemplateQuery body)
+        {
+            // Using a new task and ConfigureAwait(false) to avoid deadlocks
+            return Task.Run(() => ApplyTemplateAsync(body)).ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+
         public async Task<LlamaServerState> GetServerStateAsync(CancellationToken cancellationToken = default)
         {
             return await SendRequestAsync<LlamaServerState>(_httpClient!, HttpMethod.Get, "/props", cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -386,6 +402,68 @@ namespace LetheAISharp.API
     {
         public string model { get; set; } = "gpt-4";
         public List<MessageQuery> messages { get; set; } = [];
+    }
+
+    /// <summary>
+    /// Request body for POST /apply-template. The messages must be in the same shape used by
+    /// /v1/chat/completions so the server applies the identical chat template used at generation time.
+    /// This is a plain, Newtonsoft-serializable structure on purpose: the OpenAI.Chat.* types use
+    /// System.Text.Json (JsonNode) internals that Newtonsoft cannot serialize.
+    /// </summary>
+    public class ApplyTemplateQuery
+    {
+        [JsonProperty("messages")]
+        public List<ApplyTemplateMessage> messages { get; set; } = [];
+    }
+
+    /// <summary>
+    /// A single chat message for /apply-template, mirroring the /v1/chat/completions message schema.
+    /// Null members are dropped so the payload matches what the OpenAI-compatible endpoint expects.
+    /// </summary>
+    public class ApplyTemplateMessage
+    {
+        [JsonProperty("role")]
+        public string role { get; set; } = "user";
+
+        [JsonProperty("content", NullValueHandling = NullValueHandling.Ignore)]
+        public string? content { get; set; }
+
+        [JsonProperty("tool_calls", NullValueHandling = NullValueHandling.Ignore)]
+        public List<ApplyTemplateToolCall>? tool_calls { get; set; }
+
+        [JsonProperty("tool_call_id", NullValueHandling = NullValueHandling.Ignore)]
+        public string? tool_call_id { get; set; }
+    }
+
+    public class ApplyTemplateToolCall
+    {
+        [JsonProperty("id")]
+        public string id { get; set; } = string.Empty;
+
+        [JsonProperty("type")]
+        public string type { get; set; } = "function";
+
+        [JsonProperty("function")]
+        public ApplyTemplateFunction function { get; set; } = new();
+    }
+
+    public class ApplyTemplateFunction
+    {
+        [JsonProperty("name")]
+        public string name { get; set; } = string.Empty;
+
+        // Per the OpenAI spec, function arguments are a JSON *string*, not a nested object.
+        [JsonProperty("arguments")]
+        public string arguments { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Response body for POST /apply-template. Contains the fully-formatted prompt string.
+    /// </summary>
+    public class ApplyTemplateResponse
+    {
+        [JsonProperty("prompt")]
+        public string prompt { get; set; } = string.Empty;
     }
 
     public class MessageQuery(string role, string content)

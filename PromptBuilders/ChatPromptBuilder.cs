@@ -183,15 +183,7 @@ namespace LetheAISharp
 
             var total = GetTokenUsage(workingprompt);
             var max = LLMEngine.MaxContextLength - (responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride) - 15;
-            while (total > max && workingprompt.Count > 1)
-            {
-                if (total > max + 2048)
-                {
-                    workingprompt.RemoveAt(1);
-                }
-                workingprompt.RemoveAt(1);
-                total = GetTokenUsage(workingprompt);
-            }
+            TrimToFit(workingprompt, ref total, max);
 
             var finalprompt = new List<Message>(workingprompt.ConvertAll(m => m.ToChatCompletion()));
             var cleanimages = !LLMEngine.SupportsVision || LLMEngine.Settings.MaxImageCount > 0;
@@ -302,6 +294,80 @@ namespace LetheAISharp
                 return req;
             }
 
+        }
+
+        /// <summary>
+        /// Trims the oldest messages (preserving index 0, the system prompt) until the accurate token
+        /// usage of <paramref name="workingprompt"/> fits within <paramref name="max"/>.
+        /// </summary>
+        /// <remarks>
+        /// The naive approach re-counts the full prompt after every single removal, which is extremely
+        /// slow on backends whose token-counting is an HTTP round-trip (e.g. llama.cpp). Instead we use a
+        /// cheap local per-message estimate to decide how many messages to drop in one batch, then perform
+        /// a single accurate re-count to verify. The batch is intentionally conservative (under-drops) so
+        /// that we never trim more context than necessary; if the estimate was too optimistic we simply
+        /// loop again, which converges in one or two accurate counts instead of N.
+        /// </remarks>
+        private void TrimToFit(List<SingleMessage> workingprompt, ref int total, int max)
+        {
+            // Fast path: nothing to do.
+            if (total <= max || workingprompt.Count <= 1)
+                return;
+
+            // Guard against pathological loops (e.g. a single message that is itself larger than max).
+            var safety = 0;
+            while (total > max && workingprompt.Count > 1)
+            {
+                var excess = total - max;
+
+                // Walk from the oldest removable message (index 1) forward, accumulating cheap local
+                // estimates until we've covered the excess. We deliberately stop as soon as the estimate
+                // meets the excess (conservative / under-drop) rather than padding it, because any
+                // shortfall is caught by the accurate re-count below.
+                var removeCount = 0;
+                var estRemoved = 0;
+                for (int i = 1; i < workingprompt.Count && estRemoved < excess; i++)
+                {
+                    estRemoved += EstimateLocalTokens(workingprompt[i]);
+                    removeCount++;
+                }
+
+                // Always remove at least one message so we make progress even if the local estimate is 0.
+                if (removeCount == 0)
+                    removeCount = 1;
+
+                // Never remove the final (newest) message; keep at least the system prompt + one message.
+                var maxRemovable = workingprompt.Count - 2;
+                if (maxRemovable < 1)
+                    maxRemovable = 1;
+                if (removeCount > maxRemovable)
+                    removeCount = maxRemovable;
+
+                workingprompt.RemoveRange(1, removeCount);
+
+                // One accurate count to verify the batch. If we under-dropped, the outer loop runs again.
+                total = GetTokenUsage(workingprompt);
+
+                if (++safety > workingprompt.Count + 4)
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Cheap, local (no backend call) per-message token estimate used only to decide how many
+        /// messages to drop in a single trim batch. This is intentionally an over-estimate per message so
+        /// the batch tends to be conservative; the authoritative count is always the full-prompt count.
+        /// </summary>
+        private static int EstimateLocalTokens(SingleMessage message)
+        {
+            var text = message.ToTextCompletion();
+            var total = TokenTools.CountTokens(text);
+
+            if (message.Role == AuthorRole.Assistant && message.ToolCalls.Count > 0)
+                total += TokenTools.CountTokens(message.ToolCallToString());
+
+            // Structural per-message overhead (role headers/delimiters) the plain text count misses.
+            return total + 8;
         }
 
         public void Clear()

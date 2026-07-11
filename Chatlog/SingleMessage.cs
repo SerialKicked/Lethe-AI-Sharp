@@ -74,6 +74,33 @@ namespace LetheAISharp.Files
             return tmsg.ToString();
         }
 
+        /// <summary>
+        /// Returns the macro-expanded text content of this message as it would appear in the "content"
+        /// field of a /v1/chat/completions message (including any "Name: " prefix), without image or
+        /// tool-call structure. Used for accurate chat-template token counting.
+        /// </summary>
+        internal string ToChatContentText()
+        {
+            var realprompt = Message;
+            var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt;
+
+            if (Bot is GroupPersonaBase)
+                addname = true;
+
+            if (Role != AuthorRole.Assistant && Role != AuthorRole.User)
+                addname = false;
+
+            if (addname || Bot != LLMEngine.Bot || User != LLMEngine.User)
+            {
+                if (Role == AuthorRole.Assistant)
+                    realprompt = string.Format("{0}: {1}", Bot.Name, Message);
+                else if (Role == AuthorRole.User)
+                    realprompt = string.Format("{0}: {1}", User.Name, Message);
+            }
+
+            return Bot.ReplaceMacros(realprompt, User);
+        }
+
         internal Message ToChatCompletion()
         {
             // Tool result messages: skip all name/image logic

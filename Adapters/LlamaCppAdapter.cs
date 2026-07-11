@@ -242,6 +242,47 @@ namespace LetheAISharp.API
 
         public int CountMessageTokens(List<SingleMessage> messages)
         {
+            // In chat mode the authoritative count must match what /v1/chat/completions actually builds:
+            // names, macro expansion and the model's chat-template scaffolding all affect the real token
+            // count. Counting the raw message text (as the legacy /v1/messages/count_tokens path did)
+            // systematically under-counts, and the gap grows with the number of messages. To get an exact
+            // count we render the messages through the model's chat template via /apply-template (using the
+            // same content generation produces: name prefixes, macros and tool-call structure), then
+            // tokenize that string with BOS.
+            if (CompletionType == CompletionType.Chat)
+            {
+                try
+                {
+                    var chatMessages = new List<ApplyTemplateMessage>();
+                    foreach (var message in messages)
+                    {
+                        var built = BuildTemplateMessage(message);
+                        if (built is not null)
+                            chatMessages.Add(built);
+                    }
+                    if (chatMessages.Count == 0)
+                        return 0;
+
+                    var templated = _client.ApplyTemplateSync(new ApplyTemplateQuery { messages = chatMessages });
+                    if (!string.IsNullOrEmpty(templated?.prompt))
+                    {
+                        var tokens = _client.TokenizeSync(new TokenRequest
+                        {
+                            content = templated.prompt,
+                            add_special = true,
+                            parse_special = true
+                        });
+                        return tokens.GetTokenCount();
+                    }
+                    LLMEngine.Logger?.LogWarning("[LlamaCpp] /apply-template returned an empty prompt; falling back to legacy token count.");
+                }
+                catch (Exception ex)
+                {
+                    // Older servers may not expose /apply-template. Fall back to the legacy path below.
+                    LLMEngine.Logger?.LogWarning(ex, "[LlamaCpp] /apply-template unavailable; falling back to legacy token count.");
+                }
+            }
+
             var request = new MessageListQuery();
             foreach (var message in messages)
             {
@@ -266,6 +307,71 @@ namespace LetheAISharp.API
                 return 0;
             var token = _client.GetTokenCountSync(request);
             return token.input_tokens;
+        }
+
+        /// <summary>
+        /// Builds a Newtonsoft-serializable /apply-template message from a <see cref="SingleMessage"/>,
+        /// mirroring the three cases in <see cref="SingleMessage.ToChatCompletion"/> (tool result,
+        /// assistant tool-call-only, and normal text). Tool-call arguments are kept as the raw JSON
+        /// *string* (never a System.Text.Json JsonNode) so serialization cannot self-reference.
+        /// Returns null for roles that are not sent to the template.
+        /// </summary>
+        private static ApplyTemplateMessage? BuildTemplateMessage(SingleMessage message)
+        {
+            // Tool result messages
+            if (message.Role == AuthorRole.Tool && message.ToolCalls.Count > 0)
+            {
+                return new ApplyTemplateMessage
+                {
+                    role = "tool",
+                    content = message.Message,
+                    tool_call_id = message.ToolCalls[0].CallId
+                };
+            }
+
+            // Assistant tool-call-only messages (no text content)
+            if (message.Role == AuthorRole.Assistant && message.ToolCalls.Count > 0 && string.IsNullOrEmpty(message.Message))
+            {
+                var calls = new List<ApplyTemplateToolCall>();
+                foreach (var record in message.ToolCalls)
+                {
+                    calls.Add(new ApplyTemplateToolCall
+                    {
+                        id = record.CallId,
+                        type = "function",
+                        function = new ApplyTemplateFunction
+                        {
+                            name = record.FunctionName,
+                            arguments = record.ArgumentsJson
+                        }
+                    });
+                }
+                return new ApplyTemplateMessage
+                {
+                    role = "assistant",
+                    // OpenAI schema requires content (may be null) alongside tool_calls.
+                    content = string.IsNullOrEmpty(message.Message) ? null : message.Message,
+                    tool_calls = calls
+                };
+            }
+
+            // Normal messages (System / User / Assistant text)
+            var role = message.Role switch
+            {
+                AuthorRole.User => "user",
+                AuthorRole.Assistant => "assistant",
+                AuthorRole.System => "system",
+                AuthorRole.Tool => "tool",
+                _ => null
+            };
+            if (role is null)
+                return null;
+
+            return new ApplyTemplateMessage
+            {
+                role = role,
+                content = message.ToChatContentText()
+            };
         }
 
         private async Task GenerateChatCompletionStreaming(object parameters)
