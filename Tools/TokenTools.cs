@@ -103,6 +103,55 @@ namespace LetheAISharp
             return res;
         }
 
+        /// <summary>
+        /// Appends new tool-round messages (<paramref name="toadd"/>: the assistant tool-call message
+        /// followed by its tool-result messages) to the running conversation and only evicts old messages
+        /// when the conversation actually approaches the context budget.
+        /// </summary>
+        /// <remarks>
+        /// Unlike <see cref="MaintainRoughTokenCount"/> (which pins the budget to the pre-round size and
+        /// therefore evicts on <em>every</em> tool round regardless of context usage), this method lets the
+        /// conversation grow freely until the fast char/4 estimate exceeds <paramref name="maxTokens"/>.
+        /// Only then does it delete the oldest messages (from index 1, preserving the system prompt at
+        /// index 0). This matches the intended behaviour: keep everything in a fresh/low-context chat, and
+        /// fall back to dropping old messages near the real context limit.
+        ///
+        /// Counting uses the cheap local estimate only (no HTTP round-trips), so <paramref name="maxTokens"/>
+        /// should already include a generous safety margin to absorb the estimate's vagueness.
+        ///
+        /// After trimming, any orphaned leading tool-result message (a <see cref="OpenAI.Role.Tool"/> message
+        /// at index 1 whose originating assistant tool-call message was removed) is also dropped, so backends
+        /// whose chat templates reject a leading tool message do not error out.
+        /// </remarks>
+        public static List<Message> TrimToolContextIfNeeded(IList<Message> messages, List<Message> toadd, InstructFormat? format, int maxTokens)
+        {
+            var res = new List<Message>(messages);
+            res.AddRange(toadd);
+
+            // Fresh / below-budget case: let the conversation grow, evict nothing.
+            if (maxTokens <= 0 || CountTokens(res, format) <= maxTokens)
+                return res;
+
+            // Near the context limit: drop the oldest messages (index 1 onward, preserving the system
+            // prompt at index 0) until we fit. The newest messages -- the tool round we are about to
+            // re-send -- are always kept, matching the priority used by ChatPromptBuilder.TrimToFit.
+            // As with that method, if the retained tail (system prompt + newest round) is itself larger
+            // than maxTokens we cannot trim further and return it as-is; the margin baked into maxTokens
+            // by the caller is what protects against the estimate under-counting the real prompt.
+            while (res.Count > 1 && CountTokens(res, format) > maxTokens)
+            {
+                res.RemoveAt(1);
+            }
+
+            // Guard against leaving an orphaned tool-result message as the first post-system message.
+            while (res.Count > 1 && res[1].Role == OpenAI.Role.Tool)
+            {
+                res.RemoveAt(1);
+            }
+
+            return res;
+        }
+
         public static int CountTokens(IList<Message> messages, InstructFormat? format = null)
         {
             if (format == null)

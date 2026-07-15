@@ -91,7 +91,7 @@ namespace LetheAISharp.API
             //var nostopfix = true; // some backends don't return "stop" at the end of completion. It handles this case.
             var toolCallRecords = new List<ToolCallRecord>();
             var toolRound = 0;
-            int maxToolRounds = LLMEngine.Settings.ToolCallLimit;
+            int maxToolRounds = LLMEngine.Settings.ToolCallLimit <= 0 ? int.MaxValue : LLMEngine.Settings.ToolCallLimit;
             var currentRequest = request;
             try
             {
@@ -175,7 +175,11 @@ namespace LetheAISharp.API
                                 partialResponse.FirstChoice.Message
                             };
                             toadd.AddRange(toolmsgs);
-                            var updatedMessages = TokenTools.MaintainRoughTokenCount(currentRequest.Messages, toadd, LLMEngine.Instruct);
+                            // Only evict old messages when we actually approach the context budget; otherwise let
+                            // the conversation grow. A generous margin absorbs the vagueness of the fast estimate.
+                            var trimMargin = Math.Max(LLMEngine.MaxContextLength / 8, 512);
+                            var maxContextTokens = LLMEngine.MaxContextLength - LLMEngine.Settings.MaxReplyLength - trimMargin;
+                            var updatedMessages = TokenTools.TrimToolContextIfNeeded(currentRequest.Messages, toadd, LLMEngine.Instruct, maxContextTokens);
                             currentRequest.Messages = updatedMessages;
                             currentRequest.ToolChoice = toolRound < maxToolRounds ? "auto" : "none";
                             if (toolRound >= maxToolRounds)
