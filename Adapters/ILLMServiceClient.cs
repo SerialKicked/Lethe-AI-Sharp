@@ -96,6 +96,23 @@ namespace LetheAISharp.API
 
         int CountMessageTokens(List<SingleMessage> messages);
 
+        /// <summary>
+        /// True when the backend can return the exact prompt token count of a fully-built generation
+        /// request (chat template, tool definitions and images included), rather than an estimate
+        /// derived from raw message text. See <see cref="CountRequestTokensSync"/>.
+        /// </summary>
+        bool SupportsRequestTokenCount => false;
+
+        /// <summary>
+        /// Counts the exact number of prompt tokens the backend would process for a fully-built
+        /// generation request (the same request object that <see cref="GenerateTextStreaming"/>
+        /// would receive). Only called when <see cref="SupportsRequestTokenCount"/> is true;
+        /// the default implementation throws.
+        /// </summary>
+        /// <param name="parameters">The built generation request (e.g. a ChatRequest for chat backends).</param>
+        /// <returns>Exact prompt token count as computed by the backend itself.</returns>
+        int CountRequestTokensSync(object parameters) => throw new NotSupportedException();
+
         // Token counting
         Task<int> CountTokens(string text);
         int CountTokensSync(string text);

@@ -189,6 +189,47 @@ namespace LetheAISharp.API
             return Task.Run(() => ApplyTemplateAsync(body)).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
+        /// <summary>
+        /// Counts the exact number of prompt tokens llama.cpp would process for a fully-built chat
+        /// request via POST /v1/chat/completions/input_tokens (llama.cpp PR #23913, June 2026).
+        /// </summary>
+        /// <remarks>
+        /// The request is serialized with the same System.Text.Json options as /v1/chat/completions,
+        /// so the server parses the identical body it would at generation time: chat template, tool
+        /// definitions, chat_template_kwargs, add_generation_prompt and - crucially - image expansion
+        /// through mtmd placeholder bitmaps all match generation one-to-one. This makes the count
+        /// immune to the estimate drift that plagued the /apply-template + /tokenize pipeline (which
+        /// cannot count image tokens at all).
+        ///
+        /// Retries are disabled: a missing endpoint (older server) is a permanent condition and the
+        /// caller has a fallback.
+        /// </remarks>
+        public async Task<ChatInputTokensResponse> ChatInputTokensAsync(ChatRequest body, CancellationToken cancellationToken = default)
+        {
+            var json = System.Text.Json.JsonSerializer.Serialize(body, OpenAI.OpenAIClient.JsonSerializationOptions);
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/chat/completions/input_tokens");
+            var content = new StringContent(json);
+            content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json");
+            request.Content = content;
+            request.Headers.Accept.Add(MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+            using var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            var status = (int)response.StatusCode;
+            var responseText = response.Content is null ? string.Empty : await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            if (status != 200)
+            {
+                throw new ApiException($"HTTP status code {status} was not expected.", status, responseText, new Dictionary<string, IEnumerable<string>>(), null);
+            }
+            var res = JsonConvert.DeserializeObject<ChatInputTokensResponse>(responseText, JsonSerializerSettings);
+            return res ?? new ChatInputTokensResponse();
+        }
+
+        public ChatInputTokensResponse ChatInputTokensSync(ChatRequest body)
+        {
+            // Using a new task and ConfigureAwait(false) to avoid deadlocks
+            return Task.Run(() => ChatInputTokensAsync(body)).ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+
         public async Task<LlamaServerState> GetServerStateAsync(CancellationToken cancellationToken = default)
         {
             return await SendRequestAsync<LlamaServerState>(_httpClient!, HttpMethod.Get, "/props", cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -209,6 +250,16 @@ namespace LetheAISharp.API
     public class TokenCountResponse
     {
         public int input_tokens { get; set; } = 0;
+    }
+
+    /// <summary>
+    /// Response body for POST /v1/chat/completions/input_tokens. Contains the exact number of
+    /// prompt tokens the paired /v1/chat/completions request would process (image tokens included).
+    /// </summary>
+    public class ChatInputTokensResponse
+    {
+        [JsonProperty("input_tokens")]
+        public long input_tokens { get; set; } = 0;
     }
 
     public class MessageListQuery

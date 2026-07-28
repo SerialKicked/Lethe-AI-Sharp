@@ -91,6 +91,7 @@ namespace LetheAISharp.API
             // A reconnect (or a model swap) may well fix whatever made /apply-template fail, so give the
             // accurate token count another chance.
             _applyTemplateUnavailable = false;
+            _inputTokensUnavailable = false;
 
             if (CompletionType == CompletionType.Chat)
             {
@@ -198,6 +199,42 @@ namespace LetheAISharp.API
             return token.GetTokenCount();
         }
 
+        /// <summary>
+        /// True when the server exposes /v1/chat/completions/input_tokens (llama.cpp builds from June
+        /// 2026 onward), letting it count the exact prompt tokens of a fully-built chat request -
+        /// template, tools, template kwargs and image expansion included. This is the only count that
+        /// cannot drift from what generation actually processes.
+        /// </summary>
+        public bool SupportsRequestTokenCount => CompletionType == CompletionType.Chat && !_inputTokensUnavailable;
+
+        /// <inheritdoc cref="ILLMServiceClient.CountRequestTokensSync"/>
+        public int CountRequestTokensSync(object parameters)
+        {
+            if (parameters is not ChatRequest input)
+                throw new ArgumentException("Parameters must be of type ChatRequest");
+            try
+            {
+                return checked((int)_client.ChatInputTokensSync(input).input_tokens);
+            }
+            catch (ApiException ex) when (ex.StatusCode is 404 or 501)
+            {
+                // Older llama.cpp server without the endpoint: stop paying for a round-trip we know
+                // will fail on every subsequent count. Cleared by GetBackendInfo (i.e. on reconnect).
+                _inputTokensUnavailable = true;
+                LLMEngine.Logger?.LogWarning(
+                    "[LlamaCpp] /v1/chat/completions/input_tokens is not available on this server (HTTP {StatusCode}); falling back to template-based token counting. Update llama.cpp to a June 2026 or newer build for exact token counts.",
+                    ex.StatusCode);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// True once /v1/chat/completions/input_tokens has been reported missing, so we stop paying
+        /// for a round-trip we know will fail on every subsequent count. Cleared by
+        /// <see cref="GetBackendInfo"/> (i.e. on reconnect).
+        /// </summary>
+        private bool _inputTokensUnavailable;
+
         public async Task<byte[]> TextToSpeech(string text, string voice)
         {
             // OpenAI does not support TTS directly
@@ -266,12 +303,16 @@ namespace LetheAISharp.API
 
         public int CountMessageTokens(List<SingleMessage> messages)
         {
-            // In chat mode the authoritative count must match what /v1/chat/completions actually builds:
-            // names, macro expansion and the model's chat-template scaffolding all affect the real token
+            // Fallback message-list count for servers without /v1/chat/completions/input_tokens
+            // (see CountRequestTokensSync, the preferred exact path). Unlike that endpoint, this path
+            // reconstructs the prompt from the message list: in chat mode the authoritative count must
+            // match what /v1/chat/completions actually builds: names, macro expansion and the model's
+            // chat-template scaffolding all affect the real token
             // count. Counting the raw message text (as the legacy /v1/messages/count_tokens path did)
             // systematically under-counts, and the gap grows with the number of messages. To get an exact
             // count we render the messages through the model's chat template via /apply-template (using the
             // same content, tools and template arguments generation uses), then tokenize that string.
+            // Note: /tokenize cannot expand image tokens, so callers must add an image estimate on top.
             if (CompletionType == CompletionType.Chat && !_applyTemplateUnavailable)
             {
                 try

@@ -3,6 +3,7 @@ using LetheAISharp.API;
 using LetheAISharp.Files;
 using LetheAISharp.LLM;
 using LLama.Sampling;
+using Microsoft.Extensions.Logging;
 using OpenAI;
 using OpenAI.Chat;
 using System;
@@ -151,49 +152,99 @@ namespace LetheAISharp
             // Let's make sure we don't overshoot token limits.
             var workingprompt = new List<SingleMessage>(_prompt);
             var think = LLMEngine.Settings.DisableThinking;
-            if (_currentSchema is not null)
+            try
             {
-                LLMEngine.Settings.DisableThinking = true;
-                LLMEngine.NamesInPromptOverride = false;
-                // Structured output suppresses the assistant generation prefix; the token count has to
-                // render the same way, so publish it before GetTokenUsage runs.
-                LLMEngine.AddGenerationPromptOverride = false;
-            }
-
-            if (LLMEngine.Settings.ToolCallChainLimit > 0 && workingprompt.Count > LLMEngine.Settings.ToolCallChainLimit)
-            {
-                int chainCount = 0;
-                int foundID = -1;
-
-                for (int i = workingprompt.Count - 1; i >= 0; i--)
+                if (_currentSchema is not null)
                 {
-                    var msg = workingprompt[i];
+                    LLMEngine.Settings.DisableThinking = true;
+                    LLMEngine.NamesInPromptOverride = false;
+                    // Structured output suppresses the assistant generation prefix; the token count has to
+                    // render the same way, so publish it before GetTokenUsage runs.
+                    LLMEngine.AddGenerationPromptOverride = false;
+                }
 
-                    // Count only tool call roots (assistant messages with tool calls)
-                    if (msg.Role == AuthorRole.Assistant && msg.ToolCalls.Count > 0)
+                if (LLMEngine.Settings.ToolCallChainLimit > 0 && workingprompt.Count > LLMEngine.Settings.ToolCallChainLimit)
+                {
+                    int chainCount = 0;
+                    int foundID = -1;
+
+                    for (int i = workingprompt.Count - 1; i >= 0; i--)
                     {
-                        chainCount++;
-                        if (chainCount > LLMEngine.Settings.ToolCallChainLimit)
+                        var msg = workingprompt[i];
+
+                        // Count only tool call roots (assistant messages with tool calls)
+                        if (msg.Role == AuthorRole.Assistant && msg.ToolCalls.Count > 0)
                         {
-                            foundID = i;
-                            break;
+                            chainCount++;
+                            if (chainCount > LLMEngine.Settings.ToolCallChainLimit)
+                            {
+                                foundID = i;
+                                break;
+                            }
                         }
+                    }
+
+                    if (foundID >= 0)
+                    {
+                        // Remove ONLY tool-related messages before foundID
+                        workingprompt = [.. workingprompt.Where((m, idx) =>
+                            !(idx < foundID && (m.Role == AuthorRole.Tool || (m.Role == AuthorRole.Assistant && m.ToolCalls.Count > 0))))];
+                    }
+                }
+                LLMEngine.Instruct.UpdateSysPromptForThinking(workingprompt[0]);
+
+                var max = LLMEngine.MaxContextLength - (responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride) - 15;
+
+                // Exact path: the backend counts the fully-built request itself (chat template, tool
+                // definitions and image expansion included), so trimming matches what the server will
+                // actually process - no estimate drift. Currently llama.cpp only.
+                if (LLMEngine.Client is { SupportsRequestTokenCount: true } exactClient)
+                {
+                    try
+                    {
+                        var request = BuildChatRequest(workingprompt, tempoverride, responseoverride, overridePrefill);
+                        var total = exactClient.CountRequestTokensSync(request);
+                        var maxIterations = workingprompt.Count + 4;
+                        var iteration = 0;
+                        while (total > max && workingprompt.Count > 1)
+                        {
+                            RemoveTrimBatch(workingprompt, total - max);
+                            request = BuildChatRequest(workingprompt, tempoverride, responseoverride, overridePrefill);
+                            total = exactClient.CountRequestTokensSync(request);
+                            if (++iteration > maxIterations)
+                                break;
+                        }
+                        return request;
+                    }
+                    catch (Exception ex)
+                    {
+                        // The endpoint-missing case already disabled the capability inside the adapter
+                        // (and logged why); anything else (a payload the server rejects, a transient
+                        // failure) falls back to the estimate-based path for this query only.
+                        LLMEngine.Logger?.LogWarning(ex, "[PromptBuilder] Exact request token count failed; falling back to estimate-based trimming.");
                     }
                 }
 
-                if (foundID >= 0)
-                {
-                    // Remove ONLY tool-related messages before foundID
-                    workingprompt = [.. workingprompt.Where((m, idx) => 
-                        !(idx < foundID && (m.Role == AuthorRole.Tool || (m.Role == AuthorRole.Assistant && m.ToolCalls.Count > 0))))];
-                }
+                var esttotal = GetTokenUsage(workingprompt);
+                TrimToFit(workingprompt, ref esttotal, max);
+                return BuildChatRequest(workingprompt, tempoverride, responseoverride, overridePrefill);
             }
-            LLMEngine.Instruct.UpdateSysPromptForThinking(workingprompt[0]);
+            finally
+            {
+                LLMEngine.Settings.DisableThinking = think;
+                LLMEngine.NamesInPromptOverride = null;
+                LLMEngine.AddGenerationPromptOverride = null;
+            }
+        }
 
-            var total = GetTokenUsage(workingprompt);
-            var max = LLMEngine.MaxContextLength - (responseoverride == -1 ? LLMEngine.Settings.MaxReplyLength : responseoverride) - 15;
-            TrimToFit(workingprompt, ref total, max);
-
+        /// <summary>
+        /// Converts <paramref name="workingprompt"/> into the final <see cref="ChatRequest"/>: message
+        /// conversion, image pruning, prefill, sampler import, tool definitions and template kwargs.
+        /// This is the single construction site for the outgoing request, so an exact token count taken
+        /// on its result always describes the payload generation will actually send.
+        /// </summary>
+        private ChatRequest BuildChatRequest(List<SingleMessage> workingprompt, double tempoverride, int responseoverride, bool? overridePrefill)
+        {
             var finalprompt = new List<Message>(workingprompt.ConvertAll(m => m.ToChatCompletion()));
             var cleanimages = !LLMEngine.SupportsVision || LLMEngine.Settings.MaxImageCount > 0;
             var maxallowed = LLMEngine.SupportsVision ? LLMEngine.Settings.MaxImageCount : 0;
@@ -268,9 +319,6 @@ namespace LetheAISharp
                         }
                 };
                 req.ImportFromGenerationInput(LLMEngine.Sampler);
-                LLMEngine.Settings.DisableThinking = think;
-                LLMEngine.NamesInPromptOverride = null;
-                LLMEngine.AddGenerationPromptOverride = null;
                 return req;
             }
             else
@@ -299,12 +347,8 @@ namespace LetheAISharp
                     req.add_generation_prompt = null;
                 }
                 req.ImportFromGenerationInput(LLMEngine.Sampler);
-                LLMEngine.Settings.DisableThinking = think;
-                LLMEngine.NamesInPromptOverride = null;
-                LLMEngine.AddGenerationPromptOverride = null;
                 return req;
             }
-
         }
 
         /// <summary>
@@ -329,38 +373,55 @@ namespace LetheAISharp
             var safety = 0;
             while (total > max && workingprompt.Count > 1)
             {
-                var excess = total - max;
-
-                // Walk from the oldest removable message (index 1) forward, accumulating cheap local
-                // estimates until we've covered the excess. We deliberately stop as soon as the estimate
-                // meets the excess (conservative / under-drop) rather than padding it, because any
-                // shortfall is caught by the accurate re-count below.
-                var removeCount = 0;
-                var estRemoved = 0;
-                for (int i = 1; i < workingprompt.Count && estRemoved < excess; i++)
-                {
-                    estRemoved += EstimateLocalTokens(workingprompt[i]);
-                    removeCount++;
-                }
-
-                // Always remove at least one message so we make progress even if the local estimate is 0.
-                if (removeCount == 0)
-                    removeCount = 1;
-
-                // Never remove the final (newest) message; keep at least the system prompt + one message.
-                var maxRemovable = workingprompt.Count - 2;
-                if (maxRemovable < 1)
-                    maxRemovable = 1;
-                if (removeCount > maxRemovable)
-                    removeCount = maxRemovable;
-
-                workingprompt.RemoveRange(1, removeCount);
+                RemoveTrimBatch(workingprompt, total - max);
 
                 // One accurate count to verify the batch. If we under-dropped, the outer loop runs again.
                 total = GetTokenUsage(workingprompt);
 
                 if (++safety > workingprompt.Count + 4)
                     break;
+            }
+        }
+
+        /// <summary>
+        /// Removes one batch of the oldest messages from <paramref name="workingprompt"/> (preserving
+        /// index 0, the system prompt, and never removing the newest message) whose combined cheap local
+        /// estimate covers <paramref name="excess"/> tokens. The batch deliberately under-drops: any
+        /// shortfall is caught by the accurate re-count the caller performs afterwards. Also drops any
+        /// orphaned tool-result message exposed at index 1, so backends whose chat templates reject a
+        /// leading tool message do not error out.
+        /// </summary>
+        private static void RemoveTrimBatch(List<SingleMessage> workingprompt, int excess)
+        {
+            // Walk from the oldest removable message (index 1) forward, accumulating cheap local
+            // estimates until we've covered the excess. We deliberately stop as soon as the estimate
+            // meets the excess (conservative / under-drop) rather than padding it, because any
+            // shortfall is caught by the accurate re-count the caller performs afterwards.
+            var removeCount = 0;
+            var estRemoved = 0;
+            for (int i = 1; i < workingprompt.Count && estRemoved < excess; i++)
+            {
+                estRemoved += EstimateLocalTokens(workingprompt[i]);
+                removeCount++;
+            }
+
+            // Always remove at least one message so we make progress even if the local estimate is 0.
+            if (removeCount == 0)
+                removeCount = 1;
+
+            // Never remove the final (newest) message; keep at least the system prompt + one message.
+            var maxRemovable = workingprompt.Count - 2;
+            if (maxRemovable < 1)
+                maxRemovable = 1;
+            if (removeCount > maxRemovable)
+                removeCount = maxRemovable;
+
+            workingprompt.RemoveRange(1, removeCount);
+
+            // Guard against leaving an orphaned tool-result message as the first post-system message.
+            while (workingprompt.Count > 1 && workingprompt[1].Role == AuthorRole.Tool)
+            {
+                workingprompt.RemoveAt(1);
             }
         }
 

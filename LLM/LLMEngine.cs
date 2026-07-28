@@ -1219,9 +1219,9 @@ namespace LetheAISharp.LLM
 
             // get the full, formated chat history complemented by the data inserts
             var addinserts = string.IsNullOrEmpty(Instruct.ThinkingStart) || !Settings.RAGMoveToThinkBlock;
-            var cushion = Client?.CompletionType == CompletionType.Chat ? MaxContextLength / 10 : 0;
-            if (cushion > 10240)
-                cushion = 10240;
+            var cushion = Client?.CompletionType == CompletionType.Chat ? MaxContextLength / 2 : 0;
+            if (cushion > 15240)
+                cushion = 15240;
             var historytokens = availtokens + cushion;
             History.AddHistoryToPrompt(Settings.SessionHandling, historytokens, addinserts ? dataInserts : null);
             if (!string.IsNullOrEmpty(message.Message) || message.Role != AuthorRole.User)
