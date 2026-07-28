@@ -132,7 +132,10 @@ namespace LetheAISharp.Files
             // Tool result messages: skip all name/image logic
             if (Role == AuthorRole.Tool && ToolCalls.Count > 0)
             {
-                return new Message(OpenAI.Role.Tool, Message);
+                // The tool_call_id is required by strict backends (OpenAI 400s without it). Built
+                // through the same Message(ToolCall, string) constructor the live tool-call loop
+                // uses, so replayed history has the identical shape (id + function name).
+                return new Message(ToolCalls[0].ToToolcall(), Message);
             }
 
             // Assistant tool-call-only messages: skip all name/image logic

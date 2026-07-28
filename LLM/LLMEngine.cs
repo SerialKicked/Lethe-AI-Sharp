@@ -1237,11 +1237,17 @@ namespace LetheAISharp.LLM
                 PromptBuilder.AddMessage(message);
             }
 
-            var final = PromptBuilder.GetTokenUsage();
-            if (final > (MaxContextLength - Settings.MaxReplyLength) && Client?.CompletionType == CompletionType.Text)
+            // In chat mode the count below is pure overhead: it costs a full backend token-count round
+            // trip, and its only consumer is the over-limit warning for text completion (chat prompts
+            // are authoritatively trimmed in PromptToQuery anyway).
+            if (Client?.CompletionType == CompletionType.Text)
             {
-                var diff = final - (MaxContextLength - Settings.MaxReplyLength);
-                logger?.LogWarning("The prompt is {Diff} tokens over the limit.", diff);
+                var final = PromptBuilder.GetTokenUsage();
+                if (final > (MaxContextLength - Settings.MaxReplyLength))
+                {
+                    var diff = final - (MaxContextLength - Settings.MaxReplyLength);
+                    logger?.LogWarning("The prompt is {Diff} tokens over the limit.", diff);
+                }
             }
             if (string.IsNullOrEmpty(message.Message) && message.Role == AuthorRole.User)
                 return PromptBuilder.PromptToQuery(AuthorRole.User, forceAltRoles: forceAltRolesAnyway ?? (IsGroupConversation && Settings.GroupInstructFormatAdapter));

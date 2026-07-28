@@ -4,6 +4,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Processing;
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -46,6 +47,15 @@ namespace LetheAISharp
         }
 
         /// <summary>
+        /// Memoized encodes, keyed by path + maxSize and invalidated by the file's last-write time.
+        /// Decode + resize + PNG encode is by far the most expensive part of rebuilding a chat request,
+        /// and prompt building can rebuild the same images several times per generation (token-count
+        /// trim iterations, rerolls). Entries are large strings, so the cache is hard-capped.
+        /// </summary>
+        private static readonly ConcurrentDictionary<string, (DateTime WriteTimeUtc, string Data)> _base64Cache = new(StringComparer.OrdinalIgnoreCase);
+        private const int Base64CacheCap = 12;
+
+        /// <summary>
         /// Converts an image file to a base64 encoded string suitable for the KoboldCpp API.
         /// This encodes the actual pixel data of the image, with optional scaling.
         /// </summary>
@@ -56,8 +66,23 @@ namespace LetheAISharp
         {
             try
             {
+                var key = $"{maxSize}|{imagePath}";
+                var writeTime = File.GetLastWriteTimeUtc(imagePath);
+                if (_base64Cache.TryGetValue(key, out var cached) && cached.WriteTimeUtc == writeTime)
+                    return cached.Data;
+
                 using var image = Image.Load(imagePath);
-                return ImageToBase64(image, maxSize);
+                var res = ImageToBase64(image, maxSize);
+                if (res != null)
+                {
+                    // Crude but effective bound: entries are big and the active working set is small
+                    // (a handful of images per prompt), so clearing on overflow costs at most one
+                    // re-encode per image.
+                    if (_base64Cache.Count >= Base64CacheCap)
+                        _base64Cache.Clear();
+                    _base64Cache[key] = (writeTime, res);
+                }
+                return res;
             }
             catch (Exception ex)
             {
