@@ -1,4 +1,4 @@
-﻿using LetheAISharp.Agent.Tools;
+using LetheAISharp.Agent.Tools;
 using LetheAISharp.API;
 using LetheAISharp.Files;
 using LetheAISharp.LLM;
@@ -59,7 +59,13 @@ namespace LetheAISharp
         {
 
             var total = 0;
-            if (LLMEngine.ToolCallsLoaded)
+
+            // Some backends render the tool definitions themselves when counting (llama.cpp's
+            // /apply-template does), in which case their cost is already inside CountMessageTokens and
+            // adding a local estimate on top would inflate the count and trim the prompt for no reason.
+            var toolsAlreadyCounted = LLMEngine.Client is LlamaCppAdapter llama && llama.CountsToolDefinitions;
+
+            if (LLMEngine.ToolCallsLoaded && !toolsAlreadyCounted)
                 total += LLMEngine.ToolManager.EstimatedTokenCost();
 
             if (LLMEngine.SupportsVision)
@@ -149,6 +155,9 @@ namespace LetheAISharp
             {
                 LLMEngine.Settings.DisableThinking = true;
                 LLMEngine.NamesInPromptOverride = false;
+                // Structured output suppresses the assistant generation prefix; the token count has to
+                // render the same way, so publish it before GetTokenUsage runs.
+                LLMEngine.AddGenerationPromptOverride = false;
             }
 
             if (LLMEngine.Settings.ToolCallChainLimit > 0 && workingprompt.Count > LLMEngine.Settings.ToolCallChainLimit)
@@ -261,6 +270,7 @@ namespace LetheAISharp
                 req.ImportFromGenerationInput(LLMEngine.Sampler);
                 LLMEngine.Settings.DisableThinking = think;
                 LLMEngine.NamesInPromptOverride = null;
+                LLMEngine.AddGenerationPromptOverride = null;
                 return req;
             }
             else
@@ -291,6 +301,7 @@ namespace LetheAISharp
                 req.ImportFromGenerationInput(LLMEngine.Sampler);
                 LLMEngine.Settings.DisableThinking = think;
                 LLMEngine.NamesInPromptOverride = null;
+                LLMEngine.AddGenerationPromptOverride = null;
                 return req;
             }
 

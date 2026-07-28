@@ -4,6 +4,7 @@ using LLama.Sampling;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using OpenAI;
 using OpenAI.Chat;
 using OpenAI.Models;
@@ -172,9 +173,14 @@ namespace LetheAISharp.API
         /// the fully-formatted prompt string exactly as it would be built for /v1/chat/completions (names,
         /// roles, template scaffolding included). This does not run inference.
         /// </summary>
+        /// <remarks>
+        /// Retries are disabled: the failure modes here (endpoint missing on old servers, or a template
+        /// that refuses the message shape) are permanent, and the caller has a fallback. Retrying would
+        /// only add several seconds of backoff to every token count.
+        /// </remarks>
         public async Task<ApplyTemplateResponse> ApplyTemplateAsync(ApplyTemplateQuery body, CancellationToken cancellationToken = default)
         {
-            return await SendRequestAsync<ApplyTemplateResponse>(_httpClient!, HttpMethod.Post, "/apply-template", body, cancellationToken: cancellationToken).ConfigureAwait(false);
+            return await SendRequestAsync<ApplyTemplateResponse>(_httpClient!, HttpMethod.Post, "/apply-template", body, cancellationToken: cancellationToken, maxRetryAttempts: 0).ConfigureAwait(false);
         }
 
         public ApplyTemplateResponse ApplyTemplateSync(ApplyTemplateQuery body)
@@ -221,6 +227,53 @@ namespace LetheAISharp.API
     {
         [JsonProperty("messages")]
         public List<ApplyTemplateMessage> messages { get; set; } = [];
+
+        /// <summary>
+        /// Tool definitions, in the same shape as /v1/chat/completions. These matter for token counting:
+        /// templates typically render a whole tool-description block, and many (Qwen's among them) also
+        /// restructure the system message when tools are present. Omitted when null.
+        /// </summary>
+        [JsonProperty("tools", NullValueHandling = NullValueHandling.Ignore)]
+        public List<ApplyTemplateTool>? tools { get; set; }
+
+        /// <summary>
+        /// Template keyword arguments (for example <c>enable_thinking</c>). Omitted when null.
+        /// </summary>
+        [JsonProperty("chat_template_kwargs", NullValueHandling = NullValueHandling.Ignore)]
+        public Dictionary<string, object>? chat_template_kwargs { get; set; }
+
+        /// <summary>
+        /// Whether the server appends the assistant generation prefix. Defaults to true server-side, so
+        /// only send it when we need it off (structured output). Omitted when null.
+        /// </summary>
+        [JsonProperty("add_generation_prompt", NullValueHandling = NullValueHandling.Ignore)]
+        public bool? add_generation_prompt { get; set; }
+    }
+
+    /// <summary>
+    /// A tool definition for /apply-template, mirroring the /v1/chat/completions tool schema.
+    /// </summary>
+    public class ApplyTemplateTool
+    {
+        [JsonProperty("type")]
+        public string type { get; set; } = "function";
+
+        [JsonProperty("function")]
+        public ApplyTemplateToolFunction function { get; set; } = new();
+    }
+
+    public class ApplyTemplateToolFunction
+    {
+        [JsonProperty("name")]
+        public string name { get; set; } = string.Empty;
+
+        [JsonProperty("description")]
+        public string description { get; set; } = string.Empty;
+
+        // JSON schema of the parameters. Held as a JToken so Newtonsoft emits it as a nested object
+        // rather than an escaped string (the server rejects tools whose parameters are not an object).
+        [JsonProperty("parameters")]
+        public JToken parameters { get; set; } = new JObject();
     }
 
     /// <summary>
@@ -234,6 +287,12 @@ namespace LetheAISharp.API
 
         [JsonProperty("content", NullValueHandling = NullValueHandling.Ignore)]
         public string? content { get; set; }
+
+        /// <summary>
+        /// Optional author name, matching the <c>name</c> field the chat endpoint sends.
+        /// </summary>
+        [JsonProperty("name", NullValueHandling = NullValueHandling.Ignore)]
+        public string? name { get; set; }
 
         [JsonProperty("tool_calls", NullValueHandling = NullValueHandling.Ignore)]
         public List<ApplyTemplateToolCall>? tool_calls { get; set; }
@@ -259,7 +318,10 @@ namespace LetheAISharp.API
         [JsonProperty("name")]
         public string name { get; set; } = string.Empty;
 
-        // Per the OpenAI spec, function arguments are a JSON *string*, not a nested object.
+        // Per the OpenAI spec, function arguments are a JSON *string*, not a nested object. It must be
+        // single-encoded (`{"a":1}`), not a quoted literal (`"{\"a\":1}"`): the server parses this string
+        // back into an object before rendering, and a double-encoded value parses back into a string,
+        // which then breaks templates that iterate the arguments as a mapping.
         [JsonProperty("arguments")]
         public string arguments { get; set; } = string.Empty;
     }
@@ -506,57 +568,85 @@ namespace LetheAISharp.API
 
     }
 
+    /// <summary>
+    /// llama.cpp-specific sampler parameters shared by the native /completion request and by
+    /// <see cref="OpenAI.Chat.ChatRequest"/>.
+    /// </summary>
+    /// <remarks>
+    /// Both attribute families are required and neither is redundant: the native /completion body is
+    /// serialized with Newtonsoft (<c>JsonProperty</c>), while <c>ChatRequest</c> is serialized with
+    /// System.Text.Json (<c>JsonPropertyName</c>), which ignores Newtonsoft attributes entirely. With only
+    /// the Newtonsoft names present these fields went out to the chat endpoint as "Top_k", "Min_p" and so
+    /// on, and llama.cpp silently discarded every one of them.
+    /// </remarks>
     public class LlamaCppAdvancedSampler
     {
         [JsonProperty("top_k")]
+        [JsonPropertyName("top_k")]
         public int? Top_k { get; set; }
 
         [JsonProperty("min_p")]
+        [JsonPropertyName("min_p")]
         public float? Min_p { get; set; }
 
         [JsonProperty("typical_p")]
+        [JsonPropertyName("typical_p")]
         public float? Typical_p { get; set; }
 
         [JsonProperty("repeat_last_n")]
+        [JsonPropertyName("repeat_last_n")]
         public int? Repeat_last_n { get; set; }
 
         [JsonProperty("mirostat")]
+        [JsonPropertyName("mirostat")]
         public int? Mirostat { get; set; }
 
         [JsonProperty("mirostat_tau")]
+        [JsonPropertyName("mirostat_tau")]
         public float? Mirostat_tau { get; set; }
 
         [JsonProperty("mirostat_eta")]
+        [JsonPropertyName("mirostat_eta")]
         public float? Mirostat_eta { get; set; }
 
         [JsonProperty("ignore_eos")]
+        [JsonPropertyName("ignore_eos")]
         public bool Ignore_eos { get; set; }
 
         [JsonProperty("dynatemp_range")]
+        [JsonPropertyName("dynatemp_range")]
         public float? Dynatemp_range { get; set; }
 
         [JsonProperty("dynatemp_exponent")]
+        [JsonPropertyName("dynatemp_exponent")]
         public float? Dynatemp_exponent { get; set; }
 
         [JsonProperty("xtc_probability")]
+        [JsonPropertyName("xtc_probability")]
         public float? Xtc_probability { get; set; }
 
         [JsonProperty("xtc_threshold")]
+        [JsonPropertyName("xtc_threshold")]
         public float? Xtc_threshold { get; set; }
 
         [JsonProperty("dry_multiplier")]
+        [JsonPropertyName("dry_multiplier")]
         public float? Dry_multiplier { get; set; }
 
         [JsonProperty("dry_base")]
+        [JsonPropertyName("dry_base")]
         public float? Dry_base { get; set; }
 
         [JsonProperty("dry_allowed_length")]
+        [JsonPropertyName("dry_allowed_length")]
         public int? Dry_allowed_length { get; set; }
 
         [JsonProperty("dry_penalty_last_n")]
+        [JsonPropertyName("dry_penalty_last_n")]
         public int? Dry_penalty_last_n { get; set; }
 
         [JsonProperty("dry_sequence_breakers")]
+        [JsonPropertyName("dry_sequence_breakers")]
         public List<string>? Dry_sequence_breakers { get; set; }
 
         public virtual void ImportFromGenerationInput(GenerationInput input)

@@ -3,6 +3,7 @@ using LetheAISharp.LLM;
 using LetheAISharp.SearchAPI;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using OpenAI.Chat;
 using System.Text;
 
@@ -87,6 +88,10 @@ namespace LetheAISharp.API
         {
             var res = await _client.GetServerStateAsync().ConfigureAwait(false);
 
+            // A reconnect (or a model swap) may well fix whatever made /apply-template fail, so give the
+            // accurate token count another chance.
+            _applyTemplateUnavailable = false;
+
             if (CompletionType == CompletionType.Chat)
             {
                 SupportsVision = res.modalities.vision;
@@ -94,6 +99,25 @@ namespace LetheAISharp.API
                 SupportParallelToolCall = res.chat_template_caps.supports_parallel_tool_calls;
                 var isthink = res.chat_template.Contains("enable_think") || res.chat_template.Contains("<think>", StringComparison.InvariantCultureIgnoreCase) || res.chat_template.Contains("[THINK]", StringComparison.InvariantCultureIgnoreCase);
                 AllowPrefill = LLMEngine.Settings.BackendChatAllowPrefill ?? !isthink;
+
+                LLMEngine.Logger?.LogInformation(
+                    "[LlamaCpp] Chat template caps: tools={Tools}, tool_calls={ToolCalls}, parallel_tool_calls={Parallel}, system_role={System}, object_arguments={ObjectArgs}, typed_content={Typed}",
+                    res.chat_template_caps.supports_tools, res.chat_template_caps.supports_tool_calls,
+                    res.chat_template_caps.supports_parallel_tool_calls, res.chat_template_caps.supports_system_role,
+                    res.chat_template_caps.supports_object_arguments, res.chat_template_caps.supports_typed_content);
+
+                if (res.chat_template_caps.supports_tool_calls && !res.chat_template_caps.supports_object_arguments)
+                {
+                    // Tool call arguments travel as a JSON string. When the server reports that the template
+                    // never reads them as a mapping, it will not convert them, and any template that iterates
+                    // the arguments (Qwen and friends) fails to render. Nothing we send can work around it.
+                    LLMEngine.Logger?.LogWarning("[LlamaCpp] The chat template accepts tool calls but does not read their arguments as an object. Tool-call rendering may fail server-side; consider a corrected Jinja template.");
+                }
+
+                if (!res.chat_template_caps.supports_system_role)
+                {
+                    LLMEngine.Logger?.LogWarning("[LlamaCpp] The chat template does not support system messages. LetheAISharp relies on in-conversation system messages, so expect degraded results.");
+                }
             }
             else
             {
@@ -247,9 +271,8 @@ namespace LetheAISharp.API
             // count. Counting the raw message text (as the legacy /v1/messages/count_tokens path did)
             // systematically under-counts, and the gap grows with the number of messages. To get an exact
             // count we render the messages through the model's chat template via /apply-template (using the
-            // same content generation produces: name prefixes, macros and tool-call structure), then
-            // tokenize that string with BOS.
-            if (CompletionType == CompletionType.Chat)
+            // same content, tools and template arguments generation uses), then tokenize that string.
+            if (CompletionType == CompletionType.Chat && !_applyTemplateUnavailable)
             {
                 try
                 {
@@ -263,7 +286,16 @@ namespace LetheAISharp.API
                     if (chatMessages.Count == 0)
                         return 0;
 
-                    var templated = _client.ApplyTemplateSync(new ApplyTemplateQuery { messages = chatMessages });
+                    var templated = _client.ApplyTemplateSync(new ApplyTemplateQuery
+                    {
+                        messages = chatMessages,
+                        tools = BuildTemplateTools(),
+                        chat_template_kwargs = new Dictionary<string, object>
+                        {
+                            { "enable_thinking", !LLMEngine.Settings.DisableThinking }
+                        },
+                        add_generation_prompt = LLMEngine.AddGenerationPromptOverride
+                    });
                     if (!string.IsNullOrEmpty(templated?.prompt))
                     {
                         var tokens = _client.TokenizeSync(new TokenRequest
@@ -275,10 +307,20 @@ namespace LetheAISharp.API
                         return tokens.GetTokenCount();
                     }
                     LLMEngine.Logger?.LogWarning("[LlamaCpp] /apply-template returned an empty prompt; falling back to legacy token count.");
+                    _applyTemplateUnavailable = true;
+                }
+                catch (ApiException ex)
+                {
+                    // The interesting part of a template failure is the server's own error text, which
+                    // ex.Message ("HTTP status code 500 was not expected.") does not carry.
+                    _applyTemplateUnavailable = true;
+                    LLMEngine.Logger?.LogWarning(
+                        "[LlamaCpp] /apply-template failed (HTTP {StatusCode}); falling back to legacy token count, which under-counts. Server said: {Response}",
+                        ex.StatusCode, string.IsNullOrWhiteSpace(ex.Response) ? "(no response body)" : ex.Response);
                 }
                 catch (Exception ex)
                 {
-                    // Older servers may not expose /apply-template. Fall back to the legacy path below.
+                    _applyTemplateUnavailable = true;
                     LLMEngine.Logger?.LogWarning(ex, "[LlamaCpp] /apply-template unavailable; falling back to legacy token count.");
                 }
             }
@@ -310,10 +352,72 @@ namespace LetheAISharp.API
         }
 
         /// <summary>
+        /// True once /apply-template has failed, so we stop paying for a round-trip we know will fail on
+        /// every subsequent count. Cleared by <see cref="GetBackendInfo"/> (i.e. on reconnect).
+        /// </summary>
+        private bool _applyTemplateUnavailable;
+
+        /// <summary>
+        /// True when the accurate /apply-template token count is in use. While it is, the server renders
+        /// the tool definitions itself, so callers must not add a local estimate for them on top.
+        /// </summary>
+        public bool CountsToolDefinitions => CompletionType == CompletionType.Chat && !_applyTemplateUnavailable;
+
+        /// <summary>
+        /// Converts the currently active tool list into the /apply-template tool schema, or null when no
+        /// tools are in play. Templates commonly render a large tool-description block and restructure the
+        /// system message when tools are present, so omitting these makes the count structurally wrong -
+        /// not merely short by a constant.
+        /// </summary>
+        private static List<ApplyTemplateTool>? BuildTemplateTools()
+        {
+            if (!LLMEngine.ToolCallsLoaded)
+                return null;
+
+            var tools = LLMEngine.ToolManager.GetToolList();
+            if (tools.Count == 0)
+                return null;
+
+            var result = new List<ApplyTemplateTool>(tools.Count);
+            foreach (var tool in tools)
+            {
+                if (tool.Function is null)
+                    continue;
+
+                // Parameters is a System.Text.Json node; re-parse it through Newtonsoft so it serializes as
+                // a nested object rather than an escaped string (the server rejects non-object parameters).
+                JToken parameters;
+                try
+                {
+                    parameters = tool.Function.Parameters is null
+                        ? new JObject()
+                        : JToken.Parse(tool.Function.Parameters.ToJsonString());
+                }
+                catch (Exception ex)
+                {
+                    LLMEngine.Logger?.LogWarning(ex, "[LlamaCpp] Could not convert the parameter schema of tool {Name}; counting it without parameters.", tool.Function.Name);
+                    parameters = new JObject();
+                }
+
+                result.Add(new ApplyTemplateTool
+                {
+                    type = "function",
+                    function = new ApplyTemplateToolFunction
+                    {
+                        name = tool.Function.Name ?? string.Empty,
+                        description = tool.Function.Description ?? string.Empty,
+                        parameters = parameters
+                    }
+                });
+            }
+            return result.Count == 0 ? null : result;
+        }
+
+        /// <summary>
         /// Builds a Newtonsoft-serializable /apply-template message from a <see cref="SingleMessage"/>,
         /// mirroring the three cases in <see cref="SingleMessage.ToChatCompletion"/> (tool result,
-        /// assistant tool-call-only, and normal text). Tool-call arguments are kept as the raw JSON
-        /// *string* (never a System.Text.Json JsonNode) so serialization cannot self-reference.
+        /// assistant tool-call-only, and normal text). Tool-call arguments are kept as a single-encoded
+        /// JSON *string* (never a System.Text.Json JsonNode) so serialization cannot self-reference.
         /// Returns null for roles that are not sent to the template.
         /// </summary>
         private static ApplyTemplateMessage? BuildTemplateMessage(SingleMessage message)
@@ -324,7 +428,8 @@ namespace LetheAISharp.API
                 return new ApplyTemplateMessage
                 {
                     role = "tool",
-                    content = message.Message,
+                    // The server rejects non-assistant messages without a content field.
+                    content = message.Message ?? string.Empty,
                     tool_call_id = message.ToolCalls[0].CallId
                 };
             }
@@ -342,7 +447,8 @@ namespace LetheAISharp.API
                         function = new ApplyTemplateFunction
                         {
                             name = record.FunctionName,
-                            arguments = record.ArgumentsJson
+                            // Must be single-encoded object text, matching what the chat endpoint sends.
+                            arguments = record.GetArgumentsText()
                         }
                     });
                 }
@@ -370,7 +476,8 @@ namespace LetheAISharp.API
             return new ApplyTemplateMessage
             {
                 role = role,
-                content = message.ToChatContentText()
+                content = message.ToChatContentText() ?? string.Empty,
+                name = message.ToChatContentName()
             };
         }
 

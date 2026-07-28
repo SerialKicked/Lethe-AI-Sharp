@@ -158,7 +158,10 @@ namespace LetheAISharp.API
                                 {
                                     CallId = toolcall.Id ?? string.Empty,
                                     FunctionName = toolcall.Function?.Name ?? string.Empty,
-                                    ArgumentsJson = toolcall.Function?.Arguments?.ToJsonString() ?? string.Empty,
+                                    // ToJsonString() would re-quote the accumulated arguments (the streamed
+                                    // value is a string-valued node), producing double-encoded JSON. Store
+                                    // the bare object text so the record matches what the API received.
+                                    ArgumentsJson = ArgumentsToText(toolcall.Function?.Arguments),
                                     ResultJson = success ? functionResult : string.Empty,
                                     Error = success ? null : functionResult,
                                     Success = success,
@@ -296,6 +299,25 @@ namespace LetheAISharp.API
                 LLMEngine.Logger?.LogError(ex, "[OpenAI API] Error during chat completion: {Message}", ex.Message);
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Extracts tool call arguments as bare JSON object text.
+        /// </summary>
+        /// <remarks>
+        /// While streaming, argument fragments are accumulated into a <em>string-valued</em>
+        /// <see cref="System.Text.Json.Nodes.JsonNode"/>. Calling <c>ToJsonString()</c> on such a node
+        /// returns a quoted, escaped JSON string literal rather than the object text it wraps, which would
+        /// leave the stored record double-encoded. <c>ToString()</c> gives us the unwrapped payload for
+        /// string nodes; anything else (a backend that sends a real JSON object) is serialized normally.
+        /// </remarks>
+        private static string ArgumentsToText(System.Text.Json.Nodes.JsonNode? arguments)
+        {
+            if (arguments is null)
+                return string.Empty;
+            if (arguments is System.Text.Json.Nodes.JsonValue value && value.TryGetValue<string>(out var text))
+                return text ?? string.Empty;
+            return arguments.ToJsonString();
         }
 
         /// <summary>

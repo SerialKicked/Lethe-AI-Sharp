@@ -145,12 +145,18 @@ namespace LetheAISharp.API
         /// <param name="endpoint">API Endpoint to hit</param>
         /// <param name="body">message to send for POST requests</param>
         /// <param name="cancellationToken">cancel token thing</param>
+        /// <param name="maxRetryAttempts">
+        /// Overrides <see cref="MaxRetryAttempts"/> for this call. Pass 0 for endpoints where a failure is
+        /// a permanent condition (an unsupported endpoint, or a payload the server rejects) rather than a
+        /// transient one, so callers with a fallback path are not billed the full backoff every time.
+        /// </param>
         /// <returns></returns>
         /// <exception cref="ApiException"></exception>
         /// <exception cref="ApiException{ServerBusyError}"></exception>
-        protected async Task<T> SendRequestAsync<T>(HttpClient selectclient, HttpMethod method, string endpoint, object? body = null, CancellationToken cancellationToken = default)
+        protected async Task<T> SendRequestAsync<T>(HttpClient selectclient, HttpMethod method, string endpoint, object? body = null, CancellationToken cancellationToken = default, int? maxRetryAttempts = null)
         {
             var client = selectclient;
+            var retryLimit = maxRetryAttempts ?? MaxRetryAttempts;
             int attempt = 0;
 
             while (true)
@@ -187,7 +193,7 @@ namespace LetheAISharp.API
                         }
 
                         // Handle 503 with retry if configured
-                        if (attempt <= MaxRetryAttempts && RetryStatusCodes.Contains(status))
+                        if (attempt <= retryLimit && RetryStatusCodes.Contains(status))
                         {
                             await DelayForRetryAsync(attempt).ConfigureAwait(false);
                             continue;
@@ -197,7 +203,7 @@ namespace LetheAISharp.API
                             new Dictionary<string, IEnumerable<string>>(), objectResponse.Object, null);
                     }
                     // For other status codes that should be retried
-                    else if (attempt <= MaxRetryAttempts && RetryStatusCodes.Contains(status))
+                    else if (attempt <= retryLimit && RetryStatusCodes.Contains(status))
                     {
                         await DelayForRetryAsync(attempt).ConfigureAwait(false);
                         continue;
@@ -206,22 +212,22 @@ namespace LetheAISharp.API
                     var responseData = response.Content == null ? null : await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     throw new ApiException($"HTTP status code {status} was not expected.", status, responseData, new Dictionary<string, IEnumerable<string>>(), null);
                 }
-                catch (HttpRequestException ex) when (attempt <= MaxRetryAttempts)
+                catch (HttpRequestException ex) when (attempt <= retryLimit)
                 {
                     // Network-level exceptions (connection refused, etc.)
                     await DelayForRetryAsync(attempt).ConfigureAwait(false);
 
                     // If this was the last attempt, rethrow
-                    if (attempt == MaxRetryAttempts)
+                    if (attempt == retryLimit)
                         throw new ApiException("Request failed after maximum retry attempts", 0, ex.Message, new Dictionary<string, IEnumerable<string>>(), ex);
                 }
-                catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException && attempt <= MaxRetryAttempts)
+                catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException && attempt <= retryLimit)
                 {
                     // Timeout exceptions
                     await DelayForRetryAsync(attempt).ConfigureAwait(false);
 
                     // If this was the last attempt, rethrow
-                    if (attempt == MaxRetryAttempts)
+                    if (attempt == retryLimit)
                         throw new ApiException("Request timed out after maximum retry attempts", 0, ex.Message, new Dictionary<string, IEnumerable<string>>(), ex);
                 }
             }

@@ -63,6 +63,13 @@ namespace LetheAISharp.LLM
         public static bool? NamesInPromptOverride { get; set; } = null;
 
         /// <summary>
+        /// Override for the backend's <c>add_generation_prompt</c> flag (null to leave it at the backend
+        /// default). Set by the prompt builders while a structured-output schema is active, so that
+        /// chat-template token counting renders the same prompt the generation request will.
+        /// </summary>
+        public static bool? AddGenerationPromptOverride { get; set; } = null;
+
+        /// <summary>
         /// Only prefill the character names when generating the prompt. This is useful for models interacting as a chatroom bot, 
         /// where the model needs to know its character name while the users' names are handled at the app's level.
         /// </summary>
@@ -1231,7 +1238,7 @@ namespace LetheAISharp.LLM
             }
 
             var final = PromptBuilder.GetTokenUsage();
-            if (final > (MaxContextLength - Settings.MaxReplyLength))
+            if (final > (MaxContextLength - Settings.MaxReplyLength) && Client?.CompletionType == CompletionType.Text)
             {
                 var diff = final - (MaxContextLength - Settings.MaxReplyLength);
                 logger?.LogWarning("The prompt is {Diff} tokens over the limit.", diff);

@@ -101,6 +101,32 @@ namespace LetheAISharp.Files
             return Bot.ReplaceMacros(realprompt, User);
         }
 
+        /// <summary>
+        /// Returns the value this message would put in the "name" field of a /v1/chat/completions message,
+        /// or null when no name is sent. Mirrors the naming decision in <see cref="ToChatCompletion"/> so
+        /// chat-template token counting sees the same payload generation does.
+        /// </summary>
+        internal string? ToChatContentName()
+        {
+            var addname = LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt;
+
+            if (Bot is GroupPersonaBase)
+                addname = true;
+
+            if (Role != AuthorRole.Assistant && Role != AuthorRole.User)
+                addname = false;
+
+            if (!addname && Bot == LLMEngine.Bot && User == LLMEngine.User)
+                return null;
+
+            return Role switch
+            {
+                AuthorRole.Assistant => Bot.Name,
+                AuthorRole.User => User.Name,
+                _ => null
+            };
+        }
+
         internal Message ToChatCompletion()
         {
             // Tool result messages: skip all name/image logic
