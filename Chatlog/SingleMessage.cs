@@ -22,7 +22,7 @@ namespace LetheAISharp.Files
     /// <param name="charID"> Character ID associated with the bot persona </param>
     /// <param name="userID"> User ID associated with the user persona </param>
     /// <param name="hidden"> Indicates if the message is hidden from standard views </param>
-    public class SingleMessage(AuthorRole role, DateTime date, string mess, string charID, string userID, bool hidden = false, string imagePath = "", List<ToolCallRecord>? toolCalls = null)
+    public class SingleMessage(AuthorRole role, DateTime date, string mess, string charID, string userID, bool hidden = false, List<string>? imagePath = null, List<ToolCallRecord>? toolCalls = null)
     {
         public Guid Guid { get; set; } = Guid.NewGuid();
         public AuthorRole Role = role;
@@ -31,7 +31,7 @@ namespace LetheAISharp.Files
         public DateTime Date = date;
         public string CharID = charID;
         public string UserID = userID;
-        public string ImagePath = imagePath;
+        public List<string> ImagePaths = imagePath ?? [];
         public bool Hidden = hidden;
         public string Note = string.Empty;
         public List<ToolCallRecord> ToolCalls { get; set; } = toolCalls ?? [];
@@ -42,11 +42,11 @@ namespace LetheAISharp.Files
         [JsonIgnore] public BasePersona? Sender => 
             Role == AuthorRole.User? User : Role == AuthorRole.Assistant ? Bot : null;
 
-        public SingleMessage(AuthorRole role, string mess, string img = "", List<ToolCallRecord>? toolCalls = null) : 
-            this(role, DateTime.Now, mess, LLMEngine.Bot.GetIdentifier(), LLMEngine.User.GetIdentifier(), false, img, toolCalls)
+        public SingleMessage(AuthorRole role, string mess, List<string>? imgs = null, List<ToolCallRecord>? toolCalls = null) : 
+            this(role, DateTime.Now, mess, LLMEngine.Bot.GetIdentifier(), LLMEngine.User.GetIdentifier(), false, imgs, toolCalls)
         { }
 
-        public SingleMessage() : this(AuthorRole.User, DateTime.Now, "", "", "", false, "")
+        public SingleMessage() : this(AuthorRole.User, DateTime.Now, "", "", "", false)
         {
         }
 
@@ -172,36 +172,41 @@ namespace LetheAISharp.Files
                 }
             }
 
-            if (!LLMEngine.SupportsVision || string.IsNullOrEmpty(ImagePath) || !File.Exists(ImagePath))
+            if (!LLMEngine.SupportsVision || ImagePaths.Count == 0)
                 return new Message(TokenTools.InternalRoleToChatRole(Role), Bot.ReplaceMacros(realprompt, User), selname);
 
             var content = new List<Content>();
-
-            var extension = Path.GetExtension(ImagePath).ToLowerInvariant();
-            switch (extension)
+            foreach (var ImagePath in ImagePaths)
             {
-                case ".jpg":
-                case ".jpeg":
-                    content.Add(new(ContentType.ImageUrl, $"data:image/jpeg;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
-                    break;
-                case ".png":
-                    content.Add(new(ContentType.ImageUrl, $"data:image/png;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
-                    break;
-                case ".gif":
-                    content.Add(new(ContentType.ImageUrl, $"data:image/gif;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
-                    break;
-                case ".bmp":
-                    content.Add(new(ContentType.ImageUrl, $"data:image/bmp;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
-                    break;
-                case ".webp":
-                    content.Add(new(ContentType.ImageUrl, $"data:image/webp;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
-                    break;
-                case ".tiff":
-                    content.Add(new(ContentType.ImageUrl, $"data:image/tiff;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
-                    break;
-                default:
-                    content.Add(new(ContentType.ImageUrl, $"data:image/gif;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
-                    break;
+                if (!File.Exists(ImagePath))
+                    continue;
+
+                var extension = Path.GetExtension(ImagePath).ToLowerInvariant();
+                switch (extension)
+                {
+                    case ".jpg":
+                    case ".jpeg":
+                        content.Add(new(ContentType.ImageUrl, $"data:image/jpeg;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
+                        break;
+                    case ".png":
+                        content.Add(new(ContentType.ImageUrl, $"data:image/png;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
+                        break;
+                    case ".gif":
+                        content.Add(new(ContentType.ImageUrl, $"data:image/gif;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
+                        break;
+                    case ".bmp":
+                        content.Add(new(ContentType.ImageUrl, $"data:image/bmp;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
+                        break;
+                    case ".webp":
+                        content.Add(new(ContentType.ImageUrl, $"data:image/webp;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
+                        break;
+                    case ".tiff":
+                        content.Add(new(ContentType.ImageUrl, $"data:image/tiff;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
+                        break;
+                    default:
+                        content.Add(new(ContentType.ImageUrl, $"data:image/gif;base64,{ImageUtils.ImageToBase64(ImagePath, LLMEngine.Settings.ImageResolution)!}"));
+                        break;
+                }
             }
             content.Add(Bot.ReplaceMacros(realprompt, User));
 

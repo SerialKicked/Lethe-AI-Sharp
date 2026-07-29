@@ -217,9 +217,9 @@ namespace LetheAISharp
                 var left = LLMEngine.Settings.MaxImageCount == 0 ? int.MaxValue : LLMEngine.Settings.MaxImageCount;
                 for (int i = _prompt.Count - 1; i >= 0; i--)
                 {
-                    if (_prompt[i].Role == AuthorRole.User && !string.IsNullOrEmpty(_prompt[i].ImagePath) && File.Exists(_prompt[i].ImagePath))
+                    if (_prompt[i].Role == AuthorRole.User && _prompt[i].ImagePaths.Count > 0 && _prompt[i].ImagePaths.Any(File.Exists))
                     {
-                        var res = ImageUtils.ImageToBase64(_prompt[i].ImagePath, LLMEngine.Settings.ImageResolution);
+                        var res = ImageUtils.ImageToBase64(_prompt[i].ImagePaths.First(File.Exists), LLMEngine.Settings.ImageResolution);
                         if (res is not null)
                         {
                             vlm_pictures.Insert(0, res);
