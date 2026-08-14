@@ -8,7 +8,7 @@ The `LLMEngine` is the core component of the LetheAISharp library that provides 
 
 ## Key Features
 
-- **Backend Compatibility**: Supports KoboldAPI and OpenAI API. Also comes with its own internal backend.
+- **Backend Compatibility**: Supports Llama.cpp, KoboldAPI, and OpenAI API. Also comes with its own internal backend.
 - **Simple Queries**: Direct text queries with streaming and non-streaming options
 - **Full Communication**: Complete chat system with personas, history, and context
 - **Persona Management**: Bot and user personas with customizable attributes
