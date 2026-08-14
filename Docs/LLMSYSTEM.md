@@ -14,7 +14,9 @@ The `LLMEngine` is the core component of the LetheAISharp library that provides 
 - **Persona Management**: Bot and user personas with customizable attributes
 - **Chat History**: Automatic session management and message logging
 - **RAG Integration**: Retrieval-Augmented Generation support
+- **Web Search**: Simple search (with or without tooling), and Deep Search
 - **Event System**: Real-time streaming and status updates
+- **Tooling**: Full support for function-calling on OpenAI and Llama.cpp APIs
 
 ## Table of Contents
 
