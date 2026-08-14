@@ -5,8 +5,9 @@ This guide will get you up and running with the LetheAISharp LLMEngine in just a
 ## Prerequisites
 
 1. **Backend Server**: You need a running LLM backend server. Popular options:
-   - [KoboldCpp](https://github.com/LostRuins/koboldcpp) (heavily recommended)
-   - [LM Studio](https://lmstudio.ai/) 
+   - [Llama.cpp](https://github.com/ggml-org/llama.cpp/) (heavily recommended)
+   - [KoboldCpp](https://github.com/LostRuins/koboldcpp) (good legacy alternative for text completion)
+   - [LM Studio](https://lmstudio.ai/) (no reason to use it as a backend over llama.cpp)
    - [Text Generation WebUI](https://github.com/oobabooga/text-generation-webui)
 
 You can also use the integrated backend, LLamaSharp. In that case replace the URL field by the path toward the GGUF model. But for this demonstration, just use KoboldCpp, it's a reliable backend.
