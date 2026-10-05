@@ -1151,17 +1151,24 @@ namespace LetheAISharp.LLM
                 }
             }
 
-            if (ToolCallsLoaded && Bot.Tools.Count > 0 && Settings.ToolCallsAddSystemPromptNote)
+            if (ToolCallsLoaded)
             {
-                var tools = ToolManager.GetToolsets().Where(e => !string.IsNullOrEmpty(e.SystemPromptInstruction));
-                if (tools.Any())
+                if (!string.IsNullOrEmpty(Settings.ToolInstructions))
                 {
-                    rawprompt.AppendLinuxLine($"{NewLine}{SystemPrompt.CategorySeparator} Tool Access").AppendLinuxLine();
-                    foreach (var tool in tools)
+                    rawprompt.AppendLinuxLine($"{NewLine}{SystemPrompt.CategorySeparator} Tool-use Enforcement").AppendLinuxLine();
+                    rawprompt.AppendLinuxLine(Settings.ToolInstructions).AppendLinuxLine();
+                }
+                if (Settings.ToolCallsAddSystemPromptNote)
+                {
+                    var tools = ToolManager.GetToolsets().Where(e => !string.IsNullOrEmpty(e.SystemPromptInstruction));
+                    if (tools.Any())
                     {
-                        rawprompt.AppendLinuxLine(tool.SystemPromptInstruction);
+                        rawprompt.AppendLinuxLine().AppendLinuxLine($"{NewLine}{SystemPrompt.CategorySeparator} Tool-use Notes").AppendLinuxLine();
+                        foreach (var tool in tools)
+                        {
+                            rawprompt.AppendLinuxLine(tool.SystemPromptInstruction);
+                        }
                     }
-
                 }
             }
             

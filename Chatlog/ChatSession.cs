@@ -167,13 +167,15 @@ namespace LetheAISharp.Files
             {
                 session = JsonConvert.DeserializeObject<SessionMetaInfo>(finalstr);
                 session?.ClampRelevance();
-                return session!;
             }
             catch (Exception ex)
             {
                 LLMEngine.Logger?.LogCritical("Session Switching Error: {message}", ex.Message);
-                throw;
+                session = new SessionMetaInfo();
+                session.Title = $"Session: {DateTime.Now.ToShortTimeString()}";
+                session.Summary = "No Summary is available for this session.";
             }
+            return session!;
         }
 
         /// <summary>
