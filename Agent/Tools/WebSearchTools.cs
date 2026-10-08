@@ -18,7 +18,7 @@ namespace LetheAISharp.Agent.Tools
 
         public string Description => "A set of tools for performing web searches and retrieving current date and time information.";
 
-        public string SystemPromptInstruction => "You have access to a web search tool. Use this tools proactively whenever relevant information is needed or when the user asks for it.";
+        public string SystemPromptInstruction => "You have access to [WebSearch] tools to perform web searches and retrieve current date and time information. Use these tools proactively whenever relevant information is needed or when the user asks for it.";
 
         private List<Tool> toolList = [];
 
@@ -31,10 +31,10 @@ namespace LetheAISharp.Agent.Tools
             {
                 Tool.ClearRegisteredTools();
             }
-            toolList.Add(Tool.GetOrCreateTool(this, nameof(WebSearch), "Performs a web search for the given query and returns a summary of the results."));
+            toolList.Add(Tool.GetOrCreateTool(this, nameof(WebSearch), "[Web] Performs a web search for the given query and returns a summary of the results."));
             // Disabled because right now, the LLM can't call itself recursively when in a tool loop.
             //toolList.Add(Tool.GetOrCreateTool(this, nameof(DeepSearch), "Performs a deep search for the given query and returns a detailed report of the findings. Only use this if the user explicitly mentions that you need to do a deep search."));
-            toolList.Add(Tool.GetOrCreateTool(this, nameof(GetCurrentDate), "Gets the current date and time."));
+            toolList.Add(Tool.GetOrCreateTool(this, nameof(GetCurrentDate), "[Web] Gets the current date and time."));
         }
 
         public void UnloadTools()

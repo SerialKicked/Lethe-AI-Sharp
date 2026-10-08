@@ -726,7 +726,7 @@ namespace LetheAISharp.Memory
         /// <param name="tokenBudget">Maximum number of tokens the returned string may consume.</param>
         /// <returns>A formatted bullet list of core facts, or an empty string if there are no facts or the
         /// budget is zero.</returns>
-        public virtual string GetCoreFacts(int tokenBudget)
+        public virtual string GetCoreFacts(int tokenBudget, bool compactFormat = false)
         {
             if (tokenBudget <= 0 || ExtractedFacts.Count == 0)
                 return string.Empty;
@@ -742,11 +742,14 @@ namespace LetheAISharp.Memory
 
             foreach (var f in active)
             {
-                var line = $"- {f.Fact}";
+                var line = compactFormat ? f.Fact + " " : $"- {f.Fact}";
                 var tokens = LLMEngine.GetTokenCount(line);
                 if (tokens > remaining)
                     break;
-                sb.AppendLinuxLine(line);
+                if (!compactFormat)
+                    sb.AppendLinuxLine(line);
+                else
+                    sb.Append(line);
                 remaining -= tokens;
             }
 

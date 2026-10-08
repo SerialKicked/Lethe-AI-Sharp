@@ -1124,9 +1124,9 @@ namespace LetheAISharp.LLM
             var syspromptentries = Settings.MoveAllInsertsToSysPrompt ? dataInserts : dataInserts.GetEntriesByPosition(-1);
             if (syspromptentries.Count > 0)
             {
-                rawprompt.AppendLinuxLine().AppendLinuxLine(SystemPrompt.WorldInfoTitle).AppendLinuxLine();
+                rawprompt.AppendLinuxLine($"{NewLine}{SystemPrompt.WorldInfoTitle}").AppendLinuxLine();
                 foreach (var item in syspromptentries)
-                    rawprompt.AppendLinuxLine(item.ToContent()).AppendLinuxLine();
+                    rawprompt.AppendLinuxLine(item.ToContent());
             }
 
             if (Settings.SessionMemorySystem && History.Sessions.Count > 1)
@@ -1135,7 +1135,7 @@ namespace LetheAISharp.LLM
                 if (!string.IsNullOrEmpty(shistory))
                 {
                     rawprompt.AppendLinuxLine(NewLine + Bot.ReplaceMacros(SystemPrompt.SessionHistoryTitle) + NewLine);
-                    rawprompt.AppendLinuxLine(shistory);
+                    rawprompt.AppendLinuxLine(shistory.CleanupAndTrim());
                 }
             }
 
@@ -1146,8 +1146,8 @@ namespace LetheAISharp.LLM
                 var coreFacts = Bot.Brain.GetCoreFacts(Settings.CoreFactsTokenBudget);
                 if (!string.IsNullOrEmpty(coreFacts))
                 {
-                    rawprompt.AppendLinuxLine(NewLine + Bot.ReplaceMacros(SystemPrompt.CoreFactsTitle) + NewLine);
-                    rawprompt.AppendLinuxLine(coreFacts);
+                    rawprompt.AppendLinuxLine($"{NewLine}{Bot.ReplaceMacros(SystemPrompt.CoreFactsTitle)}").AppendLinuxLine();
+                    rawprompt.AppendLinuxLine(coreFacts.CleanupAndTrim());
                 }
             }
 
@@ -1156,14 +1156,14 @@ namespace LetheAISharp.LLM
                 if (!string.IsNullOrEmpty(Settings.ToolInstructions))
                 {
                     rawprompt.AppendLinuxLine($"{NewLine}{SystemPrompt.CategorySeparator} Tool-use Enforcement").AppendLinuxLine();
-                    rawprompt.AppendLinuxLine(Settings.ToolInstructions).AppendLinuxLine();
+                    rawprompt.AppendLinuxLine(Settings.ToolInstructions.CleanupAndTrim());
                 }
                 if (Settings.ToolCallsAddSystemPromptNote)
                 {
                     var tools = ToolManager.GetToolsets().Where(e => !string.IsNullOrEmpty(e.SystemPromptInstruction));
                     if (tools.Any())
                     {
-                        rawprompt.AppendLinuxLine().AppendLinuxLine($"{NewLine}{SystemPrompt.CategorySeparator} Tool-use Notes").AppendLinuxLine();
+                        rawprompt.AppendLinuxLine($"{NewLine}{SystemPrompt.CategorySeparator} Tool-use Notes").AppendLinuxLine();
                         foreach (var tool in tools)
                         {
                             rawprompt.AppendLinuxLine(tool.SystemPromptInstruction);
@@ -1177,10 +1177,9 @@ namespace LetheAISharp.LLM
                 var abilities = Bot.AgentSystem?.AbilitiesToString();
                 if (!string.IsNullOrEmpty(abilities))
                 {
-                    rawprompt.AppendLinuxLine(NewLine + "Note: Sometimes the system will insert events in the format <SystemEvent>[TYPE]: {content}.\nThese may include JOURNAL, WEBSEARCH, or GOAL.\nYou may acknowledge that you did one of the actions listed below when a system message says you did. However, you must not invent or describe the contents of those actions unless a <SystemEvent>[TYPE] has been explicitly provided:" + abilities);
+                    rawprompt.AppendLinuxLine(NewLine + "**Note:** Sometimes the system will insert events in the format <SystemEvent>[TYPE]: {content}.\nThese may include JOURNAL, WEBSEARCH, or GOAL.\nYou may acknowledge that you did one of the actions listed below when a system message says you did. However, you must not invent or describe the contents of those actions unless a <SystemEvent>[TYPE] has been explicitly provided:" + abilities);
                 }
             }
-
             return Bot.ReplaceMacros(rawprompt.ToString()).CleanupAndTrim();
         }
 

@@ -18,7 +18,7 @@ namespace LetheAISharp.Agent.Tools
         
         public string Description => "A set of tools for managing, searching, and storing long-term memory entries and reminders.";
 
-        public string SystemPromptInstruction => "You have access to a set of memory management tools that allow you to save important information, set reminders, and search through your long-term memory. Use these tools proactively whenever the user shares new information, references past events, or asks you to remember something. Don't wait to be asked directly, be proactive. You can also use the search tools to retrieve relevant memories based on keywords, dates, or other criterias mentioned by you or the user.";
+        public string SystemPromptInstruction => "You have access to [Memory] tools to save important information, set reminders, and search through your long-term memory. Use these tools proactively whenever the user shares new information, references past events, or asks you to remember something. You can also retrieve contextually relevant memories based on keywords, dates, or other criterias mentioned by you or the user.";
 
         private List<Tool> toolList = [];
 
@@ -31,13 +31,12 @@ namespace LetheAISharp.Agent.Tools
             {
                 Tool.ClearRegisteredTools();
             }
-            toolList.Add(Tool.GetOrCreateTool(this, nameof(SaveMemory), 
-                "[Memory] Use this tool to Commit information to your long term memory when the user is mentioning something new that seems worth remembering. Provide a short title, and the content of the memory you want to save (which can be of any length). Use this tool proactively."));
+            toolList.Add(Tool.GetOrCreateTool(this, nameof(MemorySave), "[Memory] Use this tool to Commit information to your long term memory when the user is mentioning something new that seems worth remembering. Provide a short title, and the content of the memory you want to save (which can be of any length). Use this tool proactively."));
             toolList.Add(Tool.GetOrCreateTool(this, nameof(MemorySearch), "[Memory] Search your long term memory for relevant information. Provide the text to look for. Keep it short and direct (ex: a keyword, title, or short sentence like).  Use this tool proactively whenever the user references events or asks you to remember something, do not wait to be asked."));
-            toolList.Add(Tool.GetOrCreateTool(this, nameof(GetMemoryByDate), "[Memory] User this tool to remember events and memories tied to a date. Provide the year, month, and day (as numbers). You can search for any day in a month by setting day to 0. Use this tool proactively whenever the user references past events or asks you to remember a date, do not wait to be asked."));
-            toolList.Add(Tool.GetOrCreateTool(this, nameof(SetReminder), "[Memory] Set a reminder for a specific date. Provide a title for the reminder, the message you want to be reminded of, and the date of the reminder."));
-            toolList.Add(Tool.GetOrCreateTool(this, nameof(SetSchedule), "[Memory] Set a daily schedule for a specific day of the week. Provide the day of the week and the schedule details."));
-            toolList.Add(Tool.GetOrCreateTool(this, nameof(GetSchedule), "[Memory] Get the daily schedule for a specific day of the week. Provide the day of the week to retrieve the schedule."));
+            toolList.Add(Tool.GetOrCreateTool(this, nameof(MemorySearchByDate), "[Memory] User this tool to remember events and memories tied to a date. Provide the year, month, and day (as numbers). You can search for any day in a month by setting day to 0. Use this tool proactively whenever the user references past events or asks you to remember a date, do not wait to be asked."));
+            toolList.Add(Tool.GetOrCreateTool(this, nameof(MemorySetReminder), "[Memory] Set a reminder for a specific date. Provide a title for the reminder, the message you want to be reminded of, and the date of the reminder."));
+            toolList.Add(Tool.GetOrCreateTool(this, nameof(MemorySetSchedule), "[Memory] Set a daily schedule for a specific day of the week. Provide the day of the week and the schedule details."));
+            toolList.Add(Tool.GetOrCreateTool(this, nameof(MemoryGetSchedule), "[Memory] Get the daily schedule for a specific day of the week. Provide the day of the week to retrieve the schedule."));
         }
 
         public void UnloadTools()
@@ -117,7 +116,7 @@ namespace LetheAISharp.Agent.Tools
         /// given month.</param>
         /// <returns>A string containing formatted details of relevant memories and conversation sessions for the specified date.
         /// Returns a message indicating no results if none are found.</returns>
-        public async Task<string> GetMemoryByDate(int year, int month, int day)
+        public async Task<string> MemorySearchByDate(int year, int month, int day)
         {
             await Task.Delay(5).ConfigureAwait(false);
 
@@ -170,7 +169,7 @@ namespace LetheAISharp.Agent.Tools
         /// <param name="MemoryTitle">The title of the memory entry to be saved. Cannot be null.</param>
         /// <param name="MemoryContent">The content associated with the memory entry. Cannot be null.</param>
         /// <returns>A string message indicating that the memory was saved successfully, including the memory title.</returns>
-        public async Task<string> SaveMemory(string MemoryTitle, string MemoryContent)
+        public async Task<string> MemorySave(string MemoryTitle, string MemoryContent)
         {
             var mem = new MemoryUnit()
             {
@@ -192,7 +191,7 @@ namespace LetheAISharp.Agent.Tools
         /// <param name="date">The date and time when the reminder should be set. Represents the start time of the reminder.</param>
         /// <returns>A confirmation message indicating that the reminder was successfully set, including the reminder title and
         /// scheduled date.</returns>
-        public async Task<string> SetReminder(string ReminderTitle, string Message, DateTime date)
+        public async Task<string> MemorySetReminder(string ReminderTitle, string Message, DateTime date)
         {
             var mem = new MemoryUnit()
             {
@@ -208,14 +207,14 @@ namespace LetheAISharp.Agent.Tools
             return $"Reminder '{ReminderTitle}' set for {date.ToHumanString()} successfully.";
         }
 
-        public async Task<string> SetSchedule(DayOfWeek day, string schedule)
+        public async Task<string> MemorySetSchedule(DayOfWeek day, string schedule)
         {
             await Task.Delay(5).ConfigureAwait(false);
             LLMEngine.Bot.Brain.SetDailySchedule(day, schedule);
             return $"Schedule for {day} set to '{schedule}' successfully.";
         }
 
-        public async Task<string> GetSchedule(DayOfWeek day)
+        public async Task<string> MemoryGetSchedule(DayOfWeek day)
         {
             await Task.Delay(5).ConfigureAwait(false);
             var schedule = LLMEngine.Bot.Brain.GetDailySchedule(day);

@@ -518,6 +518,7 @@ namespace LetheAISharp.LLM
             StringBuilder res = new(inputText);
             res.Replace("{{user}}", userName)
                .Replace("{{userbio}}", userBio)
+               .Replace("{{userfacts}}", Brain.GetCoreFacts(LLMEngine.Settings.CoreFactsTokenBudget, true))
                .Replace("{{char}}", Name)
                .Replace("{{charbio}}", GetBio(userName))
                .Replace("{{examples}}", GetDialogExamples(userName))
