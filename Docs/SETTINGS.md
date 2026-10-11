@@ -214,6 +214,10 @@ The dimensionality of the image embedding vectors your vision model produces. `7
 
 Images larger than this pixel dimension (width or height) are resized before being sent to the model. `1024` matches the most common VLM limit. Reduce this to save tokens; increase it only if your model explicitly supports higher resolution inputs.
 
+Images with an extreme aspect ratio (more than roughly 4:1) are allowed to exceed this value on their long side, so that the short side stays readable. The total pixel count is capped at `ImageResolution` squared, and the long side at 4 times `ImageResolution`.
+
+Whatever the source format, images are always re-encoded as 8-bit RGB PNG before being sent: only the first frame of animated images is kept, EXIF orientation is applied, and transparency is flattened onto a white background.
+
 ---
 
 ### `MaxImageCount`
