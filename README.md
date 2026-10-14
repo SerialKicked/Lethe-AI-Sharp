@@ -68,6 +68,7 @@ Alternatively, if running an external backend is too much, **Lethe AI** also com
 | Chain of thoughts | ✅ | ✅ | ✅ | ✅ |
 | Personas & chat sessions | ✅ | ✅ | ✅ | ✅ |
 | Memory integration | ✅ | ✅ | ✅ | ✅ |
+| Skills | ✅ | ✅ | ✅ | ✅ |
 | Samplers | ✅ Advanced  | ✅ Advanced |  ✅ Basics  | ✅ Advanced |
 | Token management | ✅ Exact | ✅ Exact | ⚠️ Estimated  | ✅ Exact |
 | Web search | ✅ | ✅ | ✅ | ✅ |
@@ -90,6 +91,7 @@ Alternatively, if running an external backend is too much, **Lethe AI** also com
 - Useful LLM related tools (token counting, GBNF grammar, text manipulation helpers)
 - Visual language model support
 - Framework for group chat functionalities (one user and multiple AI characters)
+- Skill system (compatible with Claude Code and Open Code format `skill-name/SKILL.md`)
 
 ## 📝 Long Term Memory and RAG
 - United MemoryUnit format used by all long term memory systems
