@@ -1,18 +1,24 @@
-﻿using LetheAISharp.LLM;
+﻿using ImageMagick;
+using LetheAISharp.LLM;
 using Microsoft.Extensions.Logging;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Metadata.Profiles.Exif;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Concurrent;
+using System.Drawing;
 using System.IO;
 using System.Threading.Tasks;
 
 namespace LetheAISharp
 {
+    /// <summary>
+    /// Image helpers used to prepare pictures for vision-capable backends and for UI thumbnails.
+    /// The public API is deliberately independent of the underlying imaging library: it only deals with
+    /// file paths, streams, byte arrays and base64 strings.
+    /// <para>
+    /// Only JPEG, PNG, GIF, BMP, WebP and TIFF files are decoded. The format is detected from the file
+    /// signature (never from the file name), which keeps the many exotic and script-capable coders of
+    /// the underlying library out of reach of untrusted input.
+    /// </para>
+    /// </summary>
     public static class ImageUtils
     {
         /// <summary>
@@ -73,22 +79,6 @@ namespace LetheAISharp
         }
 
         /// <summary>
-        /// Scales an image proportionally to respect the specified maximum size (see <see cref="GetScaledSize"/>).
-        /// </summary>
-        /// <param name="image">The source image to scale</param>
-        /// <param name="maxSize">The maximum width or height allowed</param>
-        /// <returns>A new scaled image if resizing was needed, or the original image if already within limits</returns>
-        public static Image ScaleImage(Image image, int maxSize)
-        {
-            var target = GetScaledSize(image.Width, image.Height, maxSize);
-            if (target.Width == image.Width && target.Height == image.Height)
-                return image;
-
-            // Clone and resize the image with high quality bicubic resampling
-            return image.Clone(ctx => ctx.Resize(target.Width, target.Height, KnownResamplers.Bicubic));
-        }
-
-        /// <summary>
         /// Memoized encodes, keyed by path + maxSize and invalidated by the file's last-write time.
         /// Decode + resize + PNG encode is by far the most expensive part of rebuilding a chat request,
         /// and prompt building can rebuild the same images several times per generation (token-count
@@ -100,7 +90,8 @@ namespace LetheAISharp
         /// <summary>
         /// Converts an image file to a base64 encoded PNG (always 8-bit RGB, single frame, no metadata)
         /// suitable for vision-capable backends. The image is scaled down if needed, see <see cref="GetScaledSize"/>.
-        /// Animated images are reduced to their first frame, and transparency is flattened onto a white background.
+        /// Animated images are reduced to their first frame, EXIF orientation is applied to the pixels,
+        /// and transparency is flattened onto a white background.
         /// </summary>
         /// <param name="imagePath">Path to the image file</param>
         /// <param name="maxSize">Optional maximum size for width or height. If specified, image will be scaled down proportionally if needed.</param>
@@ -114,9 +105,7 @@ namespace LetheAISharp
                 if (_base64Cache.TryGetValue(key, out var cached) && cached.WriteTimeUtc == writeTime)
                     return cached.Data;
 
-                // Only the first frame is ever used, so don't waste time decoding the others.
-                using var image = Image.Load(new DecoderOptions { MaxFrames = 1 }, imagePath);
-                var res = ImageToBase64(image, maxSize);
+                var res = ImageToBase64(File.ReadAllBytes(imagePath), maxSize);
                 if (res != null)
                 {
                     // Crude but effective bound: entries are big and the active working set is small
@@ -130,39 +119,36 @@ namespace LetheAISharp
             }
             catch (Exception ex)
             {
-                LLMEngine.Logger?.LogError(ex,"Error converting image to base64: {mess}", ex.Message);
+                LLMEngine.Logger?.LogError(ex, "Error converting image to base64: {mess}", ex.Message);
                 return null;
             }
         }
 
         /// <summary>
-        /// Converts an in-memory image to a base64 encoded PNG (always 8-bit RGB, single frame, no metadata),
-        /// with optional scaling. The source image is never modified.
-        /// Animated images are reduced to their first frame, EXIF orientation is applied to the pixels,
-        /// and transparency is flattened onto a white background.
+        /// Converts in-memory image data to a base64 encoded PNG (always 8-bit RGB, single frame, no metadata),
+        /// with optional scaling. Same behavior as <see cref="ImageToBase64(string, int)"/>.
         /// </summary>
-        /// <param name="image">The image to convert</param>
+        /// <param name="data">The encoded image file content (JPEG, PNG, GIF, BMP, WebP or TIFF)</param>
         /// <param name="maxSize">Optional maximum size for width or height. If specified, image will be scaled down proportionally if needed.</param>
         /// <returns>Base64 encoded string of the PNG data, or null on failure</returns>
-        public static string? ImageToBase64(Image image, int maxSize = 0)
+        public static string? ImageToBase64(byte[] data, int maxSize = 0)
         {
             try
             {
-                using var prepared = PrepareForEncoding(image, maxSize);
+                using var image = Load(data);
+                Prepare(image, maxSize);
 
-                // Be explicit about every encoding parameter. Left to its defaults, the PNG encoder inherits the
-                // color type, bit depth, palette, interlacing and metadata of the source image, which can produce
+                // Be explicit about every encoding parameter. Left to its defaults, the encoder inherits the
+                // color type, bit depth, palette and interlacing of the source image, which can produce
                 // palettized, 1/2/4 bit or 16 bit PNGs that some decoders (stb_image/mtmd, PIL) handle poorly.
-                var encoder = new PngEncoder
-                {
-                    ColorType = PngColorType.Rgb,
-                    BitDepth = PngBitDepth.Bit8,
-                    InterlaceMethod = PngInterlaceMode.None,
-                    SkipMetadata = true
-                };
+                // Png24 is 8-bit RGB without alpha.
+                image.Format = MagickFormat.Png24;
+                image.Depth = 8;
+                image.Settings.Interlace = Interlace.NoInterlace;
+                image.Settings.SetDefine("png:exclude-chunk", "all");
 
                 using MemoryStream ms = new();
-                prepared.Save(ms, encoder);
+                image.Write(ms);
                 return Convert.ToBase64String(ms.GetBuffer(), 0, (int)ms.Length);
             }
             catch (Exception ex)
@@ -173,70 +159,56 @@ namespace LetheAISharp
         }
 
         /// <summary>
-        /// Builds a clean, caller-independent copy of <paramref name="source"/> that is ready to be encoded:
-        /// first frame only, EXIF orientation applied, scaled to <paramref name="maxSize"/>, transparency
-        /// flattened onto white and non-pixel metadata removed.
+        /// Converts an image stream to a base64 encoded PNG (always 8-bit RGB, single frame, no metadata),
+        /// with optional scaling. Same behavior as <see cref="ImageToBase64(string, int)"/>.
+        /// The stream is read from its current position to its end and is not closed.
         /// </summary>
-        /// <returns>A new image the caller must dispose. <paramref name="source"/> is never modified.</returns>
-        private static Image PrepareForEncoding(Image source, int maxSize)
+        /// <param name="stream">Stream containing the encoded image file (JPEG, PNG, GIF, BMP, WebP or TIFF)</param>
+        /// <param name="maxSize">Optional maximum size for width or height. If specified, image will be scaled down proportionally if needed.</param>
+        /// <returns>Base64 encoded string of the PNG data, or null on failure</returns>
+        public static string? ImageToBase64(Stream stream, int maxSize = 0)
         {
-            // Animated sources: keep only the first frame (CloneFrame already returns an independent copy).
-            Image current = source.Frames.Count > 1 ? source.Frames.CloneFrame(0) : source;
             try
             {
-                int width = current.Width;
-                int height = current.Height;
-
-                // The EXIF orientation is dropped when encoding, so it has to be baked into the pixels.
-                // Orientations 5 to 8 are the ones that swap the width and height.
-                ushort orientation = GetExifOrientation(current);
-                if (orientation >= 5 && orientation <= 8)
-                    (width, height) = (height, width);
-
-                var target = GetScaledSize(width, height, maxSize);
-                bool resize = target.Width != width || target.Height != height;
-
-                // Alpha is dropped when encoding to RGB. Without flattening, transparent pixels would show their raw
-                // (often black) color values to the model instead of what a viewer displays over a light background.
-                bool flatten = HasAlpha(current);
-
-                Image result = current.Clone(ctx =>
-                {
-                    if (orientation > 1)
-                        ctx.AutoOrient();
-                    if (resize)
-                        ctx.Resize(target.Width, target.Height, KnownResamplers.Bicubic);
-                    if (flatten)
-                        ctx.BackgroundColor(Color.White);
-                });
-
-                // Make sure nothing from the source leaks into the encoder (a PNG color key would end up as a tRNS chunk).
-                result.Metadata.ExifProfile = null;
-                result.Metadata.IccProfile = null;
-                result.Metadata.IptcProfile = null;
-                result.Metadata.XmpProfile = null;
-                result.Metadata.GetPngMetadata().TransparentColor = null;
-                return result;
+                using MemoryStream ms = new();
+                stream.CopyTo(ms);
+                return ImageToBase64(ms.ToArray(), maxSize);
             }
-            finally
+            catch (Exception ex)
             {
-                if (!ReferenceEquals(current, source))
-                    current.Dispose();
+                LLMEngine.Logger?.LogError(ex, "Error converting image to base64: {mess}", ex.Message);
+                return null;
             }
         }
 
-        private static ushort GetExifOrientation(Image image)
+        /// <summary>
+        /// Loads an image file, scales it down if needed (see <see cref="GetScaledSize"/>) and encodes it as a JPEG.
+        /// Meant for thumbnails and previews. Animated images are reduced to their first frame, EXIF orientation
+        /// is applied to the pixels, transparency is flattened onto a white background (JPEG has no alpha)
+        /// and metadata is removed.
+        /// </summary>
+        /// <param name="imagePath">Path to the image file (JPEG, PNG, GIF, BMP, WebP or TIFF)</param>
+        /// <param name="maxSize">Maximum width or height. Zero or less disables scaling.</param>
+        /// <param name="quality">JPEG quality, 1 to 100</param>
+        /// <returns>The JPEG file content, or null on failure</returns>
+        public static byte[]? EncodeJpeg(string imagePath, int maxSize, int quality = 85)
         {
-            var exif = image.Metadata.ExifProfile;
-            if (exif != null && exif.TryGetValue(ExifTag.Orientation, out var value) && value is not null)
-                return value.Value;
-            return 1;
-        }
+            try
+            {
+                using var image = Load(File.ReadAllBytes(imagePath));
+                Prepare(image, maxSize);
 
-        private static bool HasAlpha(Image image)
-        {
-            // Unknown alpha representation is treated as "has alpha" to stay on the safe side.
-            return image.PixelType.AlphaRepresentation != PixelAlphaRepresentation.None;
+                image.Format = MagickFormat.Jpeg;
+                image.Quality = (uint)Math.Clamp(quality, 1, 100);
+                using MemoryStream ms = new();
+                image.Write(ms);
+                return ms.ToArray();
+            }
+            catch (Exception ex)
+            {
+                LLMEngine.Logger?.LogError(ex, "Error encoding image to JPEG: {mess}", ex.Message);
+                return null;
+            }
         }
 
         /// <summary>
@@ -250,15 +222,100 @@ namespace LetheAISharp
             {
                 using HttpClient httpClient = new();
                 byte[] imageBytes = await httpClient.GetByteArrayAsync(imageUrl).ConfigureAwait(false);
-                using MemoryStream ms = new(imageBytes);
-                using Image image = Image.Load(new DecoderOptions { MaxFrames = 1 }, ms);
-                return ImageToBase64(image);
+                return ImageToBase64(imageBytes);
             }
             catch (Exception ex)
             {
                 LLMEngine.Logger?.LogError(ex, "Error downloading or converting image from URL to base64: {mess}", ex.Message);
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Decodes the first frame of an image from its encoded bytes. The format is detected from the file
+        /// signature and forced on the decoder, so only the supported formats can ever be decoded.
+        /// </summary>
+        /// <exception cref="NotSupportedException">The data is not a supported image format</exception>
+        private static MagickImage Load(byte[] data)
+        {
+            var format = DetectFormat(data) ?? throw new NotSupportedException("Unsupported or unrecognized image format.");
+
+            // Only the first frame is ever used, so don't waste time decoding the others.
+            var settings = new MagickReadSettings
+            {
+                Format = format,
+                FrameIndex = 0,
+                FrameCount = 1
+            };
+            return new MagickImage(data, settings);
+        }
+
+        /// <summary>
+        /// Detects a supported image format from its file signature.
+        /// </summary>
+        private static MagickFormat? DetectFormat(ReadOnlySpan<byte> h)
+        {
+            // JPEG: FF D8 FF
+            if (h.Length >= 3 && h[0] == 0xFF && h[1] == 0xD8 && h[2] == 0xFF)
+                return MagickFormat.Jpeg;
+            // PNG: 89 'PNG' 0D 0A 1A 0A
+            if (h.Length >= 8 && h[0] == 0x89 && h[1] == 'P' && h[2] == 'N' && h[3] == 'G'
+                && h[4] == 0x0D && h[5] == 0x0A && h[6] == 0x1A && h[7] == 0x0A)
+                return MagickFormat.Png;
+            // GIF: 'GIF87a' / 'GIF89a'
+            if (h.Length >= 6 && h[0] == 'G' && h[1] == 'I' && h[2] == 'F' && h[3] == '8' && (h[4] == '7' || h[4] == '9') && h[5] == 'a')
+                return MagickFormat.Gif;
+            // WebP: 'RIFF' size 'WEBP'
+            if (h.Length >= 12 && h[0] == 'R' && h[1] == 'I' && h[2] == 'F' && h[3] == 'F'
+                && h[8] == 'W' && h[9] == 'E' && h[10] == 'B' && h[11] == 'P')
+                return MagickFormat.WebP;
+            // TIFF / BigTIFF: 'II' 2A 00 | 'MM' 00 2A | 'II' 2B 00 | 'MM' 00 2B
+            if (h.Length >= 4 && ((h[0] == 'I' && h[1] == 'I' && (h[2] == 0x2A || h[2] == 0x2B) && h[3] == 0x00)
+                || (h[0] == 'M' && h[1] == 'M' && h[2] == 0x00 && (h[3] == 0x2A || h[3] == 0x2B))))
+                return MagickFormat.Tiff;
+            // BMP: 'BM'
+            if (h.Length >= 2 && h[0] == 'B' && h[1] == 'M')
+                return MagickFormat.Bmp;
+            return null;
+        }
+
+        /// <summary>
+        /// Brings a freshly decoded image to a clean, encoder-independent state: EXIF orientation applied to the
+        /// pixels, converted to sRGB, scaled to <paramref name="maxSize"/>, transparency flattened onto white
+        /// and all metadata removed. Modifies <paramref name="image"/> in place.
+        /// </summary>
+        private static void Prepare(MagickImage image, int maxSize)
+        {
+            // The EXIF orientation is dropped when encoding, so it has to be baked into the pixels.
+            // This also swaps the dimensions for the orientations that require it.
+            image.AutoOrient();
+
+            // CMYK (typically JPEG/TIFF) and other exotic colorspaces must end up as sRGB.
+            if (image.ColorSpace != ColorSpace.sRGB && image.ColorSpace != ColorSpace.Gray)
+                image.TransformColorSpace(ColorProfiles.SRGB);
+
+            var target = GetScaledSize((int)image.Width, (int)image.Height, maxSize);
+            if (target.Width != (int)image.Width || target.Height != (int)image.Height)
+            {
+                // Catmull-Rom is the classic "bicubic" filter.
+                image.FilterType = FilterType.Catrom;
+                image.Resize(new MagickGeometry((uint)target.Width, (uint)target.Height) { IgnoreAspectRatio = true });
+            }
+
+            // Alpha is dropped when encoding to RGB/JPEG. Without flattening, transparent pixels would show their raw
+            // (often black) color values to the model instead of what a viewer displays over a light background.
+            if (image.HasAlpha)
+            {
+                image.BackgroundColor = MagickColors.White;
+                image.Alpha(AlphaAction.Remove);
+            }
+
+            // Make sure nothing from the source (profiles, comments, color key...) leaks into the encoder.
+            image.Strip();
+
+            // Strip leaves the orientation property alone, and the PNG encoder would write it out in a private chunk.
+            // The orientation has already been applied to the pixels.
+            image.Orientation = Orientation.Undefined;
         }
     }
 }
