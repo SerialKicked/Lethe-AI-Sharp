@@ -4,6 +4,7 @@ using LetheAISharp.API;
 using LetheAISharp.Files;
 using LetheAISharp.Memory;
 using LetheAISharp.Moods;
+using LetheAISharp.Skills;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -215,6 +216,11 @@ namespace LetheAISharp.LLM
         /// Used to register / unregister tools (for function calling persona) in a unified way across the system. 
         /// </summary>
         public static ToolManager ToolManager { get; } = new();
+
+        /// <summary>
+        /// Library of skills (reusable markdown instructions for particular tasks). Call <see cref="Skills.SkillManager.Load"/> once the settings are loaded.
+        /// </summary>
+        public static SkillManager SkillManager { get; } = new();
         private static readonly HashSet<string> _loadedPluginPaths = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary> Shortcut to the chat history of the currently loaded bot. </summary>
