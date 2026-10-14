@@ -523,6 +523,8 @@ namespace LetheAISharp.LLM
                .Replace("{{charbio}}", GetBio(userName))
                .Replace("{{examples}}", GetDialogExamples(userName))
                .Replace("{{selfedit}}", SelfEditField)
+               .Replace("{{mood}}", Brain.MoodHandling ? Brain.Mood.Describe(false) : string.Empty)
+               .Replace("{{moodsecondperson}}", Brain.MoodHandling ? Brain.Mood.Describe(true) : string.Empty)
                .Replace("{{mchar}}", Name)
                .Replace("{{mcharbio}}", GetBio(userName))
                .Replace("{{group}}", GetGroupBio(userName))

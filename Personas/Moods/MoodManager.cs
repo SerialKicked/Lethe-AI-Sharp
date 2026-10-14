@@ -72,9 +72,10 @@ namespace LetheAISharp.Moods
             return lst;
         }
 
-        public virtual string Describe()
+        public virtual string Describe(bool secondperson = false)
         {
-            var sb = new StringBuilder("{{mchar}} is currently feeling");
+
+            var sb = secondperson ? new StringBuilder("You are currently feeling") : new StringBuilder("{{mchar}} is currently feeling");
             var moods = GetAdjectives();
             if (moods.Count > 0)
             {

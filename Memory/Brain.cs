@@ -997,11 +997,16 @@ namespace LetheAISharp.Memory
 
             if (MoodHandling)
             {
-                var res = Mood.Describe();
-                if (!string.IsNullOrWhiteSpace(res))
+                // check if system prompt contains {{mood}} already, if so, don't add it again
+                var sysPrompt = LLMEngine.SystemPrompt.GetSystemPromptRaw(Owner);
+                if (string.IsNullOrWhiteSpace(sysPrompt) || !sysPrompt.Contains("{{mood}}", StringComparison.InvariantCultureIgnoreCase))
                 {
-                    totalmessage.AppendLinuxLine(res);
-                    totalmessage.AppendLinuxLine();
+                    var res = Mood.Describe();
+                    if (!string.IsNullOrWhiteSpace(res))
+                    {
+                        totalmessage.AppendLinuxLine(res);
+                        totalmessage.AppendLinuxLine();
+                    }
                 }
             }
 
