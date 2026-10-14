@@ -326,8 +326,10 @@ namespace LetheAISharp.LLM
             {
                 logger?.LogError("[Core] Invalid settings: {Error}", validationError);
             }            // Create the appropriate client based on the selected backend
-            var httpClient = new HttpClient();
-            httpClient.Timeout = new TimeSpan(0, 5, 0);
+            var httpClient = new HttpClient
+            {
+                Timeout = new TimeSpan(0, 5, 0)
+            };
 
             Client = Settings.BackendAPI switch
             {
@@ -947,7 +949,8 @@ namespace LetheAISharp.LLM
                                 FunctionName = record.FunctionName,
                                 Success = record.Success,
                                 ResultJson = record.ResultJson,
-                                Error = record.Error
+                                Error = record.Error,
+                                Images = record.Images
                             },
                             IsComplete = true
                         });
@@ -964,8 +967,12 @@ namespace LetheAISharp.LLM
                     // One ToolResult message per tool call
                     foreach (var record in e.ToolCallRecords)
                     {
+                        // Images attached by the tool (unpacked from the ToolMediaResult envelope by the
+                        // client) are stored in ImagePaths so replayed history renders the same content
+                        // parts as the live call, images included.
                         var resultMsg = new SingleMessage(AuthorRole.Tool,
                             record.Success ? record.ResultJson : (record.Error ?? $"Error calling {record.FunctionName}"),
+                            imgs: record.Images,
                             toolCalls: [.. new List<ToolCallRecord> { record }]);
                         Bot.History.LogMessage(resultMsg);
                     }

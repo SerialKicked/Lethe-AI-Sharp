@@ -154,6 +154,22 @@ namespace LetheAISharp.API
                                 }
                                 sw.Stop();
                                 LLMEngine.Logger?.LogInformation("[OpenAI API] Tool Call: {Name}", toolcall.Function?.Name);
+
+                                // A tool may wrap image paths/URLs in a ToolMediaResult envelope. Unpack it here:
+                                // images become image_url content parts on the tool result message (when the
+                                // backend supports vision), the stripped JSON becomes the text the model sees,
+                                // and the paths ride on the record for chat-log logging and later replay.
+                                List<string>? toolImages = null;
+                                if (success && !string.IsNullOrEmpty(functionResult))
+                                {
+                                    var media = ToolMediaResult.TryParse(functionResult);
+                                    if (media?.Urls is { Count: > 0 } urls)
+                                    {
+                                        toolImages = urls;
+                                        functionResult = ToolMediaResult.StripPayload(functionResult);
+                                    }
+                                }
+
                                 toolCallRecords?.Add(new ToolCallRecord
                                 {
                                     CallId = toolcall.Id ?? string.Empty,
@@ -165,9 +181,28 @@ namespace LetheAISharp.API
                                     ResultJson = success ? functionResult : string.Empty,
                                     Error = success ? null : functionResult,
                                     Success = success,
+                                    Images = toolImages,
                                     Duration = sw.Elapsed
                                 });
-                                toolmsgs.Add(new OpenAI.Chat.Message(toolcall, functionResult));
+
+                                if (toolImages != null && LLMEngine.SupportsVision)
+                                {
+                                    var parts = new List<OpenAI.Content>();
+                                    foreach (var image in toolImages)
+                                    {
+                                        var imageUrl = ToolMediaResult.ToImageUrl(image);
+                                        if (imageUrl != null)
+                                            parts.Add(new OpenAI.Content(imageUrl));
+                                    }
+                                    // Tool messages must carry a text part as well; fall back to a note
+                                    // when the tool's result was images-only (nothing left after stripping).
+                                    parts.Add(string.IsNullOrWhiteSpace(functionResult) ? "[Images attached by tool.]" : functionResult);
+                                    toolmsgs.Add(new OpenAI.Chat.Message(toolcall, parts));
+                                }
+                                else
+                                {
+                                    toolmsgs.Add(new OpenAI.Chat.Message(toolcall, functionResult));
+                                }
                             }
 
                             // Build updated message list: original messages + assistant tool-call message + tool results.

@@ -77,6 +77,12 @@ namespace LetheAISharp.LLM
 
         /// <summary> Error description if <see cref="Success"/> is false. </summary>
         public string? Error { get; init; }
+
+        /// <summary>
+        /// Image paths or http(s) URLs the tool attached to its result, if any.
+        /// Empty when the tool returned text only.
+        /// </summary>
+        public List<string>? Images { get; init; }
     }
 
     /// <summary>
@@ -122,6 +128,13 @@ namespace LetheAISharp.LLM
 
         /// <summary> Error message if <see cref="Success"/> is false; null otherwise. </summary>
         public string? Error { get; init; }
+
+        /// <summary>
+        /// Images the tool attached to its result: local file paths or http(s) URLs.
+        /// Null/empty when the tool returned text only. Serialized into the chat log so
+        /// replayed history can rebuild the tool result message with its images.
+        /// </summary>
+        public List<string>? Images { get; init; }
 
         /// <summary> How long the tool execution took. </summary>
         public System.TimeSpan Duration { get; init; }
