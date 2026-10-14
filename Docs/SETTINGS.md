@@ -362,7 +362,22 @@ Maximum number of tool-call rounds the model may perform within a single generat
 ### `ToolCallChainLimit`
 **Type:** `int` | **Default:** `15`
 
-Maximum number of tool call/result pairs that are kept in the prompt at once. Older pairs are dropped to save context tokens. This should be equal to or higher than `ToolCallLimit`. Set to `0` to keep all tool calls in the prompt.
+Maximum number of tool call/result pairs that are kept in the prompt at once. Older pairs are dropped to save context tokens. This should be equal to or higher than `ToolCallLimit`. Set to `0` to keep all tool calls in the prompt. This pruning is applied when the prompt of a new turn is built; it never interrupts a tool chain that is already running.
+
+---
+
+### `ToolRoundMaxLength`
+**Type:** `int` | **Default:** `0` (automatic)
+
+Maximum number of tokens a single mid-chain tool round (reasoning + tool call) may generate. Only used with tool calling in Chat Completion mode.
+
+How reply limits work with tools:
+- The **first round** of a turn uses `MaxReplyLength` as usual, since it may already be the final answer.
+- Every **later round** (after at least one tool result) gets the round ceiling instead, so long reasoning plus a tool call is not cut off by the limit meant for the final reply. Older messages are scrolled out of the context as needed to guarantee that the prompt plus the ceiling always fits in `MaxTotalTokens`.
+- The **final answer** (the message that has no tool call, either because the model is done or because `ToolCallLimit` was reached) is limited by `MaxReplyLength`, reasoning of that message included. A small floor (a quarter of `MaxReplyLength`) guarantees that a long thought still leaves room for an answer.
+- If a mid-chain round is still cut off by the ceiling, the half-written tool call is never executed: the round is retried once with a doubled ceiling, then the model is asked to produce its final answer without tools.
+
+`0` means automatic: twice `MaxReplyLength` (at most a quarter of `MaxTotalTokens`) when thinking is enabled, otherwise `MaxReplyLength`. A value above `0` is used as the explicit ceiling (at most half of `MaxTotalTokens`).
 
 ---
 
@@ -648,6 +663,7 @@ When `true`, a note identifying the currently speaking persona is prepended insi
 | `ToolCallsAllowed` | `bool` | `true` | Master switch for tool calling |
 | `ToolCallLimit` | `int` | `10` | Max tool-call rounds per generation turn |
 | `ToolCallChainLimit` | `int` | `15` | Max tool call/result pairs kept in prompt |
+| `ToolRoundMaxLength` | `int` | `0` | Max tokens of a mid-chain tool round (0 = auto, 2x `MaxReplyLength` when thinking) |
 | `AllowedToolsets` | `HashSet<string>` | `[]` | Toolset IDs enabled globally |
 | `ToolCallsAlwaysManualConfirm` | `bool` | `false` | Require manual confirmation for every tool call |
 | `ToolCallsAddSystemPromptNote` | `bool` | `true` | Inject a system note explaining tool call format |

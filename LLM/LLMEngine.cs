@@ -1075,6 +1075,37 @@ namespace LetheAISharp.LLM
         }
 
         /// <summary>
+        /// Computes the per-round token ceiling used for mid-chain tool-calling rounds (every round of a turn
+        /// after the first one, until the final answer). Such rounds produce reasoning plus a tool call, which
+        /// must not be cut short by the limit meant for the final reply.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="LLMSettings.ToolRoundMaxLength"/> &gt; 0 is used as-is (clamped to half the context). 
+        /// Otherwise (automatic) it is twice the reply limit when thinking is enabled, clamped to a quarter of
+        /// the context, or the reply limit when it is not. The result is never below <paramref name="replyLimit"/>.
+        /// </remarks>
+        /// <param name="replyLimit">The reply limit of the request (<see cref="LLMSettings.MaxReplyLength"/> or an override).</param>
+        internal static int GetToolRoundBudget(int replyLimit)
+        {
+            if (replyLimit <= 0)
+                return replyLimit;
+            int ceiling;
+            if (Settings.ToolRoundMaxLength > 0)
+            {
+                ceiling = Math.Min(Settings.ToolRoundMaxLength, MaxContextLength / 2);
+            }
+            else if (Instruct.IsThinkFormat && !Settings.DisableThinking)
+            {
+                ceiling = Math.Min(replyLimit * 2, MaxContextLength / 4);
+            }
+            else
+            {
+                ceiling = replyLimit;
+            }
+            return Math.Max(ceiling, replyLimit);
+        }
+
+        /// <summary>
         /// Resets all per-generation streaming state. Must be called before each new generation.
         /// </summary>
         private static void ResetStreamingState()

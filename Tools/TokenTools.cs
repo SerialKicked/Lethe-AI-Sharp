@@ -109,60 +109,139 @@ namespace LetheAISharp
         /// when the conversation actually approaches the context budget.
         /// </summary>
         /// <remarks>
-        /// Unlike <see cref="MaintainRoughTokenCount"/> (which pins the budget to the pre-round size and
-        /// therefore evicts on <em>every</em> tool round regardless of context usage), this method lets the
-        /// conversation grow freely until the fast char/4 estimate exceeds <paramref name="maxTokens"/>.
-        /// Only then does it delete the oldest messages (from index 1, preserving the system prompt at
-        /// index 0). This matches the intended behaviour: keep everything in a fresh/low-context chat, and
-        /// fall back to dropping old messages near the real context limit.
-        ///
-        /// Counting uses the cheap local estimate only (no HTTP round-trips), so <paramref name="maxTokens"/>
-        /// should already include a generous safety margin to absorb the estimate's vagueness.
-        ///
-        /// After trimming, any orphaned leading tool-result message (a <see cref="OpenAI.Role.Tool"/> message
-        /// at index 1 whose originating assistant tool-call message was removed) is also dropped, so backends
-        /// whose chat templates reject a leading tool message do not error out.
+        /// Convenience wrapper over <see cref="TrimToolContext"/> that ignores the "fits" result and adds no
+        /// fixed overhead. See that method for the eviction rules.
         /// </remarks>
         public static List<Message> TrimToolContextIfNeeded(IList<Message> messages, List<Message> toadd, InstructFormat? format, int maxTokens)
         {
+            return TrimToolContext(messages, toadd, format, maxTokens, 0, out _);
+        }
+
+        /// <summary>
+        /// Appends new tool-round messages to the running conversation (a tool-calling chain) and evicts old
+        /// messages only when the conversation exceeds <paramref name="maxTokens"/>.
+        /// </summary>
+        /// <remarks>
+        /// The conversation is allowed to grow freely until the fast local estimate exceeds the budget. Then,
+        /// eviction happens in this order, always preserving the system prompt (index 0), the user message that
+        /// started the current turn, and the newest tool round:
+        /// <list type="number">
+        /// <item>Older chat history (everything between the system prompt and the current user message), oldest first.</item>
+        /// <item>Older rounds of the current chain, oldest first, as atomic units (the assistant tool-call message
+        /// together with all of its tool results) so no orphaned tool message is ever left behind.</item>
+        /// </list>
+        /// Counting uses the cheap local estimate only (no HTTP round-trips), so <paramref name="maxTokens"/> should
+        /// already include a safety margin. If the pinned messages alone are over budget, nothing more can be
+        /// evicted and <paramref name="fits"/> is <see langword="false"/>, which the caller should treat as a cue
+        /// to wrap up the chain.
+        /// </remarks>
+        /// <param name="messages">The conversation so far.</param>
+        /// <param name="toadd">Messages of the round just completed (assistant tool-call message and its tool results). May be empty.</param>
+        /// <param name="format">Instruct format used for the per-message overhead estimate.</param>
+        /// <param name="maxTokens">Token budget for the messages (the caller subtracts the generation reservation and margin).</param>
+        /// <param name="overheadTokens">Fixed cost counted against the budget but not part of the messages (e.g. tool definitions).</param>
+        /// <param name="fits">Whether the returned conversation fits within the budget.</param>
+        public static List<Message> TrimToolContext(IList<Message> messages, List<Message> toadd, InstructFormat? format, int maxTokens, int overheadTokens, out bool fits)
+        {
             var res = new List<Message>(messages);
             res.AddRange(toadd);
+            fits = true;
 
-            // Fresh / below-budget case: let the conversation grow, evict nothing.
-            if (maxTokens <= 0 || CountTokens(res, format) <= maxTokens)
+            if (maxTokens <= 0 || res.Count <= 1)
                 return res;
 
-            // Near the context limit: drop the oldest messages (index 1 onward, preserving the system
-            // prompt at index 0) until we fit. The newest messages -- the tool round we are about to
-            // re-send -- are always kept, matching the priority used by ChatPromptBuilder.TrimToFit.
-            // As with that method, if the retained tail (system prompt + newest round) is itself larger
-            // than maxTokens we cannot trim further and return it as-is; the margin baked into maxTokens
-            // by the caller is what protects against the estimate under-counting the real prompt.
-            while (res.Count > 1 && CountTokens(res, format) > maxTokens)
+            var costs = res.ConvertAll(m => CountMessageTokens(m, format));
+            var total = costs.Sum() + overheadTokens;
+            if (total <= maxTokens)
+                return res;
+
+            // Locate the anchor of the current turn: the last user message that existed before this round.
+            var pin = -1;
+            for (int i = messages.Count - 1; i >= 1; i--)
             {
-                res.RemoveAt(1);
+                if (res[i].Role == OpenAI.Role.User)
+                {
+                    pin = i;
+                    break;
+                }
+            }
+            if (pin < 0)
+            {
+                // No user message: protect everything from the start of the trailing tool chain.
+                var start = res.Count;
+                while (start > 1 && IsToolChainMessage(res[start - 1]))
+                    start--;
+                pin = Math.Max(start - 1, 0);
             }
 
-            // Guard against leaving an orphaned tool-result message as the first post-system message.
-            while (res.Count > 1 && res[1].Role == OpenAI.Role.Tool)
+            void RemoveAtIndex(int index)
             {
-                res.RemoveAt(1);
+                total -= costs[index];
+                res.RemoveAt(index);
+                costs.RemoveAt(index);
             }
 
+            // Phase 1: scroll out older chat history (between the system prompt and the current turn's user message).
+            while (total > maxTokens && pin > 1)
+            {
+                RemoveAtIndex(1);
+                pin--;
+            }
+            // Never leave an orphaned tool-result message as the first post-system message.
+            while (pin > 1 && res[1].Role == OpenAI.Role.Tool)
+            {
+                RemoveAtIndex(1);
+                pin--;
+            }
+
+            // Phase 2: drop whole older rounds of the current chain (keep the newest round).
+            while (total > maxTokens)
+            {
+                var first = -1;
+                var last = -1;
+                for (int i = pin + 1; i < res.Count; i++)
+                {
+                    if (IsToolRoundStart(res[i]))
+                    {
+                        if (first < 0)
+                            first = i;
+                        last = i;
+                    }
+                }
+                if (first < 0 || first == last)
+                    break;
+                RemoveAtIndex(first);
+                while (first < res.Count && res[first].Role == OpenAI.Role.Tool)
+                    RemoveAtIndex(first);
+            }
+
+            fits = total <= maxTokens;
             return res;
         }
 
+        private static bool IsToolRoundStart(Message m) => m.Role == OpenAI.Role.Assistant && m.ToolCalls is { Count: > 0 };
+
+        private static bool IsToolChainMessage(Message m) => m.Role == OpenAI.Role.Tool || IsToolRoundStart(m);
+
+        /// <summary>
+        /// Counts the tokens of a set of chat messages with a fast local estimate (about 4 characters per token,
+        /// plus per-message overhead). Includes text parts, reasoning content, tool-call names/arguments and images.
+        /// </summary>
         public static int CountTokens(IList<Message> messages, InstructFormat? format = null)
         {
-            if (format == null)
-            {
-                return messages.Sum(m => CountTokens(m.Content.ToString()));
-            }
             var total = 0;
             foreach (var message in messages)
+                total += CountMessageTokens(message, format);
+            return total;
+        }
+
+        private static int CountMessageTokens(Message message, InstructFormat? format)
+        {
+            var charcnt = 0;
+            var imgcnt = 0;
+
+            if (format != null)
             {
-                var charcnt = 0;
-                var imgcnt = 0;
                 switch (message.Role)
                 {
                     case OpenAI.Role.System:
@@ -184,28 +263,64 @@ namespace LetheAISharp
                 {
                     charcnt += 2; // For the newlines
                 }
+            }
 
-                if (message.Content is string strContent)
+            object? content = message.Content;
+            if (content is string strContent)
+            {
+                charcnt += strContent.Length;
+            }
+            else if (content is IEnumerable<Content> parts)
+            {
+                foreach (var part in parts)
                 {
-                    charcnt += strContent.Length;
-                }
-                else if (message.Content is IEnumerable<object> enumez)
-                {
-                    foreach (var item in enumez)
+                    switch (part.Type)
                     {
-                        if (item is string strItem)
-                        {
-                            charcnt += strItem.Length;
-                        }
-                        else if (item is ImageUrl || item is ImageFile)
-                        {
+                        case ContentType.Text:
+                            charcnt += part.Text switch
+                            {
+                                string s => s.Length,
+                                TextContent tc => tc.Value?.Length ?? 0,
+                                _ => 0
+                            };
+                            break;
+                        case ContentType.ImageUrl:
+                        case ContentType.ImageFile:
                             imgcnt++;
-                        }
+                            break;
                     }
                 }
-                total += (charcnt / 4) + (imgcnt * LLMEngine.Settings.ImageEmbeddingSize) + 10; // Approximate token count with a safety margin
             }
-            return total;
+            else if (content is IEnumerable<object> items)
+            {
+                foreach (var item in items)
+                {
+                    if (item is string strItem)
+                        charcnt += strItem.Length;
+                    else if (item is ImageUrl || item is ImageFile)
+                        imgcnt++;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(message.ReasoningContent))
+                charcnt += message.ReasoningContent.Length;
+
+            if (message.ToolCalls is { Count: > 0 })
+            {
+                foreach (var call in message.ToolCalls)
+                {
+                    charcnt += (call.Function?.Name?.Length ?? 0) + 16; // JSON scaffolding around the call
+                    var args = call.Function?.Arguments;
+                    if (args != null)
+                    {
+                        charcnt += args is System.Text.Json.Nodes.JsonValue value && value.TryGetValue<string>(out var text)
+                            ? text.Length
+                            : args.ToJsonString().Length;
+                    }
+                }
+            }
+
+            return (charcnt / 4) + (imgcnt * LLMEngine.Settings.ImageEmbeddingSize) + 10; // Approximate token count with a safety margin
         }
 
         internal static OpenAI.Role InternalRoleToChatRole(AuthorRole role)

@@ -999,7 +999,7 @@ namespace LetheAISharp.Memory
             {
                 // check if system prompt contains {{mood}} already, if so, don't add it again
                 var sysPrompt = LLMEngine.SystemPrompt.GetSystemPromptRaw(Owner);
-                if (string.IsNullOrWhiteSpace(sysPrompt) || !sysPrompt.Contains("{{mood}}", StringComparison.InvariantCultureIgnoreCase))
+                if (string.IsNullOrWhiteSpace(sysPrompt) || (!sysPrompt.Contains("{{mood}}", StringComparison.InvariantCultureIgnoreCase) && !sysPrompt.Contains("{{moodsecondperson}}", StringComparison.InvariantCultureIgnoreCase)))
                 {
                     var res = Mood.Describe();
                     if (!string.IsNullOrWhiteSpace(res))

@@ -93,14 +93,61 @@ namespace LetheAISharp.API
             var toolRound = 0;
             int maxToolRounds = LLMEngine.Settings.ToolCallLimit <= 0 ? int.MaxValue : LLMEngine.Settings.ToolCallLimit;
             var currentRequest = request;
+
+            // --- Per-round token budgeting for tool-calling chains ---
+            // replyLimit is the limit meant for the final answer (what the application considers "the reply").
+            // The first round of a turn uses it as-is (it may well be the final answer already). Later rounds
+            // (after at least one tool result) are mid-chain rounds that produce reasoning + a tool call, so they
+            // get the larger round ceiling and the conversation is scrolled to make room for it. Once the model
+            // starts its answer (visible text, no tool call), the reply limit is enforced client-side.
+            var replyLimit = request.MaxTokens ?? request.MaxCompletionTokens ?? 0;
+            var toolsEnabled = request.Tools?.Count > 0;
+            var roundCeiling = toolsEnabled && replyLimit > 0 ? LLMEngine.GetToolRoundBudget(replyLimit) : replyLimit;
+            var retriedThisRound = false;
+
+            // Applies the budget of the next generation round: scrolls old messages out so that
+            // prompt + generation reservation fit in the context, and sets max_tokens accordingly.
+            bool PrepareRound(List<OpenAI.Chat.Message> toadd, int roundMax)
+            {
+                var reserve = roundMax > 0 ? roundMax : LLMEngine.Settings.MaxReplyLength;
+                // A generous margin absorbs the vagueness of the fast estimate.
+                var trimMargin = Math.Max(LLMEngine.MaxContextLength / 8, 512);
+                var maxContextTokens = LLMEngine.MaxContextLength - reserve - trimMargin;
+                var overhead = currentRequest.Tools != null ? LLMEngine.ToolManager.EstimatedTokenCost() : 0;
+                currentRequest.Messages = TokenTools.TrimToolContext(currentRequest.Messages, toadd, LLMEngine.Instruct, maxContextTokens, overhead, out var fits);
+                if (roundMax > 0)
+                {
+                    currentRequest.MaxTokens = roundMax;
+                    currentRequest.MaxCompletionTokens = roundMax;
+                }
+                return fits;
+            }
+
+            // Turns the next round into the final answer: no tools, normal reply limit.
+            void ForceFinalRound()
+            {
+                currentRequest.Tools = null;
+                currentRequest.ToolChoice = "none";
+                PrepareRound([], replyLimit);
+            }
+
             try
             {
                 bool continueLoop = true;
                 while (continueLoop)
                 {
                     continueLoop = false;
+                    var reasoningChars = 0;
+                    var contentChars = 0;
+                    var sawToolCallDelta = false;
+                    var truncatedRound = false;
+                    // The client-side answer cap only applies to mid-chain rounds that still offer tools.
+                    var clientCap = replyLimit > 0 && toolRound >= 1 && currentRequest.Tools != null;
                     await foreach (var partialResponse in API.ChatEndpoint.StreamCompletionEnumerableAsync(currentRequest, cancellationToken: cancellationToken))
                     {
+                        if (partialResponse.FirstChoice?.Delta?.ToolCalls != null)
+                            sawToolCallDelta = true;
+
                         // Flush any reasoning content that arrived in the final assistant Message
                         // (typically seen together with tool_calls) so the engine can capture it
                         // in the thinking channel before we mutate the request and re-issue.
@@ -125,26 +172,30 @@ namespace LetheAISharp.API
                                 var sw = Stopwatch.StartNew();
                                 try
                                 {
-                                    var allowed = true;
-                                    if (LLMEngine.ToolCallConfirmation != null && (LLMEngine.ToolManager.RequiresConfirmation(toolcall.Function?.Name ?? string.Empty) || LLMEngine.Settings.ToolCallsAlwaysManualConfirm))
-                                    {
-                                        // that's an UI call, so no ConfigureAwait(false) here, otherwise we might crash things at the UI level
-                                        allowed = await LLMEngine.ToolCallConfirmation(toolcall.Function?.Name ?? string.Empty, toolcall.Function?.Arguments?.ToJsonString() ?? string.Empty);
-                                    }
                                     if (toolRound >= maxToolRounds)
                                     {
+                                        // Checked before asking for confirmation: no point prompting the user for a call that will not run.
                                         functionResult = "Max amount of tool calls reached. You must finish your thoughts and produce the response now.";
                                         success = true;
                                     }
-                                    else if (!allowed)
-                                    {
-                                        functionResult = "This tool call was denied by the user.";
-                                        success = false;
-                                    }
                                     else
                                     {
-                                        functionResult = (await toolcall.InvokeFunctionAsync<string>(cancellationToken)) ?? string.Empty;
-                                        success = true;
+                                        var allowed = true;
+                                        if (LLMEngine.ToolCallConfirmation != null && (LLMEngine.ToolManager.RequiresConfirmation(toolcall.Function?.Name ?? string.Empty) || LLMEngine.Settings.ToolCallsAlwaysManualConfirm))
+                                        {
+                                            // that's an UI call, so no ConfigureAwait(false) here, otherwise we might crash things at the UI level
+                                            allowed = await LLMEngine.ToolCallConfirmation(toolcall.Function?.Name ?? string.Empty, toolcall.Function?.Arguments?.ToJsonString() ?? string.Empty);
+                                        }
+                                        if (!allowed)
+                                        {
+                                            functionResult = "This tool call was denied by the user.";
+                                            success = false;
+                                        }
+                                        else
+                                        {
+                                            functionResult = (await toolcall.InvokeFunctionAsync<string>(cancellationToken)) ?? string.Empty;
+                                            success = true;
+                                        }
                                     }
                                 }
                                 catch (Exception ex)
@@ -213,21 +264,36 @@ namespace LetheAISharp.API
                                 partialResponse.FirstChoice.Message
                             };
                             toadd.AddRange(toolmsgs);
-                            // Only evict old messages when we actually approach the context budget; otherwise let
-                            // the conversation grow. A generous margin absorbs the vagueness of the fast estimate.
-                            var trimMargin = Math.Max(LLMEngine.MaxContextLength / 8, 512);
-                            var maxContextTokens = LLMEngine.MaxContextLength - LLMEngine.Settings.MaxReplyLength - trimMargin;
-                            var updatedMessages = TokenTools.TrimToolContextIfNeeded(currentRequest.Messages, toadd, LLMEngine.Instruct, maxContextTokens);
-                            currentRequest.Messages = updatedMessages;
-                            currentRequest.ToolChoice = toolRound < maxToolRounds ? "auto" : "none";
-                            if (toolRound >= maxToolRounds)
+
+                            // Final-round switch: once the round limit is hit the model is told to wrap up and gets no tools.
+                            var finalRoundNext = toolRound >= maxToolRounds;
+                            currentRequest.ToolChoice = finalRoundNext ? "none" : "auto";
+                            if (finalRoundNext)
                                 currentRequest.Tools = null;
                             LLMEngine.StreamingTextProgress.Clear();
                             // keep this here, otherwise the model doesn't receive a warning that tool calls have ended, and it'll imagine them instead.
                             toolRound++;
+                            retriedThisRound = false;
+
+                            // Budget of the next round: a mid-chain round (tools still offered) gets the round ceiling,
+                            // the final answer round gets the normal reply limit. Older messages scroll out to make room.
+                            var nextRoundMax = currentRequest.Tools != null ? roundCeiling : replyLimit;
+                            if (!PrepareRound(toadd, nextRoundMax) && currentRequest.Tools != null)
+                            {
+                                LLMEngine.Logger?.LogWarning("[OpenAI API] Tool chain no longer fits in the context window, forcing the final answer.");
+                                ForceFinalRound();
+                            }
                             // --
                             continueLoop = true;
                             break; // exit foreach — re-enter while loop (or stop if limit reached)
+                        }
+                        else if (partialResponse.FirstChoice.FinishReason == "length" && replyLimit > 0 && currentRequest.Tools != null
+                            && (sawToolCallDelta || (toolRound >= 1 && contentChars == 0)))
+                        {
+                            // The round was cut by max_tokens while it was still reasoning or writing a tool call: it is
+                            // not a (too long) final answer. A truncated tool call is never executed.
+                            truncatedRound = true;
+                            break;
                         }
                         else if (partialResponse.FirstChoice.Delta?.Content != null || !string.IsNullOrEmpty(partialResponse.FirstChoice.Delta?.ReasoningContent))
                         {
@@ -235,6 +301,9 @@ namespace LetheAISharp.API
                             var hasFinishReason = !string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason);
                             var finishReason = partialResponse.FirstChoice.FinishReason;
                             var toolRecords = hasFinishReason && toolCallRecords?.Count > 0 ? toolCallRecords : null;
+
+                            reasoningChars += delta.ReasoningContent?.Length ?? 0;
+                            contentChars += delta.Content?.Length ?? 0;
 
                             // Reasoning (thinking) content from the separate reasoning_content field.
                             // Routed directly to the engine's thinking channel — does NOT pass through
@@ -264,6 +333,26 @@ namespace LetheAISharp.API
 
                             if (hasFinishReason && (finishReason == "stop" || finishReason == "length"))
                                 break;
+
+                            // Mid-chain round that started writing its answer without calling a tool: this is the final
+                            // message, so the reply limit applies to it. Consistent with the rest of the library, the
+                            // reasoning of this very message counts toward the limit, but a floor guarantees that a long
+                            // thought still leaves room for an answer.
+                            if (!hasFinishReason && clientCap && !sawToolCallDelta && contentChars > 0)
+                            {
+                                var allowedAnswer = Math.Max(replyLimit - EstimateTokens(reasoningChars), replyLimit / 4);
+                                if (EstimateTokens(contentChars) > allowedAnswer)
+                                {
+                                    LLMEngine.Logger?.LogInformation("[OpenAI API] Final answer reached the reply limit ({Limit} tokens), stopping generation.", replyLimit);
+                                    RaiseOnStreamingResponse(new OpenTokenResponse
+                                    {
+                                        Token = string.Empty,
+                                        FinishReason = "length",
+                                        ToolCallRecords = toolCallRecords?.Count > 0 ? toolCallRecords : null
+                                    });
+                                    break;
+                                }
+                            }
                         }
                         else if (!string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason) && partialResponse.FirstChoice.FinishReason != "null")
                         {
@@ -284,6 +373,28 @@ namespace LetheAISharp.API
                                 break;
                         }
                     }
+
+                    if (truncatedRound)
+                    {
+                        // A mid-chain round was cut off by the token ceiling. Common practice: never run the half-written
+                        // call, retry once with a larger budget, then fall back to wrapping up with a final answer.
+                        LLMEngine.StreamingTextProgress.Clear();
+                        var currentMax = currentRequest.MaxTokens ?? replyLimit;
+                        var grown = Math.Min(Math.Max(currentMax * 2, roundCeiling), LLMEngine.MaxContextLength / 2);
+                        var retried = false;
+                        if (!retriedThisRound && grown > currentMax)
+                        {
+                            retriedThisRound = true;
+                            LLMEngine.Logger?.LogWarning("[OpenAI API] Tool round was truncated at {Max} tokens, retrying with {Grown}.", currentMax, grown);
+                            retried = PrepareRound([], grown);
+                        }
+                        if (!retried)
+                        {
+                            LLMEngine.Logger?.LogWarning("[OpenAI API] Tool round was truncated and cannot be retried, forcing the final answer.");
+                            ForceFinalRound();
+                        }
+                        continueLoop = true;
+                    }
                 }
             }
             catch (System.Text.Json.JsonException ex)
@@ -291,7 +402,8 @@ namespace LetheAISharp.API
                 RaiseOnStreamingResponse(new OpenTokenResponse
                 {
                     Token = $" [Error Streaming Message: {ex.Message}] " + LLMEngine.NewLine + LLMEngine.NewLine + "This is likely an issue with the Jinja chat template used by this model. It might not support some of Lethe AI features (namely system messages in the prompt) or it can just be incorrect." + LLMEngine.NewLine + LLMEngine.NewLine + "You can either:" + LLMEngine.NewLine + "- Edit the Jinja chat template in your backend." + LLMEngine.NewLine + "- Use a different model." + LLMEngine.NewLine + "- Use a text completion backend like KoboldCpp.",
-                    FinishReason = "error"
+                    FinishReason = "error",
+                    ToolCallRecords = toolCallRecords.Count > 0 ? toolCallRecords : null
                 });
             }
             catch (OperationCanceledException ex)
@@ -300,7 +412,8 @@ namespace LetheAISharp.API
                 RaiseOnStreamingResponse(new OpenTokenResponse
                 {
                     Token = $"The response was manually interrupted or cancelled. ({ex.Message})",
-                    FinishReason = "error"
+                    FinishReason = "error",
+                    ToolCallRecords = toolCallRecords.Count > 0 ? toolCallRecords : null
                 });
             }
             catch (Exception ex)
@@ -309,13 +422,19 @@ namespace LetheAISharp.API
                 RaiseOnStreamingResponse(new OpenTokenResponse
                 {
                     Token = $"Error during streaming chat completion: {ex.Message}",
-                    FinishReason = "error"
+                    FinishReason = "error",
+                    ToolCallRecords = toolCallRecords.Count > 0 ? toolCallRecords : null
                 });
             }
 
             // CA2254 fix: Use a constant message template and pass cumulativeDelta as an argument
             LLMEngine.Logger?.LogInformation("[OpenAI API] Final response: {CumulativeDelta}", cumulativeDelta);
         }
+
+        /// <summary>
+        /// Cheap token estimate (about 4 characters per token) used while streaming, where an exact count per chunk would be too costly.
+        /// </summary>
+        private static int EstimateTokens(int characters) => (characters + 3) / 4;
 
         public virtual async Task<Choice?> ChatCompletion(ChatRequest request, CancellationToken cancellationToken = default)
         {

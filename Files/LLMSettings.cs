@@ -195,6 +195,17 @@ namespace LetheAISharp.Files
         public int ToolCallChainLimit { get; set; } = 15;
 
         /// <summary>
+        /// Maximum number of tokens a single mid-chain tool-calling round may generate (reasoning + tool call).
+        /// 0 = automatic: twice <see cref="MaxReplyLength"/> when thinking is enabled (clamped to a quarter of the context), 
+        /// otherwise <see cref="MaxReplyLength"/>. 
+        /// The first round of a turn and the final answer are always governed by <see cref="MaxReplyLength"/>.
+        /// </summary>
+        [Description("Maximum number of tokens a single mid-chain tool-calling round (reasoning + tool call) may generate. 0 = automatic.\n" +
+            "Automatic uses twice the max reply length when thinking is enabled (clamped to a quarter of the context), otherwise the max reply length.\n" +
+            "The first round of a turn and the final answer after the last tool call are always limited by the max reply length.")]
+        public int ToolRoundMaxLength { get; set; } = 0;
+
+        /// <summary>
         /// List of the toolsets that are allowed to be called by the agent. The toolsets must be registered in the ToolManager with their respective ID.
         /// </summary>
         [Description("List of the toolsets that are allowed to be called by the agent. The toolsets must be registered in the ToolManager with their respective ID.\n" +
