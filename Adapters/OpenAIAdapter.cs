@@ -69,8 +69,8 @@ namespace LetheAISharp.API
             // Use model info to determine context length
             // var modelInfo = await _client.GetModelInfo("default").ConfigureAwait(false);
             // Parse context length from model info or use a default
-            LLMEngine.Logger?.LogWarning("GetMaxContextLength is not implemented for OpenAIAdapter, returning default 32768");
-            return await Task.FromResult(32768).ConfigureAwait(false);
+            LLMEngine.Logger?.LogWarning("GetMaxContextLength is not implemented for OpenAIAdapter, returning default {MaxTotalTokens}", LLMEngine.Settings.MaxTotalTokens);
+            return await Task.FromResult(LLMEngine.Settings.MaxTotalTokens).ConfigureAwait(false);
         }
 
         /// <summary>
