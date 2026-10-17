@@ -227,7 +227,11 @@ namespace LetheAISharp.Files
             {
                 var msg = messagelist[i];
                 oldest = Math.Min(oldest, msg.Item1);
-                tokensleft -= LLMEngine.PromptBuilder.GetTokenCount(msg.Item2);
+                // Skip counting tools as they will be pruned / handled by the prompt builder
+                if (msg.Item2.Role == AuthorRole.Tool || (msg.Item2.Role == AuthorRole.Assistant && msg.Item2.ToolCalls.Count > 0))
+                    tokensleft -= 0;
+                else
+                    tokensleft -= LLMEngine.PromptBuilder.GetTokenCount(msg.Item2);
                 if (tokensleft <= 0)
                     break;
                 LLMEngine.PromptBuilder.InsertMessage(startpos, msg.Item2);

@@ -111,7 +111,6 @@ namespace LetheAISharp.Files
 
         #endregion
 
-
         #region *** General Settings ***
 
         [Description("Minimum time of user inactivity before the background agent is allowed to execute tasks. Default is 30 minutes.")]
@@ -162,8 +161,10 @@ namespace LetheAISharp.Files
             "This can help clarify who is speaking, especially in group chats or when using models that don't handle role alternation well.")]
         public bool AddNamesToPrompt { get; set; } = false;
 
-        #endregion
+        [Description("If enabled, the system message will be merged into the following user message. Useful when the template or model does not handle system messages mid-conversation.\n Only useful in ChatCompletion mode.")]
+        public bool MergeSystemMessageInUserMessage { get; set; } = false;
 
+        #endregion
 
         #region *** Tool Calling Settings ***
 
@@ -228,7 +229,6 @@ namespace LetheAISharp.Files
 
         #endregion
 
-
         #region *** Skill Settings ***
 
         /// <summary>
@@ -237,7 +237,6 @@ namespace LetheAISharp.Files
         public SkillSettings SkillOptions { get; set; } = new();
 
         #endregion
-
 
         #region *** Model Settings ***
 
@@ -264,7 +263,6 @@ namespace LetheAISharp.Files
         public int MaxImageCount { get; set; } = 4;
 
         #endregion
-
 
         #region *** Memory Systems ***
 
@@ -345,7 +343,6 @@ namespace LetheAISharp.Files
         public bool RAGKeywordEnabled { get; set; } = true;
 
         #endregion
-
 
         #region *** RAG Settings (retrieval of past information based on text embedding similarity) ***
 
@@ -429,7 +426,6 @@ namespace LetheAISharp.Files
         public RAGSelectionHeuristic RAGHeuristic { get; set; } = RAGSelectionHeuristic.SelectSimple;
 
         #endregion
-
 
         #region *** User Fact Extraction Settings ***
 

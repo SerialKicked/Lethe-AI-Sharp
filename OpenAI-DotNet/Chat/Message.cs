@@ -122,7 +122,7 @@ namespace OpenAI.Chat
         [JsonInclude]
         [JsonPropertyName("content")]
         [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
-        public dynamic Content { get; private set; }
+        public dynamic Content { get; set; }
 
         /// <summary>
         /// The chain-of-thought / reasoning content emitted by the model as a separate

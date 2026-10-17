@@ -249,6 +249,31 @@ namespace LetheAISharp
             var cleanimages = !LLMEngine.SupportsVision || LLMEngine.Settings.MaxImageCount > 0;
             var maxallowed = LLMEngine.SupportsVision ? LLMEngine.Settings.MaxImageCount : 0;
 
+            // Merge system messages (except the first) into the next user message if setup
+            if (LLMEngine.Settings.MergeSystemMessageInUserMessage)
+            {
+                for (int i = finalprompt.Count - 1; i > 0; i--)
+                {
+                    var mess = finalprompt[i];
+                    if (mess.Role == Role.System)
+                    {
+                        if (i + 1 < finalprompt.Count && finalprompt[i + 1].Role == Role.User)
+                        {
+                            var next = finalprompt[i + 1];
+                            if (next.Content is List<Content> lst)
+                            {
+                                lst[0] = new Content(ContentType.Text, "[System Note] " + mess.Content.ToString() + "[/System Note]" + LLMEngine.NewLine + lst[0].Text);
+                            }
+                            else
+                            {
+                                next.Content = "[System Note] " + mess.Content.ToString() + "[/System Note]" + LLMEngine.NewLine + next.Content.ToString();                            
+                            }
+                            finalprompt.RemoveAt(i);
+                        }
+                    }
+                }
+            }
+
             if (cleanimages)
             {
                 // traverse the list and remove oldest images until we are within the limit
