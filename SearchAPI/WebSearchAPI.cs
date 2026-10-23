@@ -201,8 +201,13 @@ namespace LetheAISharp.SearchAPI
                 // article.Content is already stripped of nav/ads by SmartReader
                 var converter = new ReverseMarkdown.Converter(new ReverseMarkdown.Config()
                 {
-                    Formatting = { RemoveComments = true, CleanupSpaces = true },
+                    Formatting = { RemoveComments = true, CleanupSpaces = true, OutputLineEnding = LLMEngine.NewLine },
                     Images = { Base64Handling = ReverseMarkdown.Config.Base64ImageHandling.Skip },
+                    Tables = { CellListHandling = ReverseMarkdown.Config.TableCellListHandlingOption.InlineText },
+                    Tags = { Unknown = ReverseMarkdown.Config.UnknownTagsOption.Drop  },
+                    Links = { SmartHref = true }
+                    
+
                 });
                 markdown = converter.Convert(article.Content);
             }
@@ -212,13 +217,13 @@ namespace LetheAISharp.SearchAPI
                 return new ExtractedPage { Content = await ExtractContentWithJinaAsync(url).ConfigureAwait(false) };
             }
             // content is in markdown, remove all links completely (including the text or image or whatever is linked)
-            markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"\[.*?\]\(.*?\)", string.Empty); // Remove links
+            // markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"\[.*?\]\(.*?\)", string.Empty); // Remove links
             // remove lines that contains no text, no letter a-Z
             markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"^\s*$\n|\r", string.Empty, System.Text.RegularExpressions.RegexOptions.Multiline);
             // remove lines with only a * (and leading/trailing spaces)
             markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"^\s*\*\s*$\n|\r", string.Empty, System.Text.RegularExpressions.RegexOptions.Multiline);
             // remove special characters like : < > | \ / that can cause issues in file names or markdown rendering
-            markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"[:<>|\\\/]", " ");
+            // markdown = System.Text.RegularExpressions.Regex.Replace(markdown, @"[:<>|\\\/]", " ");
 
             markdown = markdown.CleanupAndTrim();
 

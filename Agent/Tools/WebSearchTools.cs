@@ -160,11 +160,6 @@ namespace LetheAISharp.Agent.Tools
                 // Fetching an arbitrary URL chosen by the model also requires confirmation.
                 return true;
             }
-            //else if (functionName.StartsWith(nameof(DeepSearch)))
-            //{
-            //    // Deep search might be a more impactful action, so we require confirmation before allowing the agent to call it.
-            //    return true;
-            //}
             // Tools not in the toolset should return false for RequiresConfirmation.
             // They either aren't called, or are handled by another toolset that may or may not require confirmation.
             return false;
