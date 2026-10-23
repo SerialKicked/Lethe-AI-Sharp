@@ -71,7 +71,7 @@ namespace LetheAISharp
 
             if (LLMEngine.SupportsVision)
             {
-                var imgcnt = messages.Where(m => m.ImagePaths.Count > 0 && m.ImagePaths.Any(File.Exists)).ToList().Count;
+                var imgcnt = messages.Where(m => m.HasSendableImage()).ToList().Count;
                 if (LLMEngine.Settings.MaxImageCount > 0 && imgcnt > LLMEngine.Settings.MaxImageCount)
                     imgcnt = LLMEngine.Settings.MaxImageCount;
                 total += imgcnt * (LLMEngine.Settings.ImageEmbeddingSize + 4);
@@ -482,7 +482,7 @@ namespace LetheAISharp
         {
             var total = LLMEngine.GetTokenCount(message.ToTextCompletion());
 
-            if (LLMEngine.SupportsVision && countImages && message.ImagePaths.Count > 0 && message.ImagePaths.Any(File.Exists))
+            if (LLMEngine.SupportsVision && countImages && message.HasSendableImage())
             {
                 total += LLMEngine.Settings.ImageEmbeddingSize;
             }

@@ -127,15 +127,43 @@ namespace LetheAISharp.Files
             };
         }
 
+        /// <summary>
+        /// True when at least one of the message's images can be sent to the backend.
+        /// Tool results may reference remote URLs, other messages only local files.
+        /// </summary>
+        internal bool HasSendableImage() =>
+            ImagePaths.Count > 0 && ImagePaths.Any(Role == AuthorRole.Tool ? ToolMediaResult.Exists : File.Exists);
+
         internal Message ToChatCompletion()
         {
-            // Tool result messages: skip all name/image logic
+            // Tool result messages: skip all name logic
             if (Role == AuthorRole.Tool && ToolCalls.Count > 0)
             {
                 // The tool_call_id is required by strict backends (OpenAI 400s without it). Built
-                // through the same Message(ToolCall, string) constructor the live tool-call loop
+                // through the same Message(ToolCall, ...) constructors the live tool-call loop
                 // uses, so replayed history has the identical shape (id + function name).
-                return new Message(ToolCalls[0].ToToolcall(), Message);
+                var toolCall = ToolCalls[0].ToToolcall();
+
+                // Images attached by the tool (see ToolMediaResult) are replayed as image_url content
+                // parts, exactly like the live call. Images that no longer exist (a deleted file, or an
+                // expired web cache entry) are skipped, leaving the plain text result.
+                if (LLMEngine.SupportsVision && ImagePaths.Count > 0)
+                {
+                    var parts = new List<Content>();
+                    foreach (var image in ImagePaths.Where(ToolMediaResult.Exists))
+                    {
+                        var imageUrl = ToolMediaResult.ToImageUrl(image);
+                        if (imageUrl != null)
+                            parts.Add(new Content(imageUrl));
+                    }
+                    if (parts.Count > 0)
+                    {
+                        // Tool messages must carry a text part as well.
+                        parts.Add(string.IsNullOrWhiteSpace(Message) ? "[Images attached by tool.]" : Message);
+                        return new Message(toolCall, parts);
+                    }
+                }
+                return new Message(toolCall, Message);
             }
 
             // Assistant tool-call-only messages: skip all name/image logic

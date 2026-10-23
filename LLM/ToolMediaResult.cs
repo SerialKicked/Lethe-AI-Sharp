@@ -51,6 +51,12 @@ namespace LetheAISharp.LLM
             pathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
+        /// True when the image can be sent: a remote URL (which is not checked), or an existing local file.
+        /// </summary>
+        public static bool Exists(string pathOrUrl) =>
+            !string.IsNullOrWhiteSpace(pathOrUrl) && (IsRemote(pathOrUrl) || File.Exists(pathOrUrl));
+
+        /// <summary>
         /// Converts an image path or URL into the backend's <c>image_url</c> content part.
         /// Local files are resized and re-encoded to PNG base64; remote URLs are forwarded as-is.
         /// Returns null when the item is empty, points to a nonexistent local file, or cannot be
