@@ -262,6 +262,8 @@ namespace LetheAISharp.Files
         [Description("Maximum number of images to be kept in the active chat. This helps save tokens when sending many images. Set to 0 for no limit.")]
         public int MaxImageCount { get; set; } = 4;
 
+        public string OpenAIModelID { get; set; } = "gpt-4";
+
         #endregion
 
         #region *** Memory Systems ***

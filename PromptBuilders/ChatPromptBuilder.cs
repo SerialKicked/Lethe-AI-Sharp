@@ -327,6 +327,7 @@ namespace LetheAISharp
             {
                 var req = new ChatRequest(finalprompt,
                     tools: LLMEngine.ToolManager.GetToolList(),
+                    model: LLMEngine.Settings.OpenAIModelID,
                     toolChoice: "auto",
                     topP: LLMEngine.Sampler.Top_p,
                     frequencyPenalty: DoFrequence ? LLMEngine.Sampler.Rep_pen - 1 : null,
@@ -350,6 +351,7 @@ namespace LetheAISharp
             {
                 var req = new ChatRequest(finalprompt,
                     topP: LLMEngine.Sampler.Top_p,
+                    model: LLMEngine.Settings.OpenAIModelID,
                     frequencyPenalty: DoFrequence ? LLMEngine.Sampler.Rep_pen - 1 : null,
                     seed: setseed,
                     user: LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt ? LLMEngine.User.Name : null,
