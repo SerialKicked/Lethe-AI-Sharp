@@ -136,6 +136,8 @@ namespace LetheAISharp.API
                 bool continueLoop = true;
                 while (continueLoop)
                 {
+                    // A cancelled turn must not start another round (tool loop / retry loop).
+                    cancellationToken.ThrowIfCancellationRequested();
                     continueLoop = false;
                     var reasoningChars = 0;
                     var contentChars = 0;
@@ -397,6 +399,12 @@ namespace LetheAISharp.API
                     }
                 }
             }
+            catch (Exception ex) when (cancellationToken.IsCancellationRequested)
+            {
+                // Cancelled by the caller (any exception shape: OperationCanceledException, a disposed/aborted
+                // stream, ...). Stay quiet: the engine reports the cancellation itself, nothing must be raised here.
+                LLMEngine.Logger?.LogInformation("[OpenAI API] Message stream stopped by user: {Message}", ex.Message);
+            }
             catch (System.Text.Json.JsonException ex)
             {
                 RaiseOnStreamingResponse(new OpenTokenResponse
@@ -408,10 +416,11 @@ namespace LetheAISharp.API
             }
             catch (OperationCanceledException ex)
             {
-                LLMEngine.Logger?.LogInformation(ex, "[OpenAI API] Message stream stopped by user: {Message}", ex.Message);
+                // Not requested by the caller: the HttpClient timeout elapsed.
+                LLMEngine.Logger?.LogError(ex, "[OpenAI API] Message stream timed out: {Message}", ex.Message);
                 RaiseOnStreamingResponse(new OpenTokenResponse
                 {
-                    Token = $"The response was manually interrupted or cancelled. ({ex.Message})",
+                    Token = "The request to the backend timed out.",
                     FinishReason = "error",
                     ToolCallRecords = toolCallRecords.Count > 0 ? toolCallRecords : null
                 });

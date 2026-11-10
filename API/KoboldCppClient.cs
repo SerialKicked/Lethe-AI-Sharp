@@ -101,12 +101,12 @@ namespace LetheAISharp.API
             {
                 response.EnsureSuccessStatusCode();
 
-                using (var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
                 using (var reader = new System.IO.StreamReader(stream))
                 {
                     while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
                     {
-                        var line = await reader.ReadLineAsync().ConfigureAwait(false);
+                        var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
                         if (!string.IsNullOrEmpty(line) && line.StartsWith("data:"))
                         {
                             var data = line.Substring(5).Trim();

@@ -99,8 +99,16 @@ namespace LetheAISharp.LLM
         /// <summary> All tool calls made during this inference cycle. </summary>
         public List<ToolCallRecord> ToolCalls { get; init; } = [];
 
-        /// <summary> The finish reason reported by the backend (e.g. "stop", "length", "tool_calls"). </summary>
+        /// <summary> The finish reason reported by the backend (e.g. "stop", "length", "tool_calls"). "cancelled" when the user cancelled the turn, "error" when it failed. </summary>
         public string? FinishReason { get; init; }
+
+        /// <summary>
+        /// True when the turn was cancelled through <see cref="LLMEngine.CancelGeneration"/>. Every started generation
+        /// raises exactly one <see cref="LLMEngine.OnInferenceCompleted"/>; this flag tells the application the
+        /// response is a partial one that was abandoned (<see cref="Response"/> and <see cref="ThinkingContent"/> hold what was
+        /// streamed so far). As with any response, logging it to the chat history is the application's job: it should normally discard it.
+        /// </summary>
+        public bool WasCancelled { get; init; }
     }
 
     /// <summary>

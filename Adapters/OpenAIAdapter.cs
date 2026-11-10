@@ -88,17 +88,25 @@ namespace LetheAISharp.API
             return await _client.GetBackendInfo().ConfigureAwait(false);
         }
 
-        public async Task<string> GenerateText(object parameters)
+        /// <summary>
+        /// Starts a new abortable call. The returned token is linked to <paramref name="external"/>, so it is cancelled
+        /// either by <see cref="AbortGenerationSync"/> or by the caller's token (already cancelled stays cancelled).
+        /// </summary>
+        private CancellationToken BeginCall(CancellationToken external)
         {
-            if (parameters is not ChatRequest input)
-                throw new ArgumentException("Parameters must be of type ChatRequest");
-            CancellationToken token;
             lock (_ctsLock)
             {
                 cts?.Dispose(); // Dispose old token source
-                cts = new CancellationTokenSource();
-                token = cts.Token;
+                cts = CancellationTokenSource.CreateLinkedTokenSource(external);
+                return cts.Token;
             }
+        }
+
+        public async Task<string> GenerateText(object parameters, CancellationToken ct = default)
+        {
+            if (parameters is not ChatRequest input)
+                throw new ArgumentException("Parameters must be of type ChatRequest");
+            var token = BeginCall(ct);
             var param = input;
             try
             {
@@ -110,6 +118,11 @@ namespace LetheAISharp.API
                 }
                 return res ?? string.Empty;
             }
+            catch (Exception) when (token.IsCancellationRequested)
+            {
+                LLMEngine.Logger?.LogInformation("[OpenAI API] GenerateText cancelled.");
+                return string.Empty;
+            }
             catch (Exception ex)
             {
                 LLMEngine.Logger?.LogError(ex, "[OpenAI API] Error during GenerateText: {Message}", ex.Message);
@@ -117,17 +130,11 @@ namespace LetheAISharp.API
             }
         }
 
-        public async Task GenerateTextStreaming(object parameters)
+        public async Task GenerateTextStreaming(object parameters, CancellationToken ct = default)
         {
             if (parameters is not ChatRequest input)
                 throw new ArgumentException("Parameters must be of type ChatRequest");
-            CancellationToken token;
-            lock (_ctsLock)
-            {
-                cts?.Dispose(); // Dispose old token source
-                cts = new CancellationTokenSource();
-                token = cts.Token;
-            }
+            var token = BeginCall(ct);
             await _client.StreamChatCompletion(input, token).ConfigureAwait(false);
         }
 

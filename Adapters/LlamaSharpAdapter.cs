@@ -142,18 +142,22 @@ namespace LetheAISharp.API
             return sett;
         }
 
-        public async Task<string> GenerateText(object parameters)
+        private CancellationToken BeginCall(CancellationToken external)
+        {
+            lock (_ctsLock)
+            {
+                cts?.Dispose(); // Dispose old token source
+                cts = CancellationTokenSource.CreateLinkedTokenSource(external);
+                return cts.Token;
+            }
+        }
+
+        public async Task<string> GenerateText(object parameters, CancellationToken ct = default)
         {
             if (parameters is not GenerationInput input)
                 throw new ArgumentException("Parameters must be of type GenerationInput");
 
-            CancellationToken token;
-            lock (_ctsLock)
-            {
-                cts?.Dispose(); // Dispose old token source
-                cts = new CancellationTokenSource();
-                token = cts.Token;
-            }
+            var token = BeginCall(ct);
             string response = string.Empty;
             var x = MakeParams(input);
             try
@@ -165,35 +169,42 @@ namespace LetheAISharp.API
                     response += text;
                 }
             }
+            catch (Exception) when (token.IsCancellationRequested)
+            {
+                return string.Empty;
+            }
             catch (Exception e)
             {
                 LLMEngine.Logger?.LogError(e, "Error during LlamaSharp inference");
                 throw;
             }
-            return response;
+            return token.IsCancellationRequested ? string.Empty : response;
         }
 
-        public async Task GenerateTextStreaming(object parameters)
+        public async Task GenerateTextStreaming(object parameters, CancellationToken ct = default)
         {
             if (parameters is not GenerationInput input)
                 throw new ArgumentException("Parameters must be of type GenerationInput");
 
-            CancellationToken token;
-            lock (_ctsLock)
+            var token = BeginCall(ct);
+            try
             {
-                cts?.Dispose(); // Dispose old token source
-                cts = new CancellationTokenSource();
-                token = cts.Token;
+                await foreach (var text in Executor.InferAsync(input.Prompt, MakeParams(input), token))
+                {
+                    if (token.IsCancellationRequested)
+                        break;
+                    TokenReceived?.Invoke(this, new LLMTokenStreamingEventArgs(text, null));
+                }
             }
-            await foreach (var text in Executor.InferAsync(input.Prompt, MakeParams(input), token))
+            catch (Exception) when (token.IsCancellationRequested)
             {
-                if (token.IsCancellationRequested)
-                    break;
-                TokenReceived?.Invoke(this, new LLMTokenStreamingEventArgs(text, null));
+                // cancelled: handled below
             }
-            var reason = token.IsCancellationRequested ? "cancel" : "stop";
+            // A cancelled generation ends quietly, the engine reports the cancellation itself.
+            if (token.IsCancellationRequested)
+                return;
             await Task.Delay(25).ConfigureAwait(false);
-            TokenReceived?.Invoke(this, new LLMTokenStreamingEventArgs(string.Empty, reason));
+            TokenReceived?.Invoke(this, new LLMTokenStreamingEventArgs(string.Empty, "stop"));
         }
 
         public async Task<string> GetBackendInfo()

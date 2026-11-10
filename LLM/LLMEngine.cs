@@ -123,7 +123,18 @@ namespace LetheAISharp.LLM
         public static bool ToolCallsLoaded => SupportsToolCalls && Settings.ToolCallsAllowed && ToolManager.HasTools();
 
         private static void RaiseOnFullPromptReady(string fullprompt) => OnFullPromptReady?.Invoke(Bot, fullprompt);
-        private static void RaiseOnStatusChange(SystemStatus newStatus) => OnStatusChanged?.Invoke(Bot, newStatus);
+        private static void RaiseOnStatusChange(SystemStatus newStatus)
+        {
+            // A throwing subscriber must never leave the engine half-transitioned (a turn that began but never ends, for instance).
+            try
+            {
+                OnStatusChanged?.Invoke(Bot, newStatus);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogError(ex, "[Core] An OnStatusChanged handler failed: {Message}", ex.Message);
+            }
+        }
         private static void RaiseOnQuickInferenceEnded(string fullprompt) => OnQuickInferenceEnded?.Invoke(Bot, fullprompt);
         private static void RaiseInferenceSegment(InferenceSegment segment) => OnInferenceSegment?.Invoke(Bot, segment);
         private static void RaiseInferenceCompleted(InferenceResult result) => OnInferenceCompleted?.Invoke(Bot, result);
@@ -140,6 +151,10 @@ namespace LetheAISharp.LLM
             get => status;
             private set
             {
+                // Only notify on a real transition: nested operations (a plugin query inside a chat turn, for
+                // example) re-assert the current status, which must not wake the UI up again.
+                if (status == value)
+                    return;
                 status = value;
                 RaiseOnStatusChange(value);
             }
@@ -147,14 +162,15 @@ namespace LetheAISharp.LLM
 
         /// <summary>
         /// True while a wire call to the backend is in flight
-        /// (i.e. <see cref="ILLMServiceClient.GenerateText(object)"/> or
-        /// <see cref="ILLMServiceClient.GenerateTextStreaming(object)"/> is on the stack,
+        /// (i.e. <see cref="ILLMServiceClient.GenerateText(object, CancellationToken)"/> or
+        /// <see cref="ILLMServiceClient.GenerateTextStreaming(object, CancellationToken)"/> is on the stack,
         /// including the in-adapter tool-call loop for chat-completion backends).
-        /// Distinct from <see cref="Status"/>: Status reflects library-user interactivity,
+        /// Distinct from <see cref="Status"/>: Status reflects library-user interactivity
+        /// (it is Busy for the whole of a chat turn, including the preparation steps before the wire call),
         /// LLMBusy reflects model-slot occupancy.
         /// Agents should consult this in their main loop and skip their tick when true.
         /// In-engine sub-calls (plugins calling <see cref="SimpleQuery(object, CancellationToken)"/>
-        /// from a plugin pre-pass) do NOT need to consult it - those happen before the wire call.
+        /// from a plugin pre-pass) are allowed: they happen before the turn's own wire call, which waits for the slot.
         /// </summary>
         public static bool LLMBusy { get; private set; } = false;
 
@@ -322,6 +338,267 @@ namespace LetheAISharp.LLM
         public static PromptInserts dataInserts = [];
         internal static readonly Random RNG = new();
 
+        #region *** Turn and operation state (internal) ***
+
+        // Everything that decides "is something running?" and "can it be cancelled?" lives here:
+        //
+        //  Status             UI facing. Busy for the whole of a chat turn (preparation steps included) or of a standalone query.
+        //  LLMBusy            The model slot. Claimed atomically around a wire call, and for nothing else.
+        //  _turnActive        A chat turn (send / reroll / impersonate / add bot message) is running. At most one at a time.
+        //  _turnCts           Cancellation scope of that turn. Cancelled by CancelGeneration, checked between the turn's steps,
+        //                     and linked into every wire call the turn (or a nested SimpleQuery) makes.
+        //  _queryCts          Same thing for a standalone SimpleQuery / SimpleQueryStreaming (no turn around it).
+        //  _completionRaised  Exactly-once guard for OnInferenceCompleted within the current streaming operation.
+        //  _turnError         Set when the turn failed before/while talking to the backend, reported through the completion event.
+        private static readonly Lock _stateLock = new();
+        private static CancellationTokenSource? _turnCts;
+        private static CancellationTokenSource? _queryCts;
+        private static bool _turnActive;
+        private static bool _completionRaised;
+        private static string? _turnError;
+
+        /// <summary> True when the operation currently running (turn or standalone query) was asked to cancel. </summary>
+        private static bool IsOperationCancelled => (_turnCts?.IsCancellationRequested ?? false) || (_queryCts?.IsCancellationRequested ?? false);
+
+        /// <summary>
+        /// Atomically claims the model slot. Returns false when someone else holds it.
+        /// </summary>
+        private static bool TryClaimWire(bool simpleQuery)
+        {
+            lock (_stateLock)
+            {
+                if (LLMBusy)
+                    return false;
+                LLMBusy = true;
+                _isSimpleQuery = simpleQuery;
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Waits for the model slot (held by an agent query, for instance) and claims it. Cancellable.
+        /// </summary>
+        private static async Task ClaimWireAsync(CancellationToken ct, bool simpleQuery)
+        {
+            var warned = false;
+            while (!TryClaimWire(simpleQuery))
+            {
+                if (!warned)
+                {
+                    warned = true;
+                    logger?.LogInformation("[Core] Waiting for the model slot to be released.");
+                }
+                await Task.Delay(50, ct).ConfigureAwait(false);
+            }
+        }
+
+        private static void ReleaseWire()
+        {
+            lock (_stateLock)
+            {
+                LLMBusy = false;
+                _isSimpleQuery = false;
+            }
+        }
+
+        /// <summary>
+        /// Starts a chat turn: refuses when anything is already running, otherwise flips the engine to Busy
+        /// right away (the preparation steps - plugins, memory, prompt building - are part of the turn).
+        /// </summary>
+        private static bool TryBeginTurn(out CancellationToken token)
+        {
+            lock (_stateLock)
+            {
+                if (_turnActive || LLMBusy || status == SystemStatus.Busy || Client == null || PromptBuilder == null)
+                {
+                    token = default;
+                    return false;
+                }
+                _turnActive = true;
+                _turnError = null;
+                _completionRaised = false;
+                _turnCts?.Dispose();
+                _turnCts = new CancellationTokenSource();
+                token = _turnCts.Token;
+            }
+            // Leftovers of the previous response must not leak into this turn (a cancel before the first token would report them).
+            ResetStreamingState();
+            Status = SystemStatus.Busy;
+            return true;
+        }
+
+        private static void EndTurn()
+        {
+            CancellationTokenSource? cts;
+            lock (_stateLock)
+            {
+                _turnActive = false;
+                cts = _turnCts;
+                _turnCts = null;
+            }
+            cts?.Dispose();
+            // Only Busy goes back to Ready: Disconnect() may have moved us to NotInit in the meantime.
+            if (status == SystemStatus.Busy)
+                Status = SystemStatus.Ready;
+        }
+
+        /// <summary>
+        /// Runs one chat turn. Contract: when this returns true, the turn was started and exactly one
+        /// <see cref="OnInferenceCompleted"/> has been raised for it (normal, error or cancelled).
+        /// Returns false, and raises nothing, when the turn could not start (engine busy or not connected).
+        /// </summary>
+        private static async Task<bool> RunTurn(Func<CancellationToken, Task> body)
+        {
+            if (!TryBeginTurn(out var ct))
+            {
+                logger?.LogWarning("[Core] Generation request ignored: the engine is busy or not connected.");
+                return false;
+            }
+            try
+            {
+                await body(ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                logger?.LogInformation("[Core] Generation cancelled.");
+            }
+            catch (Exception ex)
+            {
+                _turnError = $"Error during generation: {ex.Message}";
+                logger?.LogError(ex, "[Core] Error during generation: {Message}", ex.Message);
+            }
+            finally
+            {
+                try
+                {
+                    EnsureCompletion(ct, _turnError);
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogError(ex, "[Core] Error while finalizing the generation: {Message}", ex.Message);
+                }
+                EndTurn();
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Guarantees <see cref="OnInferenceCompleted"/> was raised once for the operation that just ended.
+        /// Backends are inconsistent when interrupted (some send nothing, some a fake error, some a stop), so the
+        /// engine is the one reporting a cancellation, whatever the backend did.
+        /// </summary>
+        private static void EnsureCompletion(CancellationToken ct, string? error)
+        {
+            if (_completionRaised)
+                return;
+
+            var (think, talk) = textStreamReceiver.GetCurrentBuffers();
+            if (ct.IsCancellationRequested)
+            {
+                _completionRaised = true;
+                StreamingTextProgress.Clear();
+                RaiseInferenceCompleted(new InferenceResult
+                {
+                    Response = talk.Trim(),
+                    ThinkingContent = think.Length > 0 ? think.Trim() : null,
+                    FinishReason = "cancelled",
+                    WasCancelled = true
+                });
+                return;
+            }
+
+            if (error != null || (talk.Length == 0 && think.Length == 0))
+            {
+                _completionRaised = true;
+                StreamingTextProgress.Clear();
+                RaiseInferenceCompleted(new InferenceResult
+                {
+                    Response = error ?? "The backend ended the response without sending anything.",
+                    FinishReason = "error"
+                });
+                return;
+            }
+
+            // The backend stopped talking without a final event (dropped connection, backend that never says "stop").
+            logger?.LogWarning("[Core] The backend ended the stream without a completion event, finalizing with what was received.");
+            Client_StreamingMessageReceived(Bot, new LLMTokenStreamingEventArgs(string.Empty, "stop"));
+        }
+
+        /// <summary>
+        /// Streaming wire call of a chat turn. Waits for the model slot if an agent query is holding it.
+        /// </summary>
+        private static async Task StreamWireAsync(object query, CancellationToken ct)
+        {
+            await ClaimWireAsync(ct, simpleQuery: false).ConfigureAwait(false);
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                var client = Client ?? throw new InvalidOperationException("The backend was disconnected.");
+                await client.GenerateTextStreaming(query, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                ReleaseWire();
+            }
+        }
+
+        /// <summary>
+        /// Creates the cancellation scope of a standalone query. Inside a chat turn (plugin pre-pass) the query joins the
+        /// turn's scope, so cancelling the turn cancels it too.
+        /// </summary>
+        private static CancellationTokenSource BeginQueryScope(CancellationToken caller)
+        {
+            lock (_stateLock)
+            {
+                if (_turnActive && _turnCts != null)
+                    return LinkSafe(caller, _turnCts.Token);
+                var scope = LinkSafe(caller, default);
+                _queryCts = scope;
+                return scope;
+            }
+        }
+
+        /// <summary>
+        /// Links the caller's token (which may belong to an already disposed source: agents recycle theirs) with an optional
+        /// engine token. A dead caller token is simply ignored.
+        /// </summary>
+        private static CancellationTokenSource LinkSafe(CancellationToken caller, CancellationToken engine)
+        {
+            try
+            {
+                return CancellationTokenSource.CreateLinkedTokenSource(caller, engine);
+            }
+            catch (ObjectDisposedException)
+            {
+                return CancellationTokenSource.CreateLinkedTokenSource(engine);
+            }
+        }
+
+        private static void EndQueryScope(CancellationTokenSource scope)
+        {
+            lock (_stateLock)
+            {
+                if (ReferenceEquals(_queryCts, scope))
+                    _queryCts = null;
+            }
+            scope.Dispose();
+        }
+
+        /// <summary>
+        /// Used by the "think prefill" feature: feeds the prefill text as if the model had written it.
+        /// </summary>
+        private static void EmitThinkPrefill(bool roleAllowsIt)
+        {
+            if (roleAllowsIt && Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart) && !ToolCallsLoaded && Client?.AllowPrefill == true)
+            {
+                var prefill = Instruct.GetThinkPrefill();
+                if (!string.IsNullOrWhiteSpace(prefill))
+                    Client_StreamingMessageReceived(Bot, new LLMTokenStreamingEventArgs(prefill, null, null));
+            }
+        }
+
+        #endregion
+
         #region *** Initialization and Loading ***
 
         private static void LoadBackendClient()
@@ -415,7 +692,9 @@ namespace LetheAISharp.LLM
                 MaxContextLength = await Client.GetMaxContextLength().ConfigureAwait(false);
                 CurrentModel = await Client.GetModelInfo().ConfigureAwait(false);
                 Backend = await Client.GetBackendInfo().ConfigureAwait(false);
-                Status = SystemStatus.Ready;
+                // Never clobber a running turn/query: only an idle or uninitialized engine becomes Ready.
+                if (status != SystemStatus.Busy)
+                    Status = SystemStatus.Ready;
             }
             catch (Exception ex)
             {
@@ -530,127 +809,139 @@ namespace LetheAISharp.LLM
 
         /// <summary>
         /// Asks the model to generate a message based on the the chat history. 
-        /// Response done through the OnInferenceStreamed and OnInferenceEnded events.
+        /// Response done through the OnInferenceSegment and OnInferenceCompleted events.
         /// </summary>
-        /// <returns>It's the app's responsibility to log (or not) the response to the chat history through the OnInferenceEnded event </returns>
-        public static async Task AddBotMessage()
+        /// <returns>
+        /// true if the turn ran (exactly one <see cref="OnInferenceCompleted"/> was raised: normal, error or cancelled),
+        /// false if it could not start because the engine is busy or not connected (nothing is raised in that case).
+        /// It's the app's responsibility to log (or not) the response to the chat history through the OnInferenceCompleted event.
+        /// </returns>
+        public static async Task<bool> AddBotMessage()
         {
-            if (Status == SystemStatus.Busy)
-                return;
-            await StartGeneration(new SingleMessage(AuthorRole.Assistant, string.Empty)).ConfigureAwait(false);
+            return await StartGeneration(new SingleMessage(AuthorRole.Assistant, string.Empty)).ConfigureAwait(false);
         }
 
         /// <summary>
         /// Ask the model to impersonate the user based on the chat history. 
-        /// Response done through the OnInferenceStreamed and OnInferenceEnded events.
+        /// Response done through the OnInferenceSegment and OnInferenceCompleted events.
         /// </summary>
-        /// <returns>It's the app's responsibility to log (or not) the response to the chat history through the OnInferenceEnded event </returns>
-        public static async Task ImpersonateUser()
+        /// <returns>See <see cref="AddBotMessage"/>.</returns>
+        public static async Task<bool> ImpersonateUser()
         {
-            if (Status == SystemStatus.Busy)
-                return;
-            await StartGeneration(new SingleMessage(AuthorRole.User, string.Empty)).ConfigureAwait(false);
+            return await StartGeneration(new SingleMessage(AuthorRole.User, string.Empty)).ConfigureAwait(false);
         }
 
         /// <summary>
-        /// Sends a message to the LLM. Message is logged to chat history. 
-        /// Response is done through the OnInferenceStreamed and OnInferenceEnded events.
+        /// Sends a message to the LLM. Message is logged to chat history (even when the turn is cancelled or fails before 
+        /// the model is reached: the message was sent). 
+        /// Response is done through the OnInferenceSegment and OnInferenceCompleted events.
         /// </summary>
         /// <param name="message">Fully fledged message</param>
-        /// <returns></returns>
-        public static async Task SendMessageToBot(SingleMessage message)
+        /// <returns>See <see cref="AddBotMessage"/>.</returns>
+        public static async Task<bool> SendMessageToBot(SingleMessage message)
         {
-            if (Status == SystemStatus.Busy)
-                return;
-            await StartGeneration(message).ConfigureAwait(false);
+            return await StartGeneration(message).ConfigureAwait(false);
         }
 
         /// <summary>
         /// Rerolls the last response from the bot. It will automatically remove the last message from the chat history (if it's from the bot).
-        /// Response done through the OnInferenceStreamed and OnInferenceEnded events.
+        /// Response done through the OnInferenceSegment and OnInferenceCompleted events.
         /// </summary>
-        /// <returns>It's the app's responsibility to log (or not) the response to the chat history through the OnInferenceEnded event </returns>
-        public static async Task RerollLastMessage()
+        /// <returns>
+        /// See <see cref="AddBotMessage"/>. Returns false, and leaves the chat history untouched, when there is nothing to reroll
+        /// or the engine is busy.
+        /// </returns>
+        public static async Task<bool> RerollLastMessage()
         {
             if (History.CurrentSession.Messages.Count == 0 || History.LastMessage()?.Role != AuthorRole.Assistant || Client == null || PromptBuilder == null)
-                return;
-            History.RemoveLast(true);
-            var oldquery = (PromptBuilder.LastQuery != null) ? PromptBuilder.RegenLastQuery() : null;
+                return false;
 
-            if (oldquery != null)
+            return await RunTurn(async ct =>
             {
-                if (Status == SystemStatus.Busy || LLMBusy)
-                    return;
-                Status = SystemStatus.Busy;
-                ResetStreamingState();
-                if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart) && !ToolCallsLoaded && Client.AllowPrefill)
+                // Only touch the history once we know the turn is really going to happen.
+                History.RemoveLast(true);
+                var pb = PromptBuilder ?? throw new InvalidOperationException("The backend was disconnected.");
+                var oldquery = (pb.LastQuery != null) ? pb.RegenLastQuery() : null;
+
+                if (oldquery != null)
                 {
-                    var prefill = Instruct.GetThinkPrefill();
-                    if (!string.IsNullOrWhiteSpace(prefill))
-                        Client_StreamingMessageReceived(Bot, new LLMTokenStreamingEventArgs(prefill, null, null));
+                    ResetStreamingState();
+                    EmitThinkPrefill(true);
+                    RaiseOnFullPromptReady(pb.PromptToText());
+                    await StreamWireAsync(oldquery, ct).ConfigureAwait(false);
                 }
-                RaiseOnFullPromptReady(PromptBuilder.PromptToText());
-                try
+                else if (pb.Count == 0)
                 {
-                    LLMBusy = true;
-                    await Client.GenerateTextStreaming(oldquery).ConfigureAwait(false);
+                    await GenerationBody(new SingleMessage(AuthorRole.Assistant, string.Empty), ct).ConfigureAwait(false);
                 }
-                finally
+                else
                 {
-                    LLMBusy = false;
-                    Status = SystemStatus.Ready;
+                    var query = pb.PromptToQuery(AuthorRole.Assistant, forceAltRoles: IsGroupConversation && Settings.GroupInstructFormatAdapter);
+                    ResetStreamingState();
+                    EmitThinkPrefill(true);
+                    RaiseOnFullPromptReady(pb.PromptToText());
+                    await StreamWireAsync(query, ct).ConfigureAwait(false);
                 }
-            }
-            else if (PromptBuilder.Count == 0)
-            {
-                if (Status == SystemStatus.Busy || LLMBusy)
-                    return;
-                await StartGeneration(new SingleMessage(AuthorRole.Assistant, string.Empty)).ConfigureAwait(false);
-            }
-            else
-            {
-                if (Status == SystemStatus.Busy || LLMBusy)
-                    return;
-                Status = SystemStatus.Busy;
-                ResetStreamingState();
-                if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart) && !ToolCallsLoaded && Client.AllowPrefill)
-                {
-                    var prefill = Instruct.GetThinkPrefill();
-                    if (!string.IsNullOrWhiteSpace(prefill))
-                        Client_StreamingMessageReceived(Bot, new LLMTokenStreamingEventArgs(prefill, null, null));
-                }
-                RaiseOnFullPromptReady(PromptBuilder.PromptToText());
-                try
-                {
-                    LLMBusy = true;
-                    await Client.GenerateTextStreaming(PromptBuilder.PromptToQuery(AuthorRole.Assistant, forceAltRoles: IsGroupConversation && Settings.GroupInstructFormatAdapter)).ConfigureAwait(false);
-                }
-                finally
-                {
-                    LLMBusy = false;
-                    Status = SystemStatus.Ready;
-                }
-            }
+            }).ConfigureAwait(false);
         }
 
         /// <summary>
-        /// Cancel the current generation
+        /// Cancel whatever the engine is currently doing: a chat turn (including its preparation steps: plugins,
+        /// memory, prompt building), a streaming/simple query, or the backend call underneath them. 
+        /// Safe to call at any time, from any thread. 
         /// </summary>
-        /// <returns></returns>
+        /// <remarks>
+        /// A cancelled chat turn always ends with one <see cref="OnInferenceCompleted"/> whose 
+        /// <see cref="InferenceResult.WasCancelled"/> is true, and then the status goes back to Ready. 
+        /// Note that some backends need an HTTP round trip to abort (KoboldCpp), so prefer calling this off the UI thread.
+        /// </remarks>
+        /// <returns>true if something was cancelled (or there is no client at all)</returns>
         public static bool CancelGeneration()
         {
-            if (Client == null)
+            var cancelled = false;
+
+            // 1. Engine level: stops the turn / query wherever it is, even when no wire call exists yet.
+            CancellationTokenSource? turn, query;
+            lock (_stateLock)
+            {
+                turn = _turnCts;
+                query = _queryCts;
+            }
+            foreach (var cts in new[] { turn, query })
+            {
+                if (cts == null)
+                    continue;
+                try
+                {
+                    if (!cts.IsCancellationRequested)
+                    {
+                        cts.Cancel();
+                        cancelled = true;
+                    }
+                }
+                catch (ObjectDisposedException)
+                {
+                    // the operation finished in the meantime, nothing left to cancel
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogError(ex, "[Core] Failed to cancel generation: {err}", ex.Message);
+                }
+            }
+
+            // 2. Backend level: some backends (KoboldCpp) keep generating after the connection is dropped and need an explicit abort.
+            var client = Client;
+            if (client == null)
                 return true;
             try
             {
-                var success = Client.AbortGenerationSync();
-                return success;
+                cancelled |= client.AbortGenerationSync();
             }
             catch (Exception ex)
             {
-                logger?.LogError(ex, "[Core] Failed to cancel generation: {err}", ex.Message);
-                return false;
+                logger?.LogError(ex, "[Core] Failed to abort the backend generation: {err}", ex.Message);
             }
+            return cancelled;
         }
 
         #endregion
@@ -676,28 +967,39 @@ namespace LetheAISharp.LLM
         /// <returns>LLM's Response</returns>
         public static async Task<string> SimpleQuery(object chatlog, CancellationToken ctx = default)
         {
-            if (Client == null)
-                throw new InvalidOperationException("LLMEngine not initialized. Call Setup() and Connect() first.");
-            if (LLMBusy)
+            var client = Client ?? throw new InvalidOperationException("LLMEngine not initialized. Call Setup() and Connect() first.");
+            if (!TryClaimWire(simpleQuery: true))
             {
                 logger?.LogError("[Core] Cannot perform SimpleQuery: LLM is currently busy.");
                 return string.Empty;
-            }                
+            }
 
+            // From here on the model slot is ours: everything below must end in ReleaseWire(), whatever happens.
             var oldst = status;
-            Status = SystemStatus.Busy;
-            _isSimpleQuery = true;
-            string result;
+            CancellationTokenSource? scope = null;
+            var result = string.Empty;
             try
             {
-                LLMBusy = true;
-                result = await Client.GenerateText(chatlog).ConfigureAwait(false);
+                Status = SystemStatus.Busy;
+                scope = BeginQueryScope(ctx);
+                if (!scope.IsCancellationRequested)
+                    result = await client.GenerateText(chatlog, scope.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (scope?.IsCancellationRequested == true)
+            {
+                result = string.Empty;
             }
             finally
             {
-                LLMBusy = false;
-                _isSimpleQuery = false;
-                Status = oldst;
+                // A cancelled query has no meaningful answer, whatever the backend returned (some return an error text).
+                if (scope?.IsCancellationRequested == true)
+                    result = string.Empty;
+                ReleaseWire();
+                if (scope != null)
+                    EndQueryScope(scope);
+                // Nested inside a chat turn, oldst is Busy and nothing changes: the turn owns the status.
+                if (status == SystemStatus.Busy)
+                    Status = oldst;
             }
             RaiseOnQuickInferenceEnded(result);
             return string.IsNullOrEmpty(result) ? string.Empty : result;
@@ -709,28 +1011,52 @@ namespace LetheAISharp.LLM
         /// <param name="chatlog">Full chatlog to sent to the LLM. GenerationInput for Text Completion API or ChatRequest for Chat Completion API. Use PromptBuilder to generate proper format for the currently loaded API automatically.</param>
         public static async Task SimpleQueryStreaming(object chatlog, CancellationToken ctx = default)
         {
-            if (Client == null)
-                throw new InvalidOperationException("LLMEngine not initialized. Call Setup() and Connect() first.");
-
-            if (LLMBusy)
+            var client = Client ?? throw new InvalidOperationException("LLMEngine not initialized. Call Setup() and Connect() first.");
+            if (!TryClaimWire(simpleQuery: true))
             {
                 logger?.LogError("[Core] Cannot perform SimpleQueryStreaming: LLM is currently busy.");
                 return;
             }
+
             var oldst = status;
-            Status = SystemStatus.Busy;
-            ResetStreamingState();
-            _isSimpleQuery = true;
+            CancellationTokenSource? scope = null;
+            string? error = null;
             try
             {
-                LLMBusy = true;
-                await Client.GenerateTextStreaming(chatlog).ConfigureAwait(false);
+                Status = SystemStatus.Busy;
+                scope = BeginQueryScope(ctx);
+                lock (_stateLock)
+                {
+                    _completionRaised = false;
+                }
+                ResetStreamingState();
+                if (!scope.IsCancellationRequested)
+                    await client.GenerateTextStreaming(chatlog, scope.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (scope?.IsCancellationRequested == true)
+            {
+                // reported below through the completion event
+            }
+            catch (Exception ex)
+            {
+                error = $"Error during generation: {ex.Message}";
+                logger?.LogError(ex, "[Core] Error during streaming query: {Message}", ex.Message);
             }
             finally
             {
-                LLMBusy = false;
-                _isSimpleQuery = false;
-                Status = oldst;
+                try
+                {
+                    EnsureCompletion(scope?.Token ?? default, error);
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogError(ex, "[Core] Error while finalizing the streaming query: {Message}", ex.Message);
+                }
+                ReleaseWire();
+                if (scope != null)
+                    EndQueryScope(scope);
+                if (status == SystemStatus.Busy)
+                    Status = oldst;
             }
         }
 
@@ -872,6 +1198,12 @@ namespace LetheAISharp.LLM
         {
             // "null", "stop", "length"
 
+            // Once the user cancelled, whatever the backend still delivers (a chunk already in flight, a "stop" sent
+            // while shutting down...) belongs to a response that was abandoned. The engine reports the end of the
+            // operation itself (see EnsureCompletion), so nothing more must reach the application or the buffers.
+            if (IsOperationCancelled)
+                return;
+
             if (e.IsComplete)
             {
                 // If the final delta carries reasoning content (e.g. a reasoning chunk
@@ -997,6 +1329,7 @@ namespace LetheAISharp.LLM
                         ToolCalls = e.ToolCallRecords ?? [],
                         FinishReason = e.FinishReason
                     };
+                    _completionRaised = true;
                     RaiseInferenceCompleted(inferenceResult);
                 }
                 // reset StreamingTextProgress to get it ready for next message (if any)
@@ -1309,8 +1642,9 @@ namespace LetheAISharp.LLM
         /// Plugin Handler
         /// </summary>
         /// <param name="lastuserinput"></param>
+        /// <param name="ct">cancellation of the turn: stops the plugin loop as soon as possible</param>
         /// <returns></returns>
-        private static async Task<string> BuildPluginSystemInsertAsync(string? lastuserinput)
+        private static async Task<string> BuildPluginSystemInsertAsync(string? lastuserinput, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(lastuserinput))
                 return string.Empty;
@@ -1318,10 +1652,12 @@ namespace LetheAISharp.LLM
             var insertmessages = new List<string>();
             foreach (var ctxplug in ContextPlugins)
             {
+                ct.ThrowIfCancellationRequested();
                 if (!ctxplug.Enabled)
                     continue;
-                // Plugins may call LLMEngine.SimpleQuery here. We are intentionally NOT
-                // holding the model semaphore yet to avoid re-entrancy deadlocks.
+                // Plugins may call LLMEngine.SimpleQuery here. That is fine: the turn is already Busy, and the model slot
+                // (LLMBusy) is only claimed by the turn's own wire call, which comes after this pre-pass.
+                // Nested queries join the turn's cancellation scope.
                 var plugres = await ctxplug.ReplaceUserInput(Bot.ReplaceMacros(lastuserinput)).ConfigureAwait(false);
                 if (plugres.IsHandled && !string.IsNullOrEmpty(plugres.Response))
                 {
@@ -1335,68 +1671,64 @@ namespace LetheAISharp.LLM
         }
 
         /// <summary>
-        /// Starts the generation process for the bot.
+        /// Starts the generation process for the bot (one chat turn).
         /// </summary>
-        /// <param name="MsgSender">Role of the sender</param>
-        /// <param name="userInput">Message from sender</param>
-        /// <returns></returns>
-        private static async Task StartGeneration(SingleMessage message)
+        /// <param name="message">Message to send (empty message = ask for a response / an impersonation, depending on the role)</param>
+        /// <returns>See <see cref="AddBotMessage"/></returns>
+        private static async Task<bool> StartGeneration(SingleMessage message)
         {
-            _isSimpleQuery = false;
-            if (Client == null || PromptBuilder == null)
-                return;
+            return await RunTurn(ct => GenerationBody(message, ct)).ConfigureAwait(false);
+        }
 
-            // Plugin pre-pass OUTSIDE the model slot to avoid deadlocks
-            var lastuserinput = string.IsNullOrWhiteSpace(message.Message) ?
-                History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty :
-                message.Message;
-
-            var pluginmessage = await BuildPluginSystemInsertAsync(lastuserinput).ConfigureAwait(false);
-
-            // call the brain if there's no plugin interfering
-            if (!string.IsNullOrEmpty(message.Message) && string.IsNullOrEmpty(pluginmessage))
-            {
-                var actbot = Bot is GroupPersonaBase gp ? gp.GetCurrentPersona() : Bot;
-                actbot ??= Bot;
-                await actbot.Brain.HandleMessages(message).ConfigureAwait(false);
-            }
-
-            if (LLMBusy)
-                return;
-            Status = SystemStatus.Busy;
-
-            var genparams = await GenerateFullPrompt(message, pluginmessage).ConfigureAwait(false);
-            PromptBuilder.LastQuery = (message.Role != AuthorRole.User) ? genparams : null;
-            
-
-            ResetStreamingState();
-            if (Instruct.PrefillThinking && !string.IsNullOrEmpty(Instruct.ThinkingStart) && !ToolCallsLoaded && Client.AllowPrefill && message.Role == AuthorRole.Assistant)
-            {
-                var prefill = Instruct.GetThinkPrefill();
-                if (!string.IsNullOrWhiteSpace(prefill))
-                    Client_StreamingMessageReceived(Bot, new LLMTokenStreamingEventArgs(prefill, null, null));
-            }
-
-
-            if (!string.IsNullOrEmpty(message.Message))
-            {
-                Bot.History.LogMessage(message);
-            }
-
-            RaiseOnFullPromptReady(PromptBuilder.PromptToText());
+        /// <summary>
+        /// The steps of a chat turn. Runs inside <see cref="RunTurn"/>: the engine is already Busy, a turn token exists, and 
+        /// whatever happens here (cancel, exception) is reported by RunTurn through a single completion event.
+        /// Every step boundary checks the token, so a cancel is honored even before the backend is involved.
+        /// </summary>
+        private static async Task GenerationBody(SingleMessage message, CancellationToken ct)
+        {
+            var pb = PromptBuilder ?? throw new InvalidOperationException("The backend was disconnected.");
+            var messageLogged = false;
             try
             {
-                LLMBusy = true;
-                await Client.GenerateTextStreaming(genparams).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                logger?.LogError(ex, "[Core] Error during generation: {Message}", ex.Message);
+                var lastuserinput = string.IsNullOrWhiteSpace(message.Message) ?
+                    History.GetLastFromInSession(AuthorRole.User)?.Message ?? string.Empty :
+                    message.Message;
+
+                var pluginmessage = await BuildPluginSystemInsertAsync(lastuserinput, ct).ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+
+                // call the brain if there's no plugin interfering
+                if (!string.IsNullOrEmpty(message.Message) && string.IsNullOrEmpty(pluginmessage))
+                {
+                    var actbot = Bot is GroupPersonaBase gp ? gp.GetCurrentPersona() : Bot;
+                    actbot ??= Bot;
+                    await actbot.Brain.HandleMessages(message).ConfigureAwait(false);
+                    ct.ThrowIfCancellationRequested();
+                }
+
+                var genparams = await GenerateFullPrompt(message, pluginmessage).ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+                pb.LastQuery = (message.Role != AuthorRole.User) ? genparams : null;
+
+                ResetStreamingState();
+                EmitThinkPrefill(message.Role == AuthorRole.Assistant);
+
+                if (!string.IsNullOrEmpty(message.Message))
+                {
+                    Bot.History.LogMessage(message);
+                    messageLogged = true;
+                }
+
+                RaiseOnFullPromptReady(pb.PromptToText());
+                await StreamWireAsync(genparams, ct).ConfigureAwait(false);
             }
             finally
             {
-                LLMBusy = false;
-                Status = SystemStatus.Ready;
+                // The message was sent: it has to be in the history (and therefore on screen) even if the turn was
+                // cancelled or failed before the normal logging point. Only the bot's response gets discarded.
+                if (!messageLogged && !string.IsNullOrEmpty(message.Message))
+                    Bot.History.LogMessage(message);
             }
         }
 

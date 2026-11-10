@@ -667,6 +667,10 @@ LLMEngine.OnInferenceSegment += (sender, segment) =>
 // Structured completion — receives the full result with separated channels
 LLMEngine.OnInferenceCompleted += (sender, result) =>
 {
+    // The user cancelled: what was streamed so far is abandoned, don't log it
+    if (result.WasCancelled)
+        return;
+
     Console.WriteLine($"\nResponse: {result.Response}");
 
     if (result.ThinkingContent != null)
@@ -678,6 +682,24 @@ LLMEngine.OnInferenceCompleted += (sender, result) =>
     LLMEngine.History.LogMessage(AuthorRole.Assistant, result.Response,
                                 LLMEngine.User, LLMEngine.Bot);
 };
+```
+
+### Cancelling a Generation
+
+`LLMEngine.CancelGeneration()` can be called at any time, from any thread, and stops whatever the engine is doing: the backend call, but also the preparation steps that come before it (context plugins, memory, prompt building). Prefer calling it off the UI thread, some backends need an HTTP round trip to abort.
+
+The chat entry points (`SendMessageToBot`, `AddBotMessage`, `ImpersonateUser`, `RerollLastMessage`) follow a simple contract:
+
+- `LLMEngine.Status` is `Busy` for the **whole** turn, preparation steps included (`LLMEngine.LLMBusy` only covers the backend call itself).
+- They return `true` if the turn ran, `false` if it could not start (engine busy or not connected). A refused call raises nothing and leaves the chat history untouched.
+- A turn that ran raises **exactly one** `OnInferenceCompleted`, whatever happened: normal end, error (`FinishReason == "error"`, the message is in `Response`), or cancel (`WasCancelled == true`, `FinishReason == "cancelled"`). It is raised before `Status` goes back to `Ready`.
+- On cancel, `Response`/`ThinkingContent` hold the partial text streamed so far. The engine never logs responses to the history: ignore or keep it, it's your call. The sent user message is always in the history, even if the turn is cancelled before reaching the model.
+- Once `CancelGeneration()` has been called, nothing more from the backend reaches your handlers (late tokens are dropped). The only thing raised afterwards is the single cancelled completion.
+
+```csharp
+// Cancel button
+await Task.Run(() => LLMEngine.CancelGeneration());
+// ...the UI is updated by OnInferenceCompleted (WasCancelled) and OnStatusChanged
 ```
 
 ### Legacy Streaming Events

@@ -131,28 +131,28 @@ namespace LetheAISharp.API
             return $"Llama.cpp [{res.build_info}]";
         }
 
-        public async Task<string> GenerateText(object parameters)
+        public async Task<string> GenerateText(object parameters, CancellationToken ct = default)
         {
             if (CompletionType == CompletionType.Chat)
             {
-                return await GenerateChatCompletion(parameters).ConfigureAwait(false);
+                return await GenerateChatCompletion(parameters, ct).ConfigureAwait(false);
             }
             if (CompletionType == CompletionType.Text)
             {
-                return await GenerateTextCompletion(parameters).ConfigureAwait(false);
+                return await GenerateTextCompletion(parameters, ct).ConfigureAwait(false);
             }
             throw new NotImplementedException($"Completion type {CompletionType} is not supported.");
         }
 
-        public async Task GenerateTextStreaming(object parameters)
+        public async Task GenerateTextStreaming(object parameters, CancellationToken ct = default)
         {
             if (CompletionType == CompletionType.Chat)
             {
-                await GenerateChatCompletionStreaming(parameters).ConfigureAwait(false);
+                await GenerateChatCompletionStreaming(parameters, ct).ConfigureAwait(false);
             }
             else if (CompletionType == CompletionType.Text)
             {
-                await GenerateTextCompletionStreaming(parameters).ConfigureAwait(false);
+                await GenerateTextCompletionStreaming(parameters, ct).ConfigureAwait(false);
             }
             else
             {
@@ -522,17 +522,26 @@ namespace LetheAISharp.API
             };
         }
 
-        private async Task GenerateChatCompletionStreaming(object parameters)
+        /// <summary>
+        /// Starts a new abortable call. The returned token is linked to <paramref name="external"/>, so it is cancelled
+        /// either by <see cref="AbortGenerationSync"/> or by the caller's token. Linking at creation time also means
+        /// a token that was already cancelled yields an already cancelled call (no lost-cancel window).
+        /// </summary>
+        private CancellationToken BeginCall(CancellationToken external)
         {
-            if (parameters is not ChatRequest input)
-                throw new ArgumentException("Parameters must be of type ChatRequest");
-            CancellationToken token;
             lock (_ctsLock)
             {
                 cts?.Dispose(); // Dispose old token source
-                cts = new CancellationTokenSource();
-                token = cts.Token;
+                cts = CancellationTokenSource.CreateLinkedTokenSource(external);
+                return cts.Token;
             }
+        }
+
+        private async Task GenerateChatCompletionStreaming(object parameters, CancellationToken external)
+        {
+            if (parameters is not ChatRequest input)
+                throw new ArgumentException("Parameters must be of type ChatRequest");
+            var token = BeginCall(external);
             // Samplers handled at the request level now. Kept in case it's needed for something else later
             //if (LLMEngine.Settings.BackendLLamaCppUseProps)
             //{
@@ -547,33 +556,21 @@ namespace LetheAISharp.API
             await _client.StreamChatCompletion(input, token).ConfigureAwait(false);
         }
 
-        private async Task GenerateTextCompletionStreaming(object parameters)
+        private async Task GenerateTextCompletionStreaming(object parameters, CancellationToken external)
         {
             if (parameters is not GenerationInput input)
                 throw new ArgumentException("Parameters must be of type GenerationInput");
-            CancellationToken token;
-            lock (_ctsLock)
-            {
-                cts?.Dispose();
-                cts = new CancellationTokenSource();
-                token = cts.Token;
-            }
+            var token = BeginCall(external);
             var request = new LlamaCppCompletionRequest();
             request.ImportFromGenerationInput(input);
             await _client.TextCompletionStreamAsync(request, token).ConfigureAwait(false);
         }
 
-        private async Task<string> GenerateChatCompletion(object parameters)
+        private async Task<string> GenerateChatCompletion(object parameters, CancellationToken external)
         {
             if (parameters is not ChatRequest input)
                 throw new ArgumentException("Parameters must be of type ChatRequest");
-            CancellationToken token;
-            lock (_ctsLock)
-            {
-                cts?.Dispose(); // Dispose old token source
-                cts = new CancellationTokenSource();
-                token = cts.Token;
-            }
+            var token = BeginCall(external);
             var param = input;
             try
             {
@@ -595,6 +592,11 @@ namespace LetheAISharp.API
                 }
                 return res ?? string.Empty;
             }
+            catch (Exception) when (token.IsCancellationRequested)
+            {
+                LLMEngine.Logger?.LogInformation("[LlamaCpp] Chat completion cancelled.");
+                return string.Empty;
+            }
             catch (Exception ex)
             {
                 LLMEngine.Logger?.LogError(ex, "[OpenAI API] Error during GenerateText: {Message}", ex.Message);
@@ -602,23 +604,22 @@ namespace LetheAISharp.API
             }
         }
 
-        private async Task<string> GenerateTextCompletion(object parameters)
+        private async Task<string> GenerateTextCompletion(object parameters, CancellationToken external)
         {
             if (parameters is not GenerationInput input)
                 throw new ArgumentException("Parameters must be of type GenerationInput");
-            CancellationToken token;
-            lock (_ctsLock)
-            {
-                cts?.Dispose();
-                cts = new CancellationTokenSource();
-                token = cts.Token;
-            }
+            var token = BeginCall(external);
             try
             {
                 var request = new LlamaCppCompletionRequest();
                 request.ImportFromGenerationInput(input);
                 var result = await _client.TextCompletionAsync(request, token).ConfigureAwait(false);
                 return result?.Content ?? string.Empty;
+            }
+            catch (Exception) when (token.IsCancellationRequested)
+            {
+                LLMEngine.Logger?.LogInformation("[LlamaCpp] Text completion cancelled.");
+                return string.Empty;
             }
             catch (Exception ex)
             {

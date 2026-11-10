@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace LetheAISharp.API
@@ -89,8 +90,20 @@ namespace LetheAISharp.API
         IPromptBuilder GetPromptBuilder();
 
         // Text generation (common to all LLMs)
-        Task<string> GenerateText(object parameters);
-        Task GenerateTextStreaming(object parameters);
+
+        /// <summary>
+        /// Runs a non-streaming generation. The token is linked to the adapter's own abort mechanism, so either
+        /// cancelling it or calling <see cref="AbortGenerationSync"/> stops the request. Passing a token (rather than
+        /// relying on <see cref="AbortGenerationSync"/> alone) guarantees a cancel requested just before the call
+        /// starts is not lost.
+        /// </summary>
+        Task<string> GenerateText(object parameters, CancellationToken ct = default);
+
+        /// <summary>
+        /// Runs a streaming generation, raising <see cref="TokenReceived"/>. A cancelled call must end quietly: it must
+        /// not synthesize error/completion tokens of its own, the engine reports the cancellation.
+        /// </summary>
+        Task GenerateTextStreaming(object parameters, CancellationToken ct = default);
         Task<bool> AbortGeneration();
         bool AbortGenerationSync();
 
@@ -105,7 +118,7 @@ namespace LetheAISharp.API
 
         /// <summary>
         /// Counts the exact number of prompt tokens the backend would process for a fully-built
-        /// generation request (the same request object that <see cref="GenerateTextStreaming"/>
+        /// generation request (the same request object that <see cref="GenerateTextStreaming(object, CancellationToken)"/>
         /// would receive). Only called when <see cref="SupportsRequestTokenCount"/> is true;
         /// the default implementation throws.
         /// </summary>

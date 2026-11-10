@@ -83,23 +83,34 @@ namespace LetheAISharp.API
             return $"{engine.result} {engine.version}";
         }
 
-        public async Task<string> GenerateText(object parameters)
-        {
-            if (parameters is not GenerationInput input)
-                throw new ArgumentException("Parameters must be of type GenerationInput");
-            var result = await _client.GenerateAsync(input).ConfigureAwait(false);
-            if (result is null)
-                return string.Empty;
-            return string.Join("", result.Results.Select(r => r.Text));
-        }
-
-        public async Task GenerateTextStreaming(object parameters)
+        public async Task<string> GenerateText(object parameters, CancellationToken ct = default)
         {
             if (parameters is not GenerationInput input)
                 throw new ArgumentException("Parameters must be of type GenerationInput");
             try
             {
-                await _client.GenerateTextStreamAsync(input).ConfigureAwait(false);
+                var result = await _client.GenerateAsync(input, ct).ConfigureAwait(false);
+                if (result is null)
+                    return string.Empty;
+                return string.Join("", result.Results.Select(r => r.Text));
+            }
+            catch (Exception) when (ct.IsCancellationRequested)
+            {
+                return string.Empty;
+            }
+        }
+
+        public async Task GenerateTextStreaming(object parameters, CancellationToken ct = default)
+        {
+            if (parameters is not GenerationInput input)
+                throw new ArgumentException("Parameters must be of type GenerationInput");
+            try
+            {
+                await _client.GenerateTextStreamAsync(input, ct).ConfigureAwait(false);
+            }
+            catch (Exception) when (ct.IsCancellationRequested)
+            {
+                // Cancelled: the engine reports it, and also asks the server to abort (AbortGenerationSync).
             }
             catch (Exception ex)
             {

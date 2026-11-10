@@ -48,7 +48,7 @@ namespace LetheAISharp.API
                 var res = await SendRequestAsync<LlamaCppCompletionResponse>(_httpClient!, HttpMethod.Post, "/completion", body, cancellationToken: cancellationToken).ConfigureAwait(false);
                 return res;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
                 LLMEngine.Logger?.LogError(ex, "[LlamaCpp] Error during text completion: {Message}", ex.Message);
                 var res = new LlamaCppCompletionResponse() { Content = $"Error during text completion: {ex.Message}", Stop_type = "error" };
@@ -121,9 +121,21 @@ namespace LetheAISharp.API
                         break;
                 }
             }
+            catch (Exception ex) when (cancellationToken.IsCancellationRequested)
+            {
+                // Cancelled by the caller. Stay quiet: the engine reports the cancellation itself, so no
+                // token (and certainly no fake completion) must be raised from here.
+                LLMEngine.Logger?.LogInformation("[LlamaCpp] Text completion stream cancelled: {Message}", ex.Message);
+            }
             catch (OperationCanceledException ex)
             {
-                LLMEngine.Logger?.LogInformation(ex, "[LlamaCpp] Text completion stream cancelled: {Message}", ex.Message);
+                // Not requested by the caller: the HttpClient timeout elapsed.
+                LLMEngine.Logger?.LogError(ex, "[LlamaCpp] Text completion stream timed out: {Message}", ex.Message);
+                RaiseOnStreamingResponse(new OpenTokenResponse
+                {
+                    Token = "The request to the backend timed out.",
+                    FinishReason = "error"
+                });
             }
             catch (Exception ex)
             {
