@@ -8,6 +8,13 @@ namespace LetheAISharp.Skills
     public class SkillSettings
     {
         /// <summary>
+        /// Master switch for the skill system. When disabled, the Skills toolset is hidden from the model and no skill is suggested or injected in the system prompt.
+        /// </summary>
+        [Description("Master switch for the skill system.\n" +
+            "When disabled, the Skills toolset is hidden from the model and no skill is suggested or injected in the system prompt.")]
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>
         /// Folder containing the skills. Each skill lives in its own sub-folder with a SKILL.md file.
         /// </summary>
         [Description("Folder containing the skills. Each skill lives in its own sub-folder with a SKILL.md file.")]

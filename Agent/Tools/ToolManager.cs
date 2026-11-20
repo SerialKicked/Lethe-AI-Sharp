@@ -32,13 +32,25 @@ namespace LetheAISharp.Agent.Tools
         /// If no tool lists are registered, returns an empty list.
         /// </summary>
         public List<Tool> GetToolList() {
-            return _toolLists.Count == 0 ? [] : [.. _toolLists.Values.Where(e => AllowedToolSets.Contains(e.Id)).SelectMany(tl => tl.GetToolList())];
+            return _toolLists.Count == 0 ? [] : [.. _toolLists.Values.Where(IsActive).SelectMany(tl => tl.GetToolList())];
             }
 
         public List<IToolList> GetToolsets()
         {
-            return _toolLists.Count == 0 ? [] : [.. _toolLists.Values.Where(e => AllowedToolSets.Contains(e.Id))];
+            return _toolLists.Count == 0 ? [] : [.. _toolLists.Values.Where(IsActive)];
         }
+
+        /// <summary>
+        /// Whether a toolset is both allowed (globally or by the persona) and currently available.
+        /// </summary>
+        private bool IsActive(IToolList toolList) => AllowedToolSets.Contains(toolList.Id) && toolList.IsAvailable;
+
+        /// <summary>
+        /// Determines whether the toolset with the specified identifier is registered, allowed and currently available.
+        /// </summary>
+        /// <param name="id">Identifier of the toolset.</param>
+        /// <returns>true if the toolset would be offered to the model (assuming tool calls are enabled); otherwise, false.</returns>
+        public bool IsToolsetActive(string id) => _toolLists.TryGetValue(id, out var toolList) && IsActive(toolList);
 
         /// <summary>
         /// Register a toolset with the manager. The tool list's <see cref="IToolList.LoadTools"/> method is called immediately to allow it to initialize any resources.
@@ -120,7 +132,7 @@ namespace LetheAISharp.Agent.Tools
         /// <returns>true if there are tools available; otherwise, false.</returns>
         public bool HasTools()
         {
-            return _toolLists.Values.FirstOrDefault(e => AllowedToolSets.Contains(e.Id)) is not null;
+            return _toolLists.Values.FirstOrDefault(IsActive) is not null;
         }
 
         /// <summary>
@@ -131,7 +143,7 @@ namespace LetheAISharp.Agent.Tools
         /// <returns>The estimated total token cost for all tool lists whose identifiers are present in the allowed tool sets.</returns>
         public int EstimatedTokenCost()
         {
-            return _toolLists.Values.Where(e => AllowedToolSets.Contains(e.Id)).Sum(tl => tl.EstimatedTokenCost) * 2;
+            return _toolLists.Values.Where(IsActive).Sum(tl => tl.EstimatedTokenCost) * 2;
         }
 
         /// <summary>

@@ -48,6 +48,8 @@ namespace LetheAISharp.Agent.Tools
             }
         }
 
+        public bool IsAvailable => LLMEngine.Settings.SkillOptions.Enabled;
+
         private readonly List<Tool> readTools = [];
         private readonly List<Tool> writeTools = [];
 

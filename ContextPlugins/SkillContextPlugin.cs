@@ -10,7 +10,7 @@ namespace LetheAISharp.LLM
     /// Otherwise the skill content is injected directly in the system prompt.
     /// </summary>
     /// <remarks>
-    /// This plugin is controlled globally by <see cref="SkillSettings.AutoSuggest"/>, so the per-persona plugin list doesn't affect it.
+    /// This plugin is controlled globally by <see cref="SkillSettings.Enabled"/> and <see cref="SkillSettings.AutoSuggest"/>, so the per-persona plugin list doesn't affect it.
     /// </remarks>
     public class SkillContextPlugin : IContextPlugin
     {
@@ -20,8 +20,8 @@ namespace LetheAISharp.LLM
 
         public bool Enabled
         {
-            get => LLMEngine.Settings.SkillOptions.AutoSuggest;
-            set { /* controlled by SkillSettings.AutoSuggest */ }
+            get => LLMEngine.Settings.SkillOptions.Enabled && LLMEngine.Settings.SkillOptions.AutoSuggest;
+            set { /* controlled by SkillSettings.Enabled and SkillSettings.AutoSuggest */ }
         }
 
         private string lastInput = string.Empty;
@@ -31,7 +31,7 @@ namespace LetheAISharp.LLM
         {
             response = string.Empty;
             var options = LLMEngine.Settings.SkillOptions;
-            if (!options.AutoSuggest || string.IsNullOrWhiteSpace(userinput) || userinput.Trim().Length < 4)
+            if (!options.Enabled || !options.AutoSuggest || string.IsNullOrWhiteSpace(userinput) || userinput.Trim().Length < 4)
                 return false;
             var manager = LLMEngine.SkillManager;
             if (manager.Enabled.Count == 0)
@@ -50,7 +50,7 @@ namespace LetheAISharp.LLM
             if (matches.Count == 0)
                 return false;
 
-            var toolsActive = LLMEngine.ToolCallsLoaded && LLMEngine.ToolManager.AllowedToolSets.Contains(ToolsetId);
+            var toolsActive = LLMEngine.ToolCallsLoaded && LLMEngine.ToolManager.IsToolsetActive(ToolsetId);
             var sb = new StringBuilder();
             sb.Append(LLMEngine.NewLine).Append(LLMEngine.SystemPrompt.CategorySeparator).Append(" Relevant Skills").Append(LLMEngine.NewLine);
             if (toolsActive)

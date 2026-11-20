@@ -17,6 +17,12 @@ namespace LetheAISharp.Agent.Tools
         void UnloadTools();
 
         /// <summary>
+        /// Whether this toolset is currently available. A toolset listed in the allowed toolsets is ignored by the <see cref="ToolManager"/> when this returns false.
+        /// Lets a toolset be switched off at runtime without editing the global or per-persona allowed lists.
+        /// </summary>
+        bool IsAvailable => true;
+
+        /// <summary>
         /// Estimated token cost of including this toolset in the prompt.
         /// Used to make budget-aware decisions when composing toolsets.
         /// </summary>
