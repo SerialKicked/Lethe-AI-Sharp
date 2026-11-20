@@ -378,7 +378,7 @@ namespace LetheAISharp.LLM
         /// <summary>
         /// Waits for the model slot (held by an agent query, for instance) and claims it. Cancellable.
         /// </summary>
-        private static async Task ClaimWireAsync(CancellationToken ct, bool simpleQuery)
+        private static async Task ClaimWireAsync(bool simpleQuery, CancellationToken ct)
         {
             var warned = false;
             while (!TryClaimWire(simpleQuery))
@@ -471,7 +471,7 @@ namespace LetheAISharp.LLM
             {
                 try
                 {
-                    EnsureCompletion(ct, _turnError);
+                    EnsureCompletion(_turnError, ct);
                 }
                 catch (Exception ex)
                 {
@@ -487,7 +487,7 @@ namespace LetheAISharp.LLM
         /// Backends are inconsistent when interrupted (some send nothing, some a fake error, some a stop), so the
         /// engine is the one reporting a cancellation, whatever the backend did.
         /// </summary>
-        private static void EnsureCompletion(CancellationToken ct, string? error)
+        private static void EnsureCompletion(string? error, CancellationToken ct)
         {
             if (_completionRaised)
                 return;
@@ -529,7 +529,7 @@ namespace LetheAISharp.LLM
         /// </summary>
         private static async Task StreamWireAsync(object query, CancellationToken ct)
         {
-            await ClaimWireAsync(ct, simpleQuery: false).ConfigureAwait(false);
+            await ClaimWireAsync(simpleQuery: false, ct).ConfigureAwait(false);
             try
             {
                 ct.ThrowIfCancellationRequested();
@@ -1046,7 +1046,7 @@ namespace LetheAISharp.LLM
             {
                 try
                 {
-                    EnsureCompletion(scope?.Token ?? default, error);
+                    EnsureCompletion(error, scope?.Token ?? default);
                 }
                 catch (Exception ex)
                 {
@@ -1518,13 +1518,18 @@ namespace LetheAISharp.LLM
 
             // Core facts section: top-ranked extracted facts about the user, inserted before session history
             // so the bot has durable user knowledge that doesn't depend on RAG similarity alone.
-            if (Settings.FactRetrievalEnabled && Settings.CoreFactsTokenBudget > 0 && !string.IsNullOrEmpty(SystemPrompt.CoreFactsTitle))
+
+            // check if raw prompt contains "{{userfacts}}" already, if so, don't add the core facts section, because the user has already added it to the system prompt
+            if (!rawprompt.ToString().Contains("{{userfacts}}", StringComparison.OrdinalIgnoreCase))
             {
-                var coreFacts = Bot.Brain.GetCoreFacts(Settings.CoreFactsTokenBudget);
-                if (!string.IsNullOrEmpty(coreFacts))
+                if (Settings.FactRetrievalEnabled && Settings.CoreFactsTokenBudget > 0 && !string.IsNullOrEmpty(SystemPrompt.CoreFactsTitle))
                 {
-                    rawprompt.AppendLinuxLine($"{NewLine}{Bot.ReplaceMacros(SystemPrompt.CoreFactsTitle)}").AppendLinuxLine();
-                    rawprompt.AppendLinuxLine(coreFacts.CleanupAndTrim());
+                    var coreFacts = Bot.Brain.GetCoreFacts(Settings.CoreFactsTokenBudget);
+                    if (!string.IsNullOrEmpty(coreFacts))
+                    {
+                        rawprompt.AppendLinuxLine($"{NewLine}{Bot.ReplaceMacros(SystemPrompt.CoreFactsTitle)}").AppendLinuxLine();
+                        rawprompt.AppendLinuxLine(coreFacts.CleanupAndTrim());
+                    }
                 }
             }
 
