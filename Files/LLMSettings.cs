@@ -248,6 +248,16 @@ namespace LetheAISharp.Files
         [Description("Max length for the bot's reply. This setting determines the maximum number of tokens the model can generate in a single response.")]
         public int MaxReplyLength { get; set; } = 512;
 
+        /// <summary>
+        /// Chat completion only. When the prompt has to be trimmed to fit the context, the trimming may stop as soon as the
+        /// result leaves at most this many tokens unused, instead of proving that keeping one more message would not fit.
+        /// 0 (default) always keeps as much history as possible. Higher values save a token count round-trip now and then.
+        /// Clamped to 0-512.
+        /// </summary>
+        [Description("Chat completion only. When the prompt has to be trimmed to fit the context, trimming may stop as soon as at most this many tokens are left unused.\n" +
+            "0 (default) always keeps as much history as possible. Higher values can save a token count round-trip to the backend. Range: 0-512.")]
+        public int PromptTrimLeeway { get; set; } = 0;
+
         /// <summary> Image embedding size (depends on the embedding model, but 768 is the most common one) </summary>
         [Description("Image embedding size (depends on the embedding model, but 768 is the most common one)\n" +
             "This is the number of tokens used by each image being sent to the model. Important for accurate calculations.\n" +
@@ -605,6 +615,11 @@ namespace LetheAISharp.Files
             if (MaxTotalTokens <= 0)
             {
                 errMessage.AppendLine("MaxTotalTokens should be greater than 0.");
+                validated = false;
+            }
+            if (PromptTrimLeeway < 0 || PromptTrimLeeway > 512)
+            {
+                errMessage.AppendLine("PromptTrimLeeway should be between 0 and 512.");
                 validated = false;
             }
             if (WebSearchDetailedMaxLength <= 0) 

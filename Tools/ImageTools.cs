@@ -103,8 +103,11 @@ namespace LetheAISharp
                 var key = $"{maxSize}|{imagePath}";
                 var writeTime = File.GetLastWriteTimeUtc(imagePath);
                 if (_base64Cache.TryGetValue(key, out var cached) && cached.WriteTimeUtc == writeTime)
+                {
+                    LLMEngine.Logger?.LogInformation("[Lethe] Loading Cached Image: {path}", imagePath);
                     return cached.Data;
-
+                }
+                LLMEngine.Logger?.LogInformation("[Lethe] Processing Image: {path}", imagePath);
                 var res = ImageToBase64(File.ReadAllBytes(imagePath), maxSize);
                 if (res != null)
                 {
@@ -220,6 +223,7 @@ namespace LetheAISharp
         {
             try
             {
+                LLMEngine.Logger?.LogInformation("[Lethe] Processing Image: {path}", imageUrl);
                 using HttpClient httpClient = new();
                 byte[] imageBytes = await httpClient.GetByteArrayAsync(imageUrl).ConfigureAwait(false);
                 return ImageToBase64(imageBytes);

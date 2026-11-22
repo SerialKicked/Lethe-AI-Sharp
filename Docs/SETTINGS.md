@@ -202,6 +202,13 @@ Maximum number of tokens the model is allowed to generate in a single reply. Inc
 
 ---
 
+### `PromptTrimLeeway`
+**Type:** `int` | **Default:** `0`
+
+Chat completion only. When the prompt is too long for the context, the oldest messages are removed until it fits. The search for the right cut point uses real token counts from the backend and normally stops only when keeping one more message would not fit, so as much history as possible is kept. With a value above `0`, it may also stop as soon as the result leaves at most this many tokens unused, which can save a token count round-trip. Range: `0` to `512`.
+
+---
+
 ### `ImageEmbeddingSize`
 **Type:** `int` | **Default:** `768`
 
@@ -644,6 +651,7 @@ When `true`, a note identifying the currently speaking persona is prepended insi
 | `LlamaSharpNoKVoffload` | `bool` | `false` | Keep KV cache in CPU RAM (LlamaSharp only) |
 | `MaxTotalTokens` | `int` | `16384` | Total token budget (context window size) |
 | `MaxReplyLength` | `int` | `512` | Max tokens the model may generate per reply |
+| `PromptTrimLeeway` | `int` | `0` | Unused tokens allowed when trimming a chat prompt to fit (0-512, 0 = tightest) |
 | `ImageEmbeddingSize` | `int` | `768` | Dimensionality of image embeddings |
 | `ImageResolution` | `int` | `1024` | Max image dimension before resizing |
 | `MaxImageCount` | `int` | `4` | Max images included per prompt (`0` = unlimited) |

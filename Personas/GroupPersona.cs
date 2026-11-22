@@ -507,6 +507,10 @@ namespace LetheAISharp.LLM
             if (string.IsNullOrEmpty(inputText))
                 return string.Empty;
 
+            // Every macro starts with "{{": without one nothing below can change the text (see BasePersona).
+            if (!inputText.Contains("{{", StringComparison.Ordinal) && inputText.IndexOf("{{memory:", StringComparison.InvariantCultureIgnoreCase) < 0)
+                return inputText;
+
             StringBuilder res = new(inputText);
 
             var currentBot = CurrentBot; // Will never be null due to property fallback

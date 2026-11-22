@@ -8,6 +8,7 @@ using OpenAI;
 using OpenAI.Chat;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -202,19 +203,12 @@ namespace LetheAISharp
                 {
                     try
                     {
-                        var request = BuildChatRequest(workingprompt, tempoverride, responseoverride, overridePrefill);
-                        var total = exactClient.CountRequestTokensSync(request);
-                        var maxIterations = workingprompt.Count + 4;
-                        var iteration = 0;
-                        while (total > max && workingprompt.Count > 1)
+                        var exact = FitToContext(workingprompt, max, TrimCountMode.Exact, candidate =>
                         {
-                            RemoveTrimBatch(workingprompt, total - max);
-                            request = BuildChatRequest(workingprompt, tempoverride, responseoverride, overridePrefill);
-                            total = exactClient.CountRequestTokensSync(request);
-                            if (++iteration > maxIterations)
-                                break;
-                        }
-                        return request;
+                            var request = BuildChatRequest(candidate, tempoverride, responseoverride, overridePrefill);
+                            return (exactClient.CountRequestTokensSync(request), request);
+                        });
+                        return exact.Request!;
                     }
                     catch (Exception ex)
                     {
@@ -225,9 +219,8 @@ namespace LetheAISharp
                     }
                 }
 
-                var esttotal = GetTokenUsage(workingprompt);
-                TrimToFit(workingprompt, ref esttotal, max);
-                return BuildChatRequest(workingprompt, tempoverride, responseoverride, overridePrefill);
+                var fitted = FitToContext(workingprompt, max, TrimCountMode.Estimate, candidate => (GetTokenUsage(candidate), null));
+                return BuildChatRequest(fitted.Prompt, tempoverride, responseoverride, overridePrefill);
             }
             finally
             {
@@ -379,83 +372,271 @@ namespace LetheAISharp
         }
 
         /// <summary>
-        /// Trims the oldest messages (preserving index 0, the system prompt) until the accurate token
-        /// usage of <paramref name="workingprompt"/> fits within <paramref name="max"/>.
+        /// Which counter a <see cref="FitToContext"/> run used. Warm-start data is only reused with the
+        /// same counter, since the exact and estimate-based counts are not on the same scale.
+        /// </summary>
+        private enum TrimCountMode { Exact, Estimate }
+
+        // Warm-start data from the last successful fit of this builder instance (the engine keeps one
+        // builder for the whole chat, so this carries over from turn to turn). It is only a hint used to
+        // place the first count; every returned prompt is still verified by a real count. Not reset by
+        // Clear() on purpose.
+        private bool _warmValid;
+        private TrimCountMode _warmMode;
+        private int _warmTotal;
+        private int _warmEstimate;
+        private double _warmSlope;
+
+        /// <summary>
+        /// Finds the prompt to send: <paramref name="source"/> with the fewest oldest messages removed
+        /// (index 0, the system prompt, is always kept) whose count by <paramref name="counter"/> fits
+        /// within <paramref name="max"/>.
         /// </summary>
         /// <remarks>
-        /// The naive approach re-counts the full prompt after every single removal, which is extremely
-        /// slow on backends whose token-counting is an HTTP round-trip (e.g. llama.cpp). Instead we use a
-        /// cheap local per-message estimate to decide how many messages to drop in one batch, then perform
-        /// a single accurate re-count to verify. The batch is intentionally conservative (under-drops) so
-        /// that we never trim more context than necessary; if the estimate was too optimistic we simply
-        /// loop again, which converges in one or two accurate counts instead of N.
+        /// <para>A cut <c>k</c> removes the <c>k</c> oldest messages after the system prompt, plus any tool
+        /// result left orphaned at index 1 (some chat templates reject a leading tool message). Removing more
+        /// messages never makes the prompt bigger, so the search keeps two bounds: the largest cut known to
+        /// be over the limit and the smallest cut known to fit. It stops when they are adjacent (keeping one
+        /// more message would not fit: the tightest result possible), or when the fitting cut leaves at most
+        /// <see cref="LLMSettings.PromptTrimLeeway"/> tokens unused.</para>
+        /// <para>Counts are expensive (a full template + tokenization round-trip on llama.cpp), so each next
+        /// cut is predicted from cheap local per-message estimates, corrected by the ratio measured between
+        /// real counts. The last fit of the previous turn places the first count, which usually lands on the
+        /// answer directly. When a guess fails to halve the search range, the next one is a plain bisection,
+        /// which bounds the number of counts to about twice log2 of the message count.</para>
         /// </remarks>
-        private void TrimToFit(List<SingleMessage> workingprompt, ref int total, int max)
+        /// <returns>The chosen prompt, its count, and the request the counter built for it (null when the counter builds none).</returns>
+        private (List<SingleMessage> Prompt, int Total, ChatRequest? Request) FitToContext(
+            List<SingleMessage> source, int max, TrimCountMode mode, Func<List<SingleMessage>, (int Total, ChatRequest? Request)> counter)
         {
-            // Fast path: nothing to do.
-            if (total <= max || workingprompt.Count <= 1)
-                return;
+            var n = source.Count;
+            var leeway = Math.Clamp(LLMEngine.Settings.PromptTrimLeeway, 0, 512);
+            // Predictions aim slightly under the limit so a guess tends to fit. This only places the counts:
+            // the stop conditions alone decide how tight the result is.
+            var target = max - (leeway > 0 ? leeway / 2 : 32);
+            var watch = Stopwatch.StartNew();
 
-            // Guard against pathological loops (e.g. a single message that is itself larger than max).
-            var safety = 0;
-            while (total > max && workingprompt.Count > 1)
+            // prefix[k] = local estimate of the k oldest removable messages, estimateTotal = whole prompt.
+            int[]? prefix = null;
+            var estimateTotal = 0;
+            void EnsureEstimates()
             {
-                RemoveTrimBatch(workingprompt, total - max);
+                if (prefix is not null)
+                    return;
+                prefix = new int[n];
+                estimateTotal = EstimateLocalTokens(source[0]);
+                for (int i = 1; i < n; i++)
+                {
+                    var cost = EstimateLocalTokens(source[i]);
+                    prefix[i] = prefix[i - 1] + cost;
+                    estimateTotal += cost;
+                }
+            }
 
-                // One accurate count to verify the batch. If we under-dropped, the outer loop runs again.
-                total = GetTokenUsage(workingprompt);
+            int Normalize(int k)
+            {
+                if (k <= 0)
+                    return 0;
+                if (k > n - 1)
+                    k = n - 1;
+                while (1 + k < n && source[1 + k].Role == AuthorRole.Tool)
+                    k++;
+                return k;
+            }
 
-                if (++safety > workingprompt.Count + 4)
+            List<SingleMessage> Materialize(int k)
+            {
+                if (k == 0)
+                    return new List<SingleMessage>(source);
+                var list = new List<SingleMessage>(n - k) { source[0] };
+                list.AddRange(source.GetRange(1 + k, n - 1 - k));
+                return list;
+            }
+
+            // Smallest cut whose removed estimate reaches the requested amount.
+            int FindCut(double need)
+            {
+                if (need <= 0 || n <= 1)
+                    return 0;
+                if (prefix![n - 1] < need)
+                    return n - 1;
+                int a = 0, b = n - 1;
+                while (a < b)
+                {
+                    var m = (a + b) / 2;
+                    if (prefix[m] >= need)
+                        b = m;
+                    else
+                        a = m + 1;
+                }
+                return a;
+            }
+
+            // Real tokens per estimated token between two counted cuts.
+            double? Slope(int ka, int ta, int kb, int tb)
+            {
+                if (ka == kb)
+                    return null;
+                if (ka > kb)
+                {
+                    (ka, kb) = (kb, ka);
+                    (ta, tb) = (tb, ta);
+                }
+                var removed = prefix![kb] - prefix[ka];
+                if (removed <= 0)
+                    return null;
+                var s = (ta - tb) / (double)removed;
+                if (double.IsNaN(s) || s <= 0)
+                    return null;
+                return Math.Clamp(s, 0.05, 20);
+            }
+
+            double? slope = null;
+            var k = 0;
+            if (_warmValid && _warmMode == mode && n > 1)
+            {
+                // Predict this prompt from the last fit: real ~ warmTotal + slope * (estimate - warmEstimate).
+                EnsureEstimates();
+                slope = _warmSlope;
+                k = FindCut((estimateTotal - _warmEstimate) + ((_warmTotal - target) / _warmSlope));
+            }
+
+            int lo = -1, loTotal = 0;
+            ChatRequest? loRequest = null;
+            int hi = -1, hiTotal = 0;
+            ChatRequest? hiRequest = null;
+            int lastK = -1, lastTotal = 0, prevK = -1, prevTotal = 0;
+            int lastStep = 0, overStreak = 0, fitStreak = 0;
+            var prevWidth = int.MaxValue;
+            var counts = 0;
+            var maxCounts = 6 + (2 * (int)Math.Ceiling(Math.Log2(n + 1)));
+
+            while (true)
+            {
+                k = Normalize(k);
+                if (lastK >= 0)
+                    lastStep = Math.Abs(k - lastK);
+                var (total, request) = counter(Materialize(k));
+                counts++;
+                prevK = lastK;
+                prevTotal = lastTotal;
+                lastK = k;
+                lastTotal = total;
+
+                if (total <= max)
+                {
+                    if (hi < 0 || k < hi)
+                    {
+                        hi = k;
+                        hiTotal = total;
+                        hiRequest = request;
+                    }
+                    fitStreak = lo < 0 ? fitStreak + 1 : 0;
+                    overStreak = 0;
+                }
+                else
+                {
+                    if (k > lo)
+                    {
+                        lo = k;
+                        loTotal = total;
+                        loRequest = request;
+                    }
+                    overStreak = hi < 0 ? overStreak + 1 : 0;
+                    fitStreak = 0;
+                }
+
+                if (hi >= 0)
+                {
+                    if (hi == 0 || max - hiTotal <= leeway)
+                        break;
+                    // Adjacent bounds (or a non-monotonic count): no cut in between is left to try.
+                    if (lo >= 0 && Normalize(lo + 1) >= hi)
+                        break;
+                }
+                else if (lo >= n - 1)
+                {
                     break;
+                }
+                if (counts >= maxCounts)
+                {
+                    // Safety net only. If nothing fits yet, the largest cut is the last thing worth trying.
+                    if (hi < 0 && lo < n - 1)
+                    {
+                        k = n - 1;
+                        continue;
+                    }
+                    break;
+                }
+
+                EnsureEstimates();
+                if (lo >= 0 && hi >= 0)
+                    slope = Slope(lo, loTotal, hi, hiTotal) ?? slope;
+                else if (prevK >= 0)
+                    slope = Slope(prevK, prevTotal, lastK, lastTotal) ?? slope;
+                slope ??= Math.Clamp(lastTotal / (double)Math.Max(1, estimateTotal - prefix![lastK]), 0.05, 20);
+
+                var next = FindCut(prefix![lastK] + ((lastTotal - target) / slope.Value));
+                if (lo >= 0 && hi >= 0)
+                {
+                    var width = hi - lo;
+                    if (width * 2 > prevWidth)
+                        next = lo + (width / 2);
+                    prevWidth = width;
+                    next = Math.Clamp(next, lo + 1, hi - 1);
+                    if (Normalize(next) >= hi)
+                        next = lo + 1;
+                }
+                else if (hi < 0)
+                {
+                    // Still over everywhere: move forward, and at least double the step once guesses keep falling short.
+                    var minStep = overStreak >= 2 ? Math.Max(1, lastStep * 2) : 1;
+                    next = Math.Min(Math.Max(next, lo + minStep), n - 1);
+                }
+                else
+                {
+                    // Fits with too much room and nothing known to be over: move back, same doubling rule.
+                    var minStep = fitStreak >= 2 ? Math.Max(1, lastStep * 2) : 1;
+                    next = Math.Max(Math.Min(next, hi - minStep), 0);
+                    // A cut landing in a run of tool results normalizes forward; step back until it is a new cut.
+                    while (next > 0 && Normalize(next) >= hi)
+                        next--;
+                }
+                k = next;
             }
+
+            watch.Stop();
+            var fits = hi >= 0;
+            var finalK = fits ? hi : lo;
+            var finalTotal = fits ? hiTotal : loTotal;
+            var finalRequest = fits ? hiRequest : loRequest;
+
+            if (fits)
+            {
+                EnsureEstimates();
+                _warmValid = true;
+                _warmMode = mode;
+                _warmTotal = hiTotal;
+                _warmEstimate = estimateTotal - prefix![hi];
+                _warmSlope = slope ?? Math.Clamp(hiTotal / (double)Math.Max(1, _warmEstimate), 0.05, 20);
+            }
+            else
+            {
+                LLMEngine.Logger?.LogWarning("[PromptBuilder] The prompt does not fit in the context even after trimming: {Total} tokens for a limit of {Max}.", finalTotal, max);
+            }
+
+            if (finalK > 0 || counts > 1)
+            {
+                LLMEngine.Logger?.LogInformation("[PromptBuilder] Context fit ({Mode}): removed {Removed} of {Count} messages, {Total}/{Max} tokens, {Counts} count(s) in {Ms} ms.",
+                    mode, finalK, n, finalTotal, max, counts, watch.ElapsedMilliseconds);
+            }
+
+            return (Materialize(finalK), finalTotal, finalRequest);
         }
 
         /// <summary>
-        /// Removes one batch of the oldest messages from <paramref name="workingprompt"/> (preserving
-        /// index 0, the system prompt, and never removing the newest message) whose combined cheap local
-        /// estimate covers <paramref name="excess"/> tokens. The batch deliberately under-drops: any
-        /// shortfall is caught by the accurate re-count the caller performs afterwards. Also drops any
-        /// orphaned tool-result message exposed at index 1, so backends whose chat templates reject a
-        /// leading tool message do not error out.
-        /// </summary>
-        private static void RemoveTrimBatch(List<SingleMessage> workingprompt, int excess)
-        {
-            // Walk from the oldest removable message (index 1) forward, accumulating cheap local
-            // estimates until we've covered the excess. We deliberately stop as soon as the estimate
-            // meets the excess (conservative / under-drop) rather than padding it, because any
-            // shortfall is caught by the accurate re-count the caller performs afterwards.
-            var removeCount = 0;
-            var estRemoved = 0;
-            for (int i = 1; i < workingprompt.Count && estRemoved < excess; i++)
-            {
-                estRemoved += EstimateLocalTokens(workingprompt[i]);
-                removeCount++;
-            }
-
-            // Always remove at least one message so we make progress even if the local estimate is 0.
-            if (removeCount == 0)
-                removeCount = 1;
-
-            // Never remove the final (newest) message; keep at least the system prompt + one message.
-            var maxRemovable = workingprompt.Count - 2;
-            if (maxRemovable < 1)
-                maxRemovable = 1;
-            if (removeCount > maxRemovable)
-                removeCount = maxRemovable;
-
-            workingprompt.RemoveRange(1, removeCount);
-
-            // Guard against leaving an orphaned tool-result message as the first post-system message.
-            while (workingprompt.Count > 1 && workingprompt[1].Role == AuthorRole.Tool)
-            {
-                workingprompt.RemoveAt(1);
-            }
-        }
-
-        /// <summary>
-        /// Cheap, local (no backend call) per-message token estimate used only to decide how many
-        /// messages to drop in a single trim batch. This is intentionally an over-estimate per message so
-        /// the batch tends to be conservative; the authoritative count is always the full-prompt count.
+        /// Cheap, local (no backend call) per-message token estimate. Only used to predict where to cut
+        /// in <see cref="FitToContext"/>; the authoritative count is always the full-prompt count.
         /// </summary>
         private static int EstimateLocalTokens(SingleMessage message)
         {

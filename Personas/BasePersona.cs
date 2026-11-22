@@ -515,6 +515,13 @@ namespace LetheAISharp.LLM
             if (string.IsNullOrEmpty(inputText))
                 return string.Empty;
 
+            // Every macro starts with "{{": without one nothing below can change the text. This matters because
+            // the replacement values are all computed up front (core facts are token-counted one by one), and
+            // this runs for every message each time a prompt is formatted, counted or rebuilt. The memory macro
+            // check uses the same comparison as the memory loop below, so the shortcut is strictly equivalent.
+            if (!inputText.Contains("{{", StringComparison.Ordinal) && inputText.IndexOf("{{memory:", StringComparison.InvariantCultureIgnoreCase) < 0)
+                return inputText;
+
             StringBuilder res = new(inputText);
             res.Replace("{{user}}", userName)
                .Replace("{{userbio}}", userBio)

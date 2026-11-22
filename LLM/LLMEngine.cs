@@ -7,6 +7,7 @@ using LetheAISharp.Moods;
 using LetheAISharp.Skills;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using OpenAI.Responses;
 using System;
 using System.Reflection;
 using System.Text;
@@ -855,6 +856,7 @@ namespace LetheAISharp.LLM
         {
             if (History.CurrentSession.Messages.Count == 0 || History.LastMessage()?.Role != AuthorRole.Assistant || Client == null || PromptBuilder == null)
                 return false;
+            LLMEngine.Logger?.LogInformation("[Lethe] Rerolling Message");
 
             return await RunTurn(async ct =>
             {
@@ -865,6 +867,7 @@ namespace LetheAISharp.LLM
 
                 if (oldquery != null)
                 {
+                    LLMEngine.Logger?.LogInformation("[Lethe] Reroll: Using Cached Prompt");
                     ResetStreamingState();
                     EmitThinkPrefill(true);
                     RaiseOnFullPromptReady(pb.PromptToText());
@@ -872,10 +875,12 @@ namespace LetheAISharp.LLM
                 }
                 else if (pb.Count == 0)
                 {
+                    LLMEngine.Logger?.LogInformation("[Lethe] Reroll: No Cache");
                     await GenerationBody(new SingleMessage(AuthorRole.Assistant, string.Empty), ct).ConfigureAwait(false);
                 }
                 else
                 {
+                    LLMEngine.Logger?.LogInformation("[Lethe] Reroll: No Cache");
                     var query = pb.PromptToQuery(AuthorRole.Assistant, forceAltRoles: IsGroupConversation && Settings.GroupInstructFormatAdapter);
                     ResetStreamingState();
                     EmitThinkPrefill(true);
@@ -1277,7 +1282,6 @@ namespace LetheAISharp.LLM
                             },
                             IsComplete = true
                         });
-                        textStreamReceiver.ForceFeed(InferenceChannel.Thinking, $"\n[Tool {record.FunctionName} called]\n");
                         RaiseInferenceSegment(new InferenceSegment
                         {
                             Channel = InferenceChannel.ToolResult,
@@ -1596,6 +1600,7 @@ namespace LetheAISharp.LLM
             await actbot.Brain.GetRAGandInserts(dataInserts, searchstring ?? string.Empty, -1, Settings.RAGDistanceCutOff).ConfigureAwait(false);
 
             // Prepare the full system prompt and count the tokens used
+            LLMEngine.Logger?.LogInformation("[Lethe] Generating System Prompt");
             var rawprompt = GenerateSystemPromptContent(message.Message);
             availtokens -= PromptBuilder.AddMessage(new SingleMessage(AuthorRole.System, rawprompt));
 
@@ -1611,6 +1616,7 @@ namespace LetheAISharp.LLM
             if (cushion > 15240)
                 cushion = 15240;
             var historytokens = availtokens + cushion;
+            LLMEngine.Logger?.LogInformation("[Lethe] Adding Chat History");
             History.AddHistoryToPrompt(Settings.SessionHandling, historytokens, addinserts ? dataInserts : null);
             if (!string.IsNullOrEmpty(message.Message) || message.Role != AuthorRole.User)
             {
@@ -1692,6 +1698,7 @@ namespace LetheAISharp.LLM
         /// </summary>
         private static async Task GenerationBody(SingleMessage message, CancellationToken ct)
         {
+            LLMEngine.Logger?.LogInformation("[Lethe] Generating Body");
             var pb = PromptBuilder ?? throw new InvalidOperationException("The backend was disconnected.");
             var messageLogged = false;
             try
