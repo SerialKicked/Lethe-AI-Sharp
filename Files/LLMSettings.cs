@@ -268,8 +268,8 @@ namespace LetheAISharp.Files
         [Description("Images larger than this resolution will be resized (depends on the model, but 1024 is, by far, the most common one)")]
         public int ImageResolution { get; set; } = 1024;
 
-        /// <summary> Maximum number of images to be sent in the prompt, this will save tokens when sending many images. Set to 0 for no limit. </summary>
-        [Description("Maximum number of images to be kept in the active chat. This helps save tokens when sending many images. Set to 0 for no limit.")]
+        /// <summary> Maximum number of messages (the most recent ones) whose images are sent in the prompt. A message with several images counts as one. This saves tokens when sending many images. Set to 0 for no limit. </summary>
+        [Description("Maximum number of messages (the most recent ones) whose images are kept in the active chat. A message with several images counts as one. This helps save tokens when sending many images. Set to 0 for no limit.")]
         public int MaxImageCount { get; set; } = 4;
 
         public string OpenAIModelID { get; set; } = "gpt-4";

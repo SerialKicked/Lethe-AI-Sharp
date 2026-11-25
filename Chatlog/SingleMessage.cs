@@ -134,8 +134,18 @@ namespace LetheAISharp.Files
         internal bool HasSendableImage() =>
             ImagePaths.Count > 0 && ImagePaths.Any(Role == AuthorRole.Tool ? ToolMediaResult.Exists : File.Exists);
 
-        internal Message ToChatCompletion()
+        /// <summary>
+        /// Converts this message into a /v1/chat/completions message.
+        /// </summary>
+        /// <param name="includeImages">
+        /// When false, attached images are left out entirely (they are not even loaded), as if the
+        /// message had none. Used by the prompt builder to honor <see cref="LLMSettings.MaxImageCount"/>.
+        /// </param>
+        internal Message ToChatCompletion(bool includeImages = true)
         {
+            var withImages = includeImages && LLMEngine.SupportsVision && ImagePaths.Count > 0;
+
+
             // Tool result messages: skip all name logic
             if (Role == AuthorRole.Tool && ToolCalls.Count > 0)
             {
@@ -147,10 +157,10 @@ namespace LetheAISharp.Files
                 // Images attached by the tool (see ToolMediaResult) are replayed as image_url content
                 // parts, exactly like the live call. Images that no longer exist (a deleted file, or an
                 // expired web cache entry) are skipped, leaving the plain text result.
-                if (LLMEngine.SupportsVision && ImagePaths.Count > 0)
+                if (withImages)
                 {
                     var parts = new List<Content>();
-                    foreach (var image in ImagePaths.Where(ToolMediaResult.Exists))
+                    foreach (var image in ImagePaths.Distinct().Where(ToolMediaResult.Exists))
                     {
                         var imageUrl = ToolMediaResult.ToImageUrl(image);
                         if (imageUrl != null)
@@ -200,11 +210,11 @@ namespace LetheAISharp.Files
                 }
             }
 
-            if (!LLMEngine.SupportsVision || ImagePaths.Count == 0)
+            if (!withImages)
                 return new Message(TokenTools.InternalRoleToChatRole(Role), Bot.ReplaceMacros(realprompt, User), selname);
 
             var content = new List<Content>();
-            foreach (var ImagePath in ImagePaths)
+            foreach (var ImagePath in ImagePaths.Distinct())
             {
                 if (!File.Exists(ImagePath))
                     continue;

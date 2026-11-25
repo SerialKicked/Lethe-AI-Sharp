@@ -79,19 +79,111 @@ namespace LetheAISharp
         }
 
         /// <summary>
-        /// Memoized encodes, keyed by path + maxSize and invalidated by the file's last-write time.
-        /// Decode + resize + PNG encode is by far the most expensive part of rebuilding a chat request,
-        /// and prompt building can rebuild the same images several times per generation (token-count
-        /// trim iterations, rerolls). Entries are large strings, so the cache is hard-capped.
+        /// Identifies one version of a file: an encode is only reused while the file keeps the same size,
+        /// last-write time and creation time.
         /// </summary>
-        private static readonly ConcurrentDictionary<string, (DateTime WriteTimeUtc, string Data)> _base64Cache = new(StringComparer.OrdinalIgnoreCase);
-        private const int Base64CacheCap = 12;
+        private readonly record struct FileStamp(long Length, DateTime WriteTimeUtc, DateTime CreationTimeUtc);
+
+        private sealed class Base64CacheEntry(string key, FileStamp stamp, string? data)
+        {
+            public readonly string Key = key;
+            public readonly FileStamp Stamp = stamp;
+            /// <summary>Null when the file could not be decoded as an image (negative entry).</summary>
+            public readonly string? Data = data;
+            public LinkedListNode<Base64CacheEntry>? Node;
+        }
+
+        /// <summary>
+        /// Memoized file encodes, keyed by full path + maxSize and validated by the file's size, last-write
+        /// and creation times. Decode + resize + PNG encode is by far the most expensive part of rebuilding
+        /// a chat request, and prompt building rebuilds the same images several times per generation
+        /// (token-count trim iterations, rerolls, the same image referenced by several messages).
+        /// Least recently used entries are evicted once either the entry or the size budget is exceeded.
+        /// </summary>
+        private static readonly StringComparer PathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        private static readonly object _cacheLock = new();
+        private static readonly Dictionary<string, Base64CacheEntry> _base64Cache = new(PathComparer);
+        private static readonly LinkedList<Base64CacheEntry> _base64Lru = new();
+        private static long _base64CacheChars;
+        private const int Base64CacheMaxEntries = 64;
+        private const long Base64CacheMaxChars = 64L * 1024 * 1024;
+
+        /// <summary>
+        /// Encodes currently running, so concurrent requests for the same file version share a single encode.
+        /// </summary>
+        private static readonly ConcurrentDictionary<string, Lazy<string?>> _base64InFlight = new(PathComparer);
+
+        /// <summary>
+        /// Empties the cache used by <see cref="ImageToBase64(string, int)"/>. Changed files are detected
+        /// automatically, so this is only useful to release memory.
+        /// </summary>
+        public static void ClearImageCache()
+        {
+            lock (_cacheLock)
+            {
+                _base64Cache.Clear();
+                _base64Lru.Clear();
+                _base64CacheChars = 0;
+            }
+        }
+
+        private static bool TryGetCached(string key, FileStamp stamp, out string? data)
+        {
+            lock (_cacheLock)
+            {
+                if (_base64Cache.TryGetValue(key, out var entry))
+                {
+                    if (entry.Stamp == stamp)
+                    {
+                        _base64Lru.Remove(entry.Node!);
+                        _base64Lru.AddFirst(entry.Node!);
+                        data = entry.Data;
+                        return true;
+                    }
+                    RemoveEntry(entry);
+                }
+            }
+            data = null;
+            return false;
+        }
+
+        private static void StoreCached(string key, FileStamp stamp, string? data)
+        {
+            lock (_cacheLock)
+            {
+                if (_base64Cache.TryGetValue(key, out var existing))
+                    RemoveEntry(existing);
+
+                var size = data?.Length ?? 0;
+                if (size > Base64CacheMaxChars)
+                    return;
+
+                var entry = new Base64CacheEntry(key, stamp, data);
+                entry.Node = _base64Lru.AddFirst(entry);
+                _base64Cache[key] = entry;
+                _base64CacheChars += size;
+
+                while (_base64Lru.Count > Base64CacheMaxEntries || _base64CacheChars > Base64CacheMaxChars)
+                    RemoveEntry(_base64Lru.Last!.Value);
+            }
+        }
+
+        private static void RemoveEntry(Base64CacheEntry entry)
+        {
+            _base64Cache.Remove(entry.Key);
+            _base64Lru.Remove(entry.Node!);
+            _base64CacheChars -= entry.Data?.Length ?? 0;
+        }
 
         /// <summary>
         /// Converts an image file to a base64 encoded PNG (always 8-bit RGB, single frame, no metadata)
         /// suitable for vision-capable backends. The image is scaled down if needed, see <see cref="GetScaledSize"/>.
         /// Animated images are reduced to their first frame, EXIF orientation is applied to the pixels,
         /// and transparency is flattened onto a white background.
+        /// <para>
+        /// Results are cached per file and size limit, and reused for as long as the file is not modified
+        /// (same size, last-write and creation times).
+        /// </para>
         /// </summary>
         /// <param name="imagePath">Path to the image file</param>
         /// <param name="maxSize">Optional maximum size for width or height. If specified, image will be scaled down proportionally if needed.</param>
@@ -100,25 +192,40 @@ namespace LetheAISharp
         {
             try
             {
-                var key = $"{maxSize}|{imagePath}";
-                var writeTime = File.GetLastWriteTimeUtc(imagePath);
-                if (_base64Cache.TryGetValue(key, out var cached) && cached.WriteTimeUtc == writeTime)
+                var fullPath = Path.GetFullPath(imagePath);
+                var info = new FileInfo(fullPath);
+                if (!info.Exists)
                 {
-                    LLMEngine.Logger?.LogInformation("[Lethe] Loading Cached Image: {path}", imagePath);
-                    return cached.Data;
+                    LLMEngine.Logger?.LogWarning("[Lethe] Image not found: {path}", imagePath);
+                    return null;
                 }
-                LLMEngine.Logger?.LogInformation("[Lethe] Processing Image: {path}", imagePath);
-                var res = ImageToBase64(File.ReadAllBytes(imagePath), maxSize);
-                if (res != null)
+
+                var stamp = new FileStamp(info.Length, info.LastWriteTimeUtc, info.CreationTimeUtc);
+                var key = $"{maxSize}|{fullPath}";
+                if (TryGetCached(key, stamp, out var cached))
                 {
-                    // Crude but effective bound: entries are big and the active working set is small
-                    // (a handful of images per prompt), so clearing on overflow costs at most one
-                    // re-encode per image.
-                    if (_base64Cache.Count >= Base64CacheCap)
-                        _base64Cache.Clear();
-                    _base64Cache[key] = (writeTime, res);
+                    LLMEngine.Logger?.LogDebug("[Lethe] Loading Cached Image: {path}", imagePath);
+                    return cached;
                 }
-                return res;
+
+                var flightKey = $"{key}|{stamp.Length}|{stamp.WriteTimeUtc.Ticks}|{stamp.CreationTimeUtc.Ticks}";
+                var lazy = _base64InFlight.GetOrAdd(flightKey, _ => new Lazy<string?>(() =>
+                {
+                    LLMEngine.Logger?.LogInformation("[Lethe] Processing Image: {path}", imagePath);
+                    // Read failures (locked or vanished file) throw and are not cached; decode failures
+                    // return null and are cached so a broken file is not decoded again on every prompt.
+                    var res = ImageToBase64(File.ReadAllBytes(fullPath), maxSize);
+                    StoreCached(key, stamp, res);
+                    return res;
+                }));
+                try
+                {
+                    return lazy.Value;
+                }
+                finally
+                {
+                    _base64InFlight.TryRemove(new KeyValuePair<string, Lazy<string?>>(flightKey, lazy));
+                }
             }
             catch (Exception ex)
             {

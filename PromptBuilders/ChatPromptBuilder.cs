@@ -238,9 +238,19 @@ namespace LetheAISharp
         /// </summary>
         private ChatRequest BuildChatRequest(List<SingleMessage> workingprompt, double tempoverride, int responseoverride, bool? overridePrefill)
         {
-            var finalprompt = new List<Message>(workingprompt.ConvertAll(m => m.ToChatCompletion()));
-            var cleanimages = !LLMEngine.SupportsVision || LLMEngine.Settings.MaxImageCount > 0;
-            var maxallowed = LLMEngine.SupportsVision ? LLMEngine.Settings.MaxImageCount : 0;
+            // Converted newest first so only the messages whose images will actually be sent get their
+            // images loaded: once MaxImageCount messages carrying images are reached, older messages are
+            // converted without them. A message whose images all fail to load does not use up the budget.
+            var imagesLeft = !LLMEngine.SupportsVision ? 0 : LLMEngine.Settings.MaxImageCount > 0 ? LLMEngine.Settings.MaxImageCount : int.MaxValue;
+            var converted = new Message[workingprompt.Count];
+            for (int i = workingprompt.Count - 1; i >= 0; i--)
+            {
+                var mess = workingprompt[i].ToChatCompletion(imagesLeft > 0);
+                if (imagesLeft > 0 && mess.Content is List<Content> parts && parts.Any(c => c.Type == ContentType.ImageUrl))
+                    imagesLeft--;
+                converted[i] = mess;
+            }
+            var finalprompt = new List<Message>(converted);
 
             // Merge system messages (except the first) into the next user message if setup
             if (LLMEngine.Settings.MergeSystemMessageInUserMessage)
@@ -255,43 +265,19 @@ namespace LetheAISharp
                             var next = finalprompt[i + 1];
                             if (next.Content is List<Content> lst)
                             {
-                                lst[0] = new Content(ContentType.Text, "[System Note] " + mess.Content.ToString() + "[/System Note]" + LLMEngine.NewLine + lst[0].Text);
+                                // Images come before the text part, so lst[0] is not necessarily text.
+                                var textIdx = lst.FindIndex(c => c.Type == ContentType.Text);
+                                var note = "[System Note] " + mess.Content.ToString() + "[/System Note]" + LLMEngine.NewLine;
+                                if (textIdx >= 0)
+                                    lst[textIdx] = new Content(ContentType.Text, note + lst[textIdx].Text);
+                                else
+                                    lst.Add(new Content(ContentType.Text, note));
                             }
                             else
                             {
                                 next.Content = "[System Note] " + mess.Content.ToString() + "[/System Note]" + LLMEngine.NewLine + next.Content.ToString();                            
                             }
                             finalprompt.RemoveAt(i);
-                        }
-                    }
-                }
-            }
-
-            if (cleanimages)
-            {
-                // traverse the list and remove oldest images until we are within the limit
-                var count = 0;
-                for (int i = finalprompt.Count - 1; i >= 0; i--)
-                {
-                    var mess = finalprompt[i];
-                    if (mess.Content is List<Content> lst)
-                    {
-                        var hasimage = false;
-                        foreach (var content in lst)
-                        {
-                            if (content.Type == ContentType.ImageUrl)
-                            {
-                                hasimage = true;
-                                break;
-                            }
-                        }
-                        if (hasimage)
-                        {
-                            count++;
-                            if (count > LLMEngine.Settings.MaxImageCount)
-                            {
-                                lst.RemoveAll(c => c.Type == ContentType.ImageUrl);
-                            }
                         }
                     }
                 }

@@ -230,7 +230,9 @@ Whatever the source format, images are always re-encoded as 8-bit RGB PNG before
 ### `MaxImageCount`
 **Type:** `int` | **Default:** `4`
 
-Maximum number of images included in a single prompt. When the conversation contains more images than this limit, only the most recent ones are kept. Set to `0` for no limit.
+Maximum number of messages whose images are included in a single prompt. The limit counts messages, not individual images: a message with several attached images counts as one. When more messages than this limit carry images, only the most recent ones keep them; older messages are sent as text only, and their images are never loaded. Tool results with attached images count like any other message. A message whose images all fail to load does not count toward the limit. Set to `0` for no limit.
+
+In text completion mode, only the first image of each user message is sent, so the limit is effectively a number of images.
 
 ---
 
@@ -654,7 +656,7 @@ When `true`, a note identifying the currently speaking persona is prepended insi
 | `PromptTrimLeeway` | `int` | `0` | Unused tokens allowed when trimming a chat prompt to fit (0-512, 0 = tightest) |
 | `ImageEmbeddingSize` | `int` | `768` | Dimensionality of image embeddings |
 | `ImageResolution` | `int` | `1024` | Max image dimension before resizing |
-| `MaxImageCount` | `int` | `4` | Max images included per prompt (`0` = unlimited) |
+| `MaxImageCount` | `int` | `4` | Max messages whose images are included per prompt (`0` = unlimited) |
 | `ScenarioOverride` | `string` | `""` | Replaces the character's scenario field |
 | `StopGenerationOnFirstParagraph` | `bool` | `false` | Stop generating after the first paragraph |
 | `DisableThinking` | `bool` | `false` | Suppress thinking block on reasoning models |
