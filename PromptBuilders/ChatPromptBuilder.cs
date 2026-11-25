@@ -21,6 +21,8 @@ namespace LetheAISharp
         private readonly List<SingleMessage> _prompt = [];
         private OpenAI.JsonSchema? _currentSchema = null;
         private List<string> imagefilepath = [];
+        // Messages actually sent by the last PromptToQuery (after tool chain pruning and context trimming).
+        private List<SingleMessage>? _lastSentPrompt = null;
         
         public object? LastQuery { get; set; }
 
@@ -167,7 +169,8 @@ namespace LetheAISharp
                 if (LLMEngine.Settings.ToolCallChainLimit > 0 && workingprompt.Count > LLMEngine.Settings.ToolCallChainLimit)
                 {
                     int chainCount = 0;
-                    int foundID = -1;
+                    int oldestKept = -1;
+                    bool overLimit = false;
 
                     for (int i = workingprompt.Count - 1; i >= 0; i--)
                     {
@@ -177,19 +180,22 @@ namespace LetheAISharp
                         if (msg.Role == AuthorRole.Assistant && msg.ToolCalls.Count > 0)
                         {
                             chainCount++;
-                            if (chainCount > LLMEngine.Settings.ToolCallChainLimit)
+                            if (chainCount == LLMEngine.Settings.ToolCallChainLimit)
+                                oldestKept = i;
+                            else if (chainCount > LLMEngine.Settings.ToolCallChainLimit)
                             {
-                                foundID = i;
+                                overLimit = true;
                                 break;
                             }
                         }
                     }
 
-                    if (foundID >= 0)
+                    if (overLimit)
                     {
-                        // Remove ONLY tool-related messages before foundID
+                        // Remove ONLY tool-related messages older than the oldest round kept. A round's results
+                        // follow its root, so every older round goes away whole, results included.
                         workingprompt = [.. workingprompt.Where((m, idx) =>
-                            !(idx < foundID && (m.Role == AuthorRole.Tool || (m.Role == AuthorRole.Assistant && m.ToolCalls.Count > 0))))];
+                            !(idx < oldestKept && (m.Role == AuthorRole.Tool || (m.Role == AuthorRole.Assistant && m.ToolCalls.Count > 0))))];
                     }
                 }
                 LLMEngine.Instruct.UpdateSysPromptForThinking(workingprompt[0]);
@@ -208,6 +214,7 @@ namespace LetheAISharp
                             var request = BuildChatRequest(candidate, tempoverride, responseoverride, overridePrefill);
                             return (exactClient.CountRequestTokensSync(request), request);
                         });
+                        _lastSentPrompt = exact.Prompt;
                         return exact.Request!;
                     }
                     catch (Exception ex)
@@ -220,6 +227,7 @@ namespace LetheAISharp
                 }
 
                 var fitted = FitToContext(workingprompt, max, TrimCountMode.Estimate, candidate => (GetTokenUsage(candidate), null));
+                _lastSentPrompt = fitted.Prompt;
                 return BuildChatRequest(fitted.Prompt, tempoverride, responseoverride, overridePrefill);
             }
             finally
@@ -639,6 +647,7 @@ namespace LetheAISharp
         public void Clear()
         {
             LastQuery = null;
+            _lastSentPrompt = null;
             _prompt.Clear();
         }
 
@@ -662,10 +671,14 @@ namespace LetheAISharp
             return total;   
         }
 
-        public string PromptToText()
+        public string PromptToText() => MessagesToText(_prompt);
+
+        public string SentPromptToText() => _lastSentPrompt is null ? PromptToText() : MessagesToText(_lastSentPrompt);
+
+        private static string MessagesToText(List<SingleMessage> messages)
         {
             var sb = new StringBuilder();
-            foreach (var message in _prompt)
+            foreach (var message in messages)
             {
                 sb.Append(message.ToTextCompletion());
             }

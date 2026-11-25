@@ -89,6 +89,14 @@ namespace LetheAISharp
         /// empty if the prompt has no content.</returns>
         string PromptToText();
 
+        /// <summary>
+        /// Textual representation of the prompt as it was actually sent by the last <see cref="PromptToQuery"/> call,
+        /// after tool chain pruning (<see cref="LLMSettings.ToolCallChainLimit"/>) and context trimming. 
+        /// Falls back to <see cref="PromptToText"/> when no query was built yet.
+        /// </summary>
+        /// <returns>A string containing the text representation of the sent prompt.</returns>
+        string SentPromptToText() => PromptToText();
+
 
         #region *** Token Counting ***
 

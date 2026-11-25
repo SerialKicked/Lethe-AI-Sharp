@@ -94,6 +94,15 @@ namespace LetheAISharp.API
             int maxToolRounds = LLMEngine.Settings.ToolCallLimit <= 0 ? int.MaxValue : LLMEngine.Settings.ToolCallLimit;
             var currentRequest = request;
 
+            // The tool loop mutates the request in place (appended rounds, final-round switch, per-round budget).
+            // The caller may keep it around (the prompt builder caches it for rerolls), so its original state is
+            // restored once the turn is over: a reroll must not resend this turn's tool rounds or lose the tools.
+            var originalMessages = request.Messages;
+            var originalTools = request.Tools;
+            var originalToolChoice = request.ToolChoice;
+            var originalMaxTokens = request.MaxTokens;
+            var originalMaxCompletionTokens = request.MaxCompletionTokens;
+
             // --- Per-round token budgeting for tool-calling chains ---
             // replyLimit is the limit meant for the final answer (what the application considers "the reply").
             // The first round of a turn uses it as-is (it may well be the final answer already). Later rounds
@@ -434,6 +443,14 @@ namespace LetheAISharp.API
                     FinishReason = "error",
                     ToolCallRecords = toolCallRecords.Count > 0 ? toolCallRecords : null
                 });
+            }
+            finally
+            {
+                request.Messages = originalMessages;
+                request.Tools = originalTools;
+                request.ToolChoice = originalToolChoice;
+                request.MaxTokens = originalMaxTokens;
+                request.MaxCompletionTokens = originalMaxCompletionTokens;
             }
 
             // CA2254 fix: Use a constant message template and pass cumulativeDelta as an argument

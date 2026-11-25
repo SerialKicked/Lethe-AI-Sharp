@@ -870,7 +870,7 @@ namespace LetheAISharp.LLM
                     LLMEngine.Logger?.LogInformation("[Lethe] Reroll: Using Cached Prompt");
                     ResetStreamingState();
                     EmitThinkPrefill(true);
-                    RaiseOnFullPromptReady(pb.PromptToText());
+                    RaiseOnFullPromptReady(pb.SentPromptToText());
                     await StreamWireAsync(oldquery, ct).ConfigureAwait(false);
                 }
                 else if (pb.Count == 0)
@@ -884,7 +884,7 @@ namespace LetheAISharp.LLM
                     var query = pb.PromptToQuery(AuthorRole.Assistant, forceAltRoles: IsGroupConversation && Settings.GroupInstructFormatAdapter);
                     ResetStreamingState();
                     EmitThinkPrefill(true);
-                    RaiseOnFullPromptReady(pb.PromptToText());
+                    RaiseOnFullPromptReady(pb.SentPromptToText());
                     await StreamWireAsync(query, ct).ConfigureAwait(false);
                 }
             }).ConfigureAwait(false);
@@ -1732,7 +1732,7 @@ namespace LetheAISharp.LLM
                     messageLogged = true;
                 }
 
-                RaiseOnFullPromptReady(pb.PromptToText());
+                RaiseOnFullPromptReady(pb.SentPromptToText());
                 await StreamWireAsync(genparams, ct).ConfigureAwait(false);
             }
             finally
