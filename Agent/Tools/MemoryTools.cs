@@ -203,7 +203,7 @@ namespace LetheAISharp.Agent.Tools
                 EndTime = date + new TimeSpan(1,0,0,0)
             };
             await mem.BuildEmbedding().ConfigureAwait(false);
-            LLMEngine.Bot.Brain.Memorize(mem);
+            LLMEngine.Bot.Brain.Memorize(mem, true);
             return $"Reminder '{ReminderTitle}' set for {date.ToHumanString()} successfully.";
         }
 
