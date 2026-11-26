@@ -78,6 +78,38 @@ The summary of the chat sessions just before the current one can be inserted in 
   - **CurrentOnly** - The chatlog will only contain the current session, with the previous ones summarized in system prompt
   - **FitAll** - The chatlog will feature as much log as possible (even across multiple sessions) depending on maximum Context Size, sessions coming before all this will be inserted in system prompt
 
+### Period Summaries (Earlier History)
+
+With daily sessions, the recent session summaries only cover a few days of history. Period summaries are a second tier covering the
+history that comes before them, in the form of meta-summaries of closed calendar periods: weeks (starting on Monday), months, and quarters.
+
+- **PeriodSummaryReservedTokens** - Token budget for this section (0 to disable). Requires **SessionMemorySystem**.
+- **PeriodSummaryIncludeRoleplay** - Mix roleplay sessions into period summaries, or ignore them entirely.
+
+They are stored in `Chatlog.PeriodSummaries` as `PeriodSummary` objects (a `MemoryUnit` of category `PeriodSummary`), aside from the session
+list. They are not used for RAG or keyword search.
+
+**Generation**: when a new chat session is started, every closed period that is new or whose sources changed is compiled. Weeks are built
+from session summaries, months from the week summaries (plus the session summaries of the partial weeks at the month's edges), and quarters
+from month summaries. A period with a single source reuses its content as is. The process can be triggered manually:
+
+```csharp
+// Update new / outdated periods
+await LLMEngine.Bot.History.UpdatePeriodSummaries();
+// Regenerate everything from scratch
+await LLMEngine.Bot.History.UpdatePeriodSummaries(regenerateAll: true);
+```
+
+The first run on a long chatlog can take a while, as every closed period has to be compiled.
+
+**Insertion**: the section is inserted in the system prompt (title: `SystemPrompt.PeriodHistoryTitle`), right before the recent session
+summaries. Selection goes backward in time from where the recent history (chatlog and session summaries) ends, getting coarser along the way:
+up to two weeks, up to two months, then as many quarters as the budget allows. After those two entries, weeks (or months) are only added to
+close a small gap (less than half a month, or half a quarter) up to the next month (or quarter) boundary; for a larger gap, the month (or quarter)
+is used directly and overlaps slightly. A period is skipped when most of its sessions are already covered by the recent history, which always
+takes priority. The budget is filled from the most recent entry and stops at the first entry that doesn't fit, so the timeline has no gaps.
+In group conversations, only the primary persona sees this section.
+
 ### Long Term Recall
 
 Older chat session can be retrieved through RAG. Their summary are compared to the user's input, for embedding distance / similarity. If judged relevant enough, those can be inserted into the prompt at different levels under different policies.

@@ -15,7 +15,7 @@ namespace LetheAISharp.Memory
     /// stored or processed. It is used to distinguish between various domains or purposes. Internally, only
     /// ChatSession, WorldInfo, and WebSearch are actively used. Other types are there for convenience and do
     /// not have to correspond to their stated purpose.</remarks>
-    public enum MemoryType { General, WorldInfo, WebSearch, ChatSession, Journal, Image, File, Location, Event, Person, Goal, Reminder }
+    public enum MemoryType { General, WorldInfo, WebSearch, ChatSession, Journal, Image, File, Location, Event, Person, Goal, Reminder, PeriodSummary }
 
     /// <summary>
     /// Specifies the modes of memory insertion for a specific MemoryUnit.
@@ -89,7 +89,8 @@ namespace LetheAISharp.Memory
             { MemoryType.Location, [ "location", "place", "area" ] },
             { MemoryType.Event, [ "event", "happening", "occasion", "incident" ] },
             { MemoryType.Person, [ "person", "individual", "character", "friend", "buddy", "people" ] },
-            { MemoryType.Goal, [ "goal", "objective", "aim", "target" ] }
+            { MemoryType.Goal, [ "goal", "objective", "aim", "target" ] },
+            { MemoryType.PeriodSummary, [ "remember", "last week", "last month", "recently" ] }
         };
 
         /// <summary>

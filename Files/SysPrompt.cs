@@ -45,6 +45,12 @@ namespace LetheAISharp.Files
         public string SessionHistoryTitle { get; set; } = "# Previous Sessions" + LLMEngine.NewLine + LLMEngine.NewLine + "Below is a list of recent chat sessions between {{user}} and {{char}}.";
 
         /// <summary>
+        /// The title for the period summaries (past weeks, months, and quarters), if session memory and period summaries are enabled.
+        /// This section is inserted before the previous sessions section.
+        /// </summary>
+        public string PeriodHistoryTitle { get; set; } = "# Earlier History" + LLMEngine.NewLine + LLMEngine.NewLine + "Below is an overview of what happened between {{user}} and {{char}} during earlier periods, from oldest to most recent.";
+
+        /// <summary>
         /// The title for the core facts section of the system prompt.
         /// Core facts are the top-ranked extracted facts about the user, included to give the bot durable
         /// knowledge of the user that persists across sessions without relying on RAG similarity alone.

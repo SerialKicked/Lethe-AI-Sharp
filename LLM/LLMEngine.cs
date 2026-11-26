@@ -1512,7 +1512,16 @@ namespace LetheAISharp.LLM
 
             if (Settings.SessionMemorySystem && History.Sessions.Count > 1)
             {
-                var shistory = History.GetPreviousSummaries(Settings.SessionReservedTokens - GetTokenCount(Bot.ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, SystemPrompt.SubCategorySeparator, allowRP: Settings.RecallMemoryMode, ignoreList: dataInserts.GetGuids());
+                var shistory = History.GetPreviousSummaries(Settings.SessionReservedTokens - GetTokenCount(Bot.ReplaceMacros(SystemPrompt.SessionHistoryTitle)) - 3, out var coverageStart, SystemPrompt.SubCategorySeparator, allowRP: Settings.RecallMemoryMode, ignoreList: dataInserts.GetGuids());
+                if (Settings.PeriodSummaryReservedTokens > 0 && !string.IsNullOrEmpty(SystemPrompt.PeriodHistoryTitle))
+                {
+                    var phistory = History.GetPeriodSummaries(Settings.PeriodSummaryReservedTokens - GetTokenCount(Bot.ReplaceMacros(SystemPrompt.PeriodHistoryTitle)) - 3, coverageStart, SystemPrompt.SubCategorySeparator);
+                    if (!string.IsNullOrEmpty(phistory))
+                    {
+                        rawprompt.AppendLinuxLine(NewLine + Bot.ReplaceMacros(SystemPrompt.PeriodHistoryTitle) + NewLine);
+                        rawprompt.AppendLinuxLine(phistory.CleanupAndTrim());
+                    }
+                }
                 if (!string.IsNullOrEmpty(shistory))
                 {
                     rawprompt.AppendLinuxLine(NewLine + Bot.ReplaceMacros(SystemPrompt.SessionHistoryTitle) + NewLine);

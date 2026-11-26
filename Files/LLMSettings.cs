@@ -306,6 +306,24 @@ namespace LetheAISharp.Files
         public int SessionReservedTokens { get; set; } = 2048;
 
         /// <summary>
+        /// Reserved token space for period summaries (meta-summaries of past weeks, months, and quarters) in the system prompt.
+        /// They cover the history older than what fits in <see cref="SessionReservedTokens"/>. Set to 0 to disable the feature.
+        /// Requires <see cref="SessionMemorySystem"/> to be enabled.
+        /// </summary>
+        [Description("This setting allocates a specific number of tokens for period summaries (compiled summaries of past weeks, months, and quarters).\n" +
+            "They provide long range context for the history that is older than the recent session summaries. Set to 0 to disable.\n" +
+            "Period summaries are compiled when a new chat session starts, which adds a few extra queries when a period ends.")]
+        public int PeriodSummaryReservedTokens { get; set; } = 2048;
+
+        /// <summary>
+        /// If true, roleplay sessions are mixed into period summaries. If false, they are ignored entirely by the period summary system.
+        /// Changing this value causes the period summaries to be regenerated on the next update.
+        /// </summary>
+        [Description("When enabled, roleplay sessions are included when compiling period summaries (weeks, months, quarters).\n" +
+            "When disabled, roleplay sessions are ignored entirely by this system. Changing this value will regenerate the period summaries on the next update.")]
+        public bool PeriodSummaryIncludeRoleplay { get; set; } = true;
+
+        /// <summary>
         /// For long chat sessions, cut the summary in the middle instead of at the end for summary purpose. Both approaches have pros and cons.
         /// </summary>
         [Description("When the system summarize the session for the memory system, this setting determines how to handle chat sessions that are longer than then context size.\n" +
@@ -645,6 +663,11 @@ namespace LetheAISharp.Files
             if (SessionReservedTokens < 0 || SessionReservedTokens >= MaxTotalTokens)
             {
                 errMessage.AppendLine("SessionReservedTokens should be above 0 and below MaxTotalTokens.");
+                validated = false;
+            }
+            if (PeriodSummaryReservedTokens < 0 || PeriodSummaryReservedTokens >= MaxTotalTokens)
+            {
+                errMessage.AppendLine("PeriodSummaryReservedTokens should be 0 or above and below MaxTotalTokens.");
                 validated = false;
             }
 

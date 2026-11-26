@@ -319,6 +319,20 @@ How many tokens to reserve in the context window for session summaries. Only rel
 
 ---
 
+### `PeriodSummaryReservedTokens`
+**Type:** `int` | **Default:** `1024`
+
+How many tokens to reserve for period summaries: meta-summaries of past weeks, months, and quarters covering the history older than the recent session summaries. Only relevant when `SessionMemorySystem` is `true`. Set to `0` to disable the feature (no period summary is generated or inserted). See [MEMORY.md](MEMORY.md) for details.
+
+---
+
+### `PeriodSummaryIncludeRoleplay`
+**Type:** `bool` | **Default:** `true`
+
+When `true`, roleplay sessions are mixed into period summaries. When `false`, they are ignored entirely by the period summary system. Changing this value causes the period summaries to be regenerated on the next update.
+
+---
+
 ### `CutInTheMiddleSummaryStrategy`
 **Type:** `bool` | **Default:** `false`
 
@@ -667,6 +681,8 @@ When `true`, a note identifying the currently speaking persona is prepended insi
 | `SessionMemorySystem` | `bool` | `false` | Enable long-term session memory summaries |
 | `SessionHandling` | `SessionHandling` | `FitAll` | How much conversation history to include in the chatlog |
 | `SessionReservedTokens` | `int` | `2048` | Token budget reserved for session summaries |
+| `PeriodSummaryReservedTokens` | `int` | `1024` | Token budget for week/month/quarter summaries (0 to disable) |
+| `PeriodSummaryIncludeRoleplay` | `bool` | `true` | Mix roleplay sessions into period summaries |
 | `CutInTheMiddleSummaryStrategy` | `bool` | `false` | Preserve session start + end when summarizing (vs. end only) |
 | `AntiHallucinationMemoryFormat` | `bool` | `true` | Add prompt guidance for handling mid-conversation system messages |
 | `SessionDetailedSummary` | `bool` | `false` | Generate a richer, more detailed session summary |

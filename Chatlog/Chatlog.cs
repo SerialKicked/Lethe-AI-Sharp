@@ -5,6 +5,7 @@ using LetheAISharp.LLM;
 using LetheAISharp.Memory;
 using CommunityToolkit.HighPerformance;
 using LLama.Sampling;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -54,6 +55,12 @@ namespace LetheAISharp.Files
         /// List of all chat sessions in this log.
         /// </summary>
         public readonly List<ChatSession> Sessions = [];
+
+        /// <summary>
+        /// Period summaries (meta-summaries of closed weeks, months, and quarters), stored aside from the session list.
+        /// See <see cref="UpdatePeriodSummaries"/> and <see cref="GetPeriodSummaries"/>.
+        /// </summary>
+        public List<PeriodSummary> PeriodSummaries { get; set; } = [];
 
         /// <summary>
         /// Accessor for the current chat session. If no sessions exist, a new session is created automatically.
@@ -117,6 +124,23 @@ namespace LetheAISharp.Files
         /// an empty string if no valid sessions are found or if the token limit is too restrictive.</returns>
         public string GetPreviousSummaries(int maxTokens, string sectionHeader = "##", MemoryMode allowRP = MemoryMode.Normal, int maxCount = int.MaxValue, HashSet<Guid>? ignoreList = null)
         {
+            return GetPreviousSummaries(maxTokens, out _, sectionHeader, allowRP, maxCount, ignoreList);
+        }
+
+        /// <summary>
+        /// Retrieves a concatenated summary of previous sessions, and reports the start of the time range covered by the recent history 
+        /// (chatlog in context and session summaries). See <see cref="GetPreviousSummaries(int, string, MemoryMode, int, HashSet{Guid}?)"/>.
+        /// </summary>
+        /// <param name="maxTokens">The maximum number of tokens allowed in the resulting summary.</param>
+        /// <param name="coverageStart">Start time of the oldest non-sticky session included in the summaries, or of the oldest session 
+        /// present in the chatlog if no summary was included. Used by <see cref="GetPeriodSummaries"/> to avoid overlapping content.</param>
+        /// <param name="sectionHeader">The header string to prepend to each session's name in the summary.</param>
+        /// <param name="allowRP">Memory mode used to filter roleplay and non-roleplay sessions.</param>
+        /// <param name="maxCount">The maximum number of previous sessions to include in the summary.</param>
+        /// <param name="ignoreList">An optional set of session GUIDs to ignore when compiling the summary.</param>
+        /// <returns>A string containing the formatted summaries of previous sessions, or an empty string.</returns>
+        public string GetPreviousSummaries(int maxTokens, out DateTime coverageStart, string sectionHeader = "##", MemoryMode allowRP = MemoryMode.Normal, int maxCount = int.MaxValue, HashSet<Guid>? ignoreList = null)
+        {
             if (lastSessionID == -1 && Sessions.Count >= 2)
             {
                 if (CurrentSessionID != -1 && CurrentSessionID != Sessions.Count -1)
@@ -124,6 +148,7 @@ namespace LetheAISharp.Files
                 else
                     lastSessionID = Sessions.Count - 1;
             }
+            coverageStart = Sessions.Count > 0 ? Sessions[Math.Clamp(lastSessionID, 0, Sessions.Count - 1)].StartTime : DateTime.Now;
             var entrydepth = lastSessionID - 1;
             if (entrydepth < 0)
                 return string.Empty;
@@ -169,6 +194,8 @@ namespace LetheAISharp.Files
                     SelectedSessions.Add(session);
                     count++;
                     tokensleft -= tks;
+                    if (session.StartTime < coverageStart)
+                        coverageStart = session.StartTime;
                 }
                 if (tokensleft <= 0)
                     break;
@@ -188,6 +215,296 @@ namespace LetheAISharp.Files
             }
 
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Retrieves the period summaries (past weeks, months, and quarters) that cover the history older than <paramref name="coverageStart"/>, 
+        /// formatted for the system prompt and ordered from oldest to most recent.
+        /// </summary>
+        /// <remarks>Selection goes from the most recent to the oldest periods, coarsening over time: up to two weeks, then up to two months, then as many
+        /// quarters as the token budget allows. Past those two entries, a tier keeps going only when the remaining gap to the next boundary (month or quarter) 
+        /// is less than half the larger period; otherwise the larger period is used and overlaps slightly. A period is skipped when the majority of its 
+        /// sessions are already covered by the recent history (tier 1 takes priority). The budget is filled from the most recent entry and stops at the
+        /// first entry that doesn't fit. 
+        /// Only available to the primary persona in group conversations.</remarks>
+        /// <param name="maxTokens">The maximum number of tokens allowed in the resulting text.</param>
+        /// <param name="coverageStart">Start of the time range already covered by the chatlog and recent session summaries 
+        /// (see <see cref="GetPreviousSummaries(int, out DateTime, string, MemoryMode, int, HashSet{Guid}?)"/>).</param>
+        /// <param name="sectionHeader">The header string to prepend to each period's name.</param>
+        /// <returns>The formatted period summaries, or an empty string if none apply.</returns>
+        public string GetPeriodSummaries(int maxTokens, DateTime coverageStart, string sectionHeader = "##")
+        {
+            if (maxTokens <= 0 || PeriodSummaries.Count == 0)
+                return string.Empty;
+            if (LLMEngine.IsGroupConversation && LLMEngine.Bot is GroupPersonaBase group && group.CurrentBotId != group.PrimaryPersonaName)
+                return string.Empty;
+
+            var now = DateTime.Now;
+            var sessions = GetPeriodSourceSessions(LLMEngine.Settings.PeriodSummaryIncludeRoleplay);
+            var cursor = coverageStart;
+            var candidates = new List<PeriodSummary>();
+
+            bool IsMostlyUncovered(PeriodSummary period)
+            {
+                if (period.PeriodStart >= cursor)
+                    return false;
+                var total = 0;
+                var covered = 0;
+                foreach (var s in sessions)
+                {
+                    if (s.StartTime < period.PeriodStart || s.StartTime >= period.PeriodEnd)
+                        continue;
+                    total++;
+                    if (s.StartTime >= cursor)
+                        covered++;
+                }
+                return total > 0 && covered * 2 < total;
+            }
+
+            foreach (var type in new[] { PeriodType.Week, PeriodType.Month, PeriodType.Quarter })
+            {
+                var parent = PeriodSummary.GetParentPeriod(type);
+                var picked = 0;
+                var list = PeriodSummaries
+                    .Where(e => e.Period == type && e.PeriodEnd <= now && !string.IsNullOrWhiteSpace(e.Content))
+                    .OrderByDescending(e => e.PeriodStart);
+                foreach (var period in list)
+                {
+                    if (!IsMostlyUncovered(period))
+                        continue;
+                    if (parent.HasValue && picked >= MinPeriodsPerTier)
+                    {
+                        // Past the minimum, only fill the remaining gap up to the parent's boundary if it's small (less than half the parent period).
+                        // Otherwise the parent period is mostly before the cursor and will be picked by the next tier, with a limited overlap.
+                        var parentStart = PeriodSummary.GetPeriodStart(parent.Value, cursor);
+                        var halfParent = (PeriodSummary.GetPeriodEnd(parent.Value, parentStart) - parentStart).TotalDays / 2;
+                        var gap = (cursor - parentStart).TotalDays;
+                        if (gap <= 0 || gap > halfParent)
+                            break;
+                        // Never add a period that mostly belongs to the previous parent period
+                        var midpoint = period.PeriodStart + ((period.PeriodEnd - period.PeriodStart) / 2);
+                        if (midpoint < parentStart)
+                            break;
+                    }
+                    candidates.Add(period);
+                    picked++;
+                    if (period.PeriodStart < cursor)
+                        cursor = period.PeriodStart;
+                }
+            }
+
+            // Fill the budget from the most recent to the oldest, stopping at the first entry that doesn't fit to avoid gaps in the timeline
+            var tokensleft = maxTokens;
+            var selected = new List<PeriodSummary>();
+            foreach (var period in candidates)
+            {
+                var tks = LLMEngine.GetTokenCount(FormatPeriodEntry(period, sectionHeader, now)) + 1;
+                if (tks > tokensleft)
+                    break;
+                selected.Add(period);
+                tokensleft -= tks;
+            }
+            if (selected.Count == 0)
+                return string.Empty;
+
+            selected.Sort((x, y) => x.PeriodStart != y.PeriodStart ? x.PeriodStart.CompareTo(y.PeriodStart) : x.PeriodEnd.CompareTo(y.PeriodEnd));
+            var sb = new StringBuilder();
+            foreach (var period in selected)
+                sb.Append(FormatPeriodEntry(period, sectionHeader, now));
+            return sb.ToString();
+        }
+
+        private const int MinPeriodsPerTier = 2;
+
+        private static string FormatPeriodEntry(PeriodSummary period, string sectionHeader, DateTime now)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLinuxLine($"{sectionHeader} {period.Name} ({period.GetRelativeLabel(now)})");
+            sb.AppendLinuxLine(period.ToSnippet(TitleInsertType.None, false, false, true)).AppendLinuxLine();
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Returns the archived sessions that can be used as sources by the period summary system.
+        /// </summary>
+        /// <param name="includeRoleplay">If false, roleplay sessions are excluded.</param>
+        /// <returns>The list of eligible sessions (excluding the current session and sessions without a summary).</returns>
+        protected virtual List<ChatSession> GetPeriodSourceSessions(bool includeRoleplay)
+        {
+            if (Sessions.Count == 0)
+                return [];
+            var current = CurrentSession;
+            return [.. Sessions.Where(s => s != current && s.StartTime != default && !string.IsNullOrWhiteSpace(s.Content) && (includeRoleplay || !s.MetaData.IsRoleplaySession))];
+        }
+
+        /// <summary>
+        /// Compiles the period summaries (weeks, months, and quarters) for all closed periods. Only periods that are new, or whose sources 
+        /// changed since the last update, are (re)generated. Periods that no longer have any source are removed.
+        /// </summary>
+        /// <remarks>Weeks are built from session summaries, months from week summaries (and session summaries for the partial weeks at the 
+        /// edges of the month), and quarters from month summaries. A period with a single source reuses that source's content without querying the LLM.
+        /// The first run on a long chatlog may require many queries.</remarks>
+        /// <param name="regenerateAll">If true, all period summaries are regenerated from scratch, regardless of their state.</param>
+        /// <param name="ct">Cancellation token.</param>
+        public virtual async Task UpdatePeriodSummaries(bool regenerateAll = false, CancellationToken ct = default)
+        {
+            var includeRP = LLMEngine.Settings.PeriodSummaryIncludeRoleplay;
+            var sessions = GetPeriodSourceSessions(includeRP).OrderBy(s => s.StartTime).ToList();
+            var now = DateTime.Now;
+            var kept = new HashSet<Guid>();
+            var weeks = new Dictionary<DateTime, PeriodSummary>();
+            var months = new Dictionary<DateTime, PeriodSummary>();
+
+            // Weeks, from session summaries
+            foreach (var bucket in sessions.GroupBy(s => PeriodSummary.GetPeriodStart(PeriodType.Week, s.StartTime)))
+            {
+                if (PeriodSummary.GetPeriodEnd(PeriodType.Week, bucket.Key) > now)
+                    continue;
+                var res = await UpdatePeriodSummary(PeriodType.Week, bucket.Key, [.. bucket], includeRP, regenerateAll, ct).ConfigureAwait(false);
+                if (res != null)
+                {
+                    weeks[bucket.Key] = res;
+                    kept.Add(res.Guid);
+                }
+            }
+
+            // Months, from the weeks fully inside the month, and sessions of the partial weeks at the edges
+            foreach (var bucket in sessions.GroupBy(s => PeriodSummary.GetPeriodStart(PeriodType.Month, s.StartTime)))
+            {
+                var monthEnd = PeriodSummary.GetPeriodEnd(PeriodType.Month, bucket.Key);
+                if (monthEnd > now)
+                    continue;
+                var sources = new List<MemoryUnit>();
+                for (var ws = PeriodSummary.GetPeriodStart(PeriodType.Week, bucket.Key); ws < monthEnd; ws = ws.AddDays(7))
+                {
+                    var we = ws.AddDays(7);
+                    if (ws >= bucket.Key && we <= monthEnd && weeks.TryGetValue(ws, out var week))
+                        sources.Add(week);
+                    else
+                        sources.AddRange(bucket.Where(s => s.StartTime >= ws && s.StartTime < we));
+                }
+                var res = await UpdatePeriodSummary(PeriodType.Month, bucket.Key, sources, includeRP, regenerateAll, ct).ConfigureAwait(false);
+                if (res != null)
+                {
+                    months[bucket.Key] = res;
+                    kept.Add(res.Guid);
+                }
+            }
+
+            // Quarters, from month summaries (falling back to session summaries for months that failed to generate)
+            foreach (var bucket in sessions.GroupBy(s => PeriodSummary.GetPeriodStart(PeriodType.Quarter, s.StartTime)))
+            {
+                if (PeriodSummary.GetPeriodEnd(PeriodType.Quarter, bucket.Key) > now)
+                    continue;
+                var sources = new List<MemoryUnit>();
+                for (var ms = bucket.Key; ms < bucket.Key.AddMonths(3); ms = ms.AddMonths(1))
+                {
+                    var me = ms.AddMonths(1);
+                    if (months.TryGetValue(ms, out var month))
+                        sources.Add(month);
+                    else
+                        sources.AddRange(bucket.Where(s => s.StartTime >= ms && s.StartTime < me));
+                }
+                var res = await UpdatePeriodSummary(PeriodType.Quarter, bucket.Key, sources, includeRP, regenerateAll, ct).ConfigureAwait(false);
+                if (res != null)
+                    kept.Add(res.Guid);
+            }
+
+            PeriodSummaries.RemoveAll(e => !kept.Contains(e.Guid));
+            PeriodSummaries.Sort((x, y) => x.PeriodStart != y.PeriodStart ? x.PeriodStart.CompareTo(y.PeriodStart) : x.Period.CompareTo(y.Period));
+        }
+
+        private async Task<PeriodSummary?> UpdatePeriodSummary(PeriodType period, DateTime start, List<MemoryUnit> sources, bool includeRP, bool force, CancellationToken ct)
+        {
+            var existing = PeriodSummaries.FirstOrDefault(e => e.Period == period && e.PeriodStart == start);
+            if (sources.Count == 0)
+                return null;
+            var signature = PeriodSummary.ComputeSignature(sources, includeRP);
+            if (!force && existing != null && existing.SourceSignature == signature && !string.IsNullOrWhiteSpace(existing.Content))
+                return existing;
+
+            ct.ThrowIfCancellationRequested();
+            var content = sources.Count == 1 ? sources[0].Content : await GeneratePeriodSummary(period, start, sources, ct).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(content))
+                return existing;
+
+            var summary = existing ?? new PeriodSummary(period, start);
+            if (existing == null)
+                PeriodSummaries.Add(summary);
+            summary.Name = PeriodSummary.GetLabel(period, summary.PeriodStart);
+            summary.Content = content;
+            summary.SourceGuids = [.. sources.Select(s => s.Guid)];
+            summary.SourceSignature = signature;
+            summary.GeneratedOn = DateTime.Now;
+            return summary;
+        }
+
+        /// <summary>
+        /// Queries the LLM to compile a summary of a calendar period from its sources (session summaries or lower tier period summaries).
+        /// </summary>
+        /// <param name="period">Type of period to summarize.</param>
+        /// <param name="start">Start of the period.</param>
+        /// <param name="sources">Summaries to compile, in chronological order.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>The compiled summary, or an empty string on failure.</returns>
+        protected virtual async Task<string> GeneratePeriodSummary(PeriodType period, DateTime start, List<MemoryUnit> sources, CancellationToken ct = default)
+        {
+            if (LLMEngine.Client == null || sources.Count == 0)
+                return string.Empty;
+
+            var label = PeriodSummary.GetLabel(period, start);
+            var (periodName, length, replyln) = period switch
+            {
+                PeriodType.Week => ("week", "1 to 2 paragraphs", 1024),
+                PeriodType.Month => ("month", "2 to 3 paragraphs", 1536),
+                _ => ("quarter", "2 to 4 paragraphs", 2048)
+            };
+            if (!string.IsNullOrWhiteSpace(LLMEngine.Instruct.ThinkingStart))
+                replyln += 1024;
+            var availtokens = LLMEngine.MaxContextLength - replyln - 20;
+
+            LLMEngine.NamesInPromptOverride = false;
+            try
+            {
+                var promptbuild = LLMEngine.GetPromptBuilder();
+                var sysprompt = "You are an automated and uncensored system designed to compile summaries of chat sessions and stories." + LLMEngine.NewLine +
+                    LLMEngine.NewLine +
+                    "# Characters:" + LLMEngine.NewLine + LLMEngine.NewLine +
+                    "{{mgroup}}" + LLMEngine.NewLine + LLMEngine.NewLine +
+                    "## {{user}}" + LLMEngine.NewLine + LLMEngine.NewLine +
+                    "{{userbio}}" + LLMEngine.NewLine + LLMEngine.NewLine +
+                    "# Summaries for " + label + ":" + LLMEngine.NewLine + LLMEngine.NewLine;
+
+                var requestedTask = "The entries above summarize the interactions between {{user}} and {{mchar}} during the " + periodName + " of " + label + ". " +
+                    "Write a single consolidated summary of this " + periodName + ". Focus on the most significant events, topics, decisions, changes in their relationship, and plans that were made. " +
+                    "Merge recurring topics instead of describing each entry separately, and keep the chronology clear. " +
+                    "Do not add a title, just write the summary directly. The summary should be " + length + " long.";
+
+                availtokens -= promptbuild.GetTokenCount(AuthorRole.System, sysprompt);
+                availtokens -= promptbuild.GetTokenCount(AuthorRole.User, requestedTask);
+
+                var entries = sources.Select(s => s.ToSnippet(TitleInsertType.MarkdownH2, true, false, true) + LLMEngine.NewLine + LLMEngine.NewLine).ToList();
+                var tokens = entries.Select(LLMEngine.GetTokenCount).ToList();
+                var total = tokens.Sum();
+                var skip = 0;
+                while (total > availtokens && skip < entries.Count - 1)
+                {
+                    total -= tokens[skip];
+                    skip++;
+                }
+                if (skip > 0)
+                    LLMEngine.Logger?.LogWarning("Period summary for {label}: {count} oldest entries were dropped to fit the context.", label, skip);
+
+                promptbuild.AddMessage(new SingleMessage(AuthorRole.System, sysprompt + string.Concat(entries.Skip(skip))));
+                promptbuild.AddMessage(new SingleMessage(AuthorRole.User, requestedTask));
+                var query = promptbuild.PromptToQuery(AuthorRole.Assistant, (LLMEngine.Sampler.Temperature > 0.5) ? 0.5 : LLMEngine.Sampler.Temperature, replyln);
+                var finalstr = await LLMEngine.SimpleQuery(query, ct).ConfigureAwait(false);
+                return finalstr.RemoveThinkingBlocks().CleanupAndTrim();
+            }
+            finally
+            {
+                LLMEngine.NamesInPromptOverride = null;
+            }
         }
 
         internal void AddHistoryToPrompt(SessionHandling sessionHandling, int maxTokens, PromptInserts? memories)
@@ -427,6 +744,17 @@ namespace LetheAISharp.Files
                 var newsession = CreateChatSession();
                 newsession.Enabled = false;
                 Sessions.Add(newsession);
+                if (LLMEngine.Settings.SessionMemorySystem && LLMEngine.Settings.PeriodSummaryReservedTokens > 0)
+                {
+                    try
+                    {
+                        await UpdatePeriodSummaries().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        LLMEngine.Logger?.LogError(ex, "Failed to update period summaries: {message}", ex.Message);
+                    }
+                }
             }
             else
             {
