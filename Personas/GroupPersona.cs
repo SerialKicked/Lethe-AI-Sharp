@@ -528,6 +528,10 @@ namespace LetheAISharp.LLM
                     .Replace("{{group}}", GetGroupBio(userName))
                     .Replace("{{mgroup}}", GetGroupBio(userName, true))
                     .Replace("{{selfedit}}", currentBot.SelfEditField)
+                    // Each persona has its own mood. User facts belong to the primary persona only.
+                    .Replace("{{mood}}", currentBot.Brain.MoodHandling ? currentBot.Brain.Mood.Describe(false) : string.Empty)
+                    .Replace("{{moodsecondperson}}", currentBot.Brain.MoodHandling ? currentBot.Brain.Mood.Describe(true) : string.Empty)
+                    .Replace("{{userfacts}}", currentBot == PrimaryBot ? currentBot.Brain.GetCoreFacts(LLMEngine.Settings.CoreFactsTokenBudget, true) : string.Empty)
                     .Replace("{{scenario}}", string.IsNullOrWhiteSpace(LLMEngine.Settings.ScenarioOverride) ? GetScenario(userName) : LLMEngine.Settings.ScenarioOverride);
             }
             else
@@ -543,6 +547,9 @@ namespace LetheAISharp.LLM
                     .Replace("{{group}}", GetGroupBio(userName))
                     .Replace("{{mgroup}}", GetGroupBio(userName, true))
                     .Replace("{{selfedit}}", SelfEditField)
+                    .Replace("{{mood}}", string.Empty)
+                    .Replace("{{moodsecondperson}}", string.Empty)
+                    .Replace("{{userfacts}}", string.Empty)
                     .Replace("{{scenario}}", string.IsNullOrWhiteSpace(LLMEngine.Settings.ScenarioOverride) ? GetScenario(userName) : LLMEngine.Settings.ScenarioOverride);
             }
 

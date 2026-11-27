@@ -135,6 +135,13 @@ namespace LetheAISharp.Files
             ImagePaths.Count > 0 && ImagePaths.Any(Role == AuthorRole.Tool ? ToolMediaResult.Exists : File.Exists);
 
         /// <summary>
+        /// Number of distinct images of this message that can be sent to the backend (see <see cref="HasSendableImage"/>).
+        /// <see cref="ToChatCompletion"/> sends all of them.
+        /// </summary>
+        internal int SendableImageCount() =>
+            ImagePaths.Count == 0 ? 0 : ImagePaths.Distinct().Count(Role == AuthorRole.Tool ? ToolMediaResult.Exists : File.Exists);
+
+        /// <summary>
         /// Converts this message into a /v1/chat/completions message.
         /// </summary>
         /// <param name="includeImages">

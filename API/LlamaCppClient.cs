@@ -165,12 +165,15 @@ namespace LetheAISharp.API
         {
             try
             {
-                return await SendRequestAsync<TokenCountResponse>(_httpClient!, HttpMethod.Post, "/v1/messages/count_tokens", body, cancellationToken: cancellationToken).ConfigureAwait(false);
+                // No retries: a missing endpoint (older servers) fails the same way every time, and the local estimate below is a usable fallback.
+                return await SendRequestAsync<TokenCountResponse>(_httpClient!, HttpMethod.Post, "/v1/messages/count_tokens", body, cancellationToken: cancellationToken, maxRetryAttempts: 0).ConfigureAwait(false);
             }
             catch (Exception e)
             {
-                LLMEngine.Logger?.LogError(e, "[LlamaCpp] Error getting token count: {Message}", e.Message);
-                return new TokenCountResponse { input_tokens = 100 };
+                LLMEngine.Logger?.LogError(e, "[LlamaCpp] Error getting token count, using a local estimate: {Message}", e.Message);
+                // Local estimate plus a small per-message overhead for the role headers
+                var estimate = body.messages.Sum(m => TokenTools.CountTokens(m.content) + 8);
+                return new TokenCountResponse { input_tokens = estimate };
             }
         }
 

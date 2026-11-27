@@ -54,6 +54,7 @@ namespace LetheAISharp.Agent.Tools
 
         /// <summary>
         /// Register a toolset with the manager. The tool list's <see cref="IToolList.LoadTools"/> method is called immediately to allow it to initialize any resources.
+        /// Registering a different instance under an already registered ID replaces (and unloads) the previous one.
         /// </summary>
         /// <param name="toolList"></param>
         /// <exception cref="ArgumentException"></exception>
@@ -61,8 +62,34 @@ namespace LetheAISharp.Agent.Tools
         {
             if (toolList == null || string.IsNullOrWhiteSpace(toolList.Id))
                 throw new ArgumentException("Tool list must have a valid ID.");
+            // Functions are cached by name: the old instance has to release its functions first, otherwise the new tools
+            // would bind to the old instance's functions and the tool cache would hold duplicates.
+            if (_toolLists.TryGetValue(toolList.Id, out var previous) && !ReferenceEquals(previous, toolList))
+                previous.UnloadTools();
             _toolLists[toolList.Id] = toolList;
             toolList.LoadTools();
+            WarnOnNameCollisions(toolList);
+        }
+
+        /// <summary>
+        /// Function names are global (one function per name): two toolsets exposing the same function name would share 
+        /// the first registered implementation and schema. This can't be resolved here, but it must not go unnoticed.
+        /// </summary>
+        private void WarnOnNameCollisions(IToolList toolList)
+        {
+            var names = toolList.GetToolList().Where(t => t.Function != null).Select(t => t.Function.Name).ToHashSet();
+            if (names.Count == 0)
+                return;
+            foreach (var other in _toolLists.Values)
+            {
+                if (ReferenceEquals(other, toolList))
+                    continue;
+                foreach (var tool in other.GetToolList())
+                {
+                    if (tool.Function != null && names.Contains(tool.Function.Name))
+                        LLMEngine.Logger?.LogWarning("[Tools] Function {Name} exists in both toolsets {First} and {Second}. Only one implementation can be used, rename one of them.", tool.Function.Name, other.Id, toolList.Id);
+                }
+            }
         }
 
         /// <summary>

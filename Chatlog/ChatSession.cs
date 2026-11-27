@@ -68,6 +68,9 @@ namespace LetheAISharp.Files
         /// <returns></returns>
         public virtual async Task UpdateSession()
         {
+            // Nothing to summarize (typically the brand new current session)
+            if (Messages.Count == 0)
+                return;
             if (StartTime == default)
             {
                 foreach (var item in Messages)

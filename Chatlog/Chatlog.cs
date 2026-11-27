@@ -141,13 +141,13 @@ namespace LetheAISharp.Files
         /// <returns>A string containing the formatted summaries of previous sessions, or an empty string.</returns>
         public string GetPreviousSummaries(int maxTokens, out DateTime coverageStart, string sectionHeader = "##", MemoryMode allowRP = MemoryMode.Normal, int maxCount = int.MaxValue, HashSet<Guid>? ignoreList = null)
         {
-            if (lastSessionID == -1 && Sessions.Count >= 2)
-            {
-                if (CurrentSessionID != -1 && CurrentSessionID != Sessions.Count -1)
-                    lastSessionID = CurrentSessionID - 1;
-                else
-                    lastSessionID = Sessions.Count - 1;
-            }
+            // lastSessionID is the oldest session present in the chatlog in context, as measured by the previous prompt build
+            // (the system prompt is built before the chat history). It's only an estimate carried over from that build, so:
+            // - with CurrentOnly, the chatlog in context is always the current session, whatever happened since
+            // - it can't be past the current session (new session started, or the user went back to an older one)
+            var cur = CurrentSessionID >= 0 && CurrentSessionID < Sessions.Count ? CurrentSessionID : Sessions.Count - 1;
+            if (lastSessionID == -1 || lastSessionID > cur || LLMEngine.Settings.SessionHandling == SessionHandling.CurrentOnly)
+                lastSessionID = cur;
             coverageStart = Sessions.Count > 0 ? Sessions[Math.Clamp(lastSessionID, 0, Sessions.Count - 1)].StartTime : DateTime.Now;
             var entrydepth = lastSessionID - 1;
             if (entrydepth < 0)
@@ -538,34 +538,52 @@ namespace LetheAISharp.Files
                     messagelist.Add((curSessionID, msg));
             }
 
-            var oldest = int.MaxValue;
+            static bool IsToolChainMessage(SingleMessage m) => m.Role == AuthorRole.Tool || (m.Role == AuthorRole.Assistant && m.ToolCalls?.Count > 0);
+
+            // An empty history still means the chatlog in context starts at the current session.
+            var oldest = curSessionID;
+            // Memories found at a depth where they can't be inserted (inside a tool chain) wait for the next valid spot.
+            var pendingMemories = new List<string>();
             // iterate through the messages in reverse order until we reach the token limit or end of messages
             for (int i = messagelist.Count - 1; i >= 0; i--)
             {
                 var msg = messagelist[i];
-                oldest = Math.Min(oldest, msg.Item1);
+                var toolChainMsg = IsToolChainMessage(msg.Item2);
                 // Skip counting tools as they will be pruned / handled by the prompt builder
-                if (msg.Item2.Role == AuthorRole.Tool || (msg.Item2.Role == AuthorRole.Assistant && msg.Item2.ToolCalls.Count > 0))
-                    tokensleft -= 0;
-                else
+                if (!toolChainMsg)
                     tokensleft -= LLMEngine.PromptBuilder.GetTokenCount(msg.Item2);
                 if (tokensleft <= 0)
                     break;
+                // Only sessions that actually contributed messages count as covered by the chatlog
+                oldest = Math.Min(oldest, msg.Item1);
                 LLMEngine.PromptBuilder.InsertMessage(startpos, msg.Item2);
                 // check if we need to add a memory
                 if (memories?.Count > 0 && !LLMEngine.Settings.MoveAllInsertsToSysPrompt)
                 {
-                    var foundmemory = memories.GetContentByPosition(entrydepth);
-                    if (!string.IsNullOrEmpty(foundmemory))
+                    // Depths count real dialog turns only, tool chain messages don't move memories deeper
+                    if (!toolChainMsg)
                     {
-                        tokensleft -= LLMEngine.PromptBuilder.GetTokenCount(AuthorRole.System, foundmemory.CleanupAndTrim());
-                        if (tokensleft > 0)
+                        var foundmemory = memories.GetContentByPosition(entrydepth);
+                        if (!string.IsNullOrEmpty(foundmemory))
+                            pendingMemories.Add(foundmemory.CleanupAndTrim());
+                    }
+                    // A memory goes right before this message: never in front of a tool result, nor between a tool chain
+                    // and the answer that follows it (the message before this one must not be part of a tool chain).
+                    var validSpot = msg.Item2.Role != AuthorRole.Tool && (i == 0 || !IsToolChainMessage(messagelist[i - 1].Item2));
+                    if (validSpot && pendingMemories.Count > 0)
+                    {
+                        // Inserted at the same position, newest found first, so they end up in depth order
+                        foreach (var memory in pendingMemories)
                         {
-                            LLMEngine.PromptBuilder.InsertMessage(startpos, new SingleMessage(AuthorRole.System, foundmemory.CleanupAndTrim()));
+                            tokensleft -= LLMEngine.PromptBuilder.GetTokenCount(AuthorRole.System, memory);
+                            if (tokensleft > 0)
+                                LLMEngine.PromptBuilder.InsertMessage(startpos, new SingleMessage(AuthorRole.System, memory));
                         }
+                        pendingMemories.Clear();
                     }
                 }
-                entrydepth++;
+                if (!toolChainMsg)
+                    entrydepth++;
             }
             lastSessionID = oldest;
         }

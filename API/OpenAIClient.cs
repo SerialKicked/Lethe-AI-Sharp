@@ -156,20 +156,26 @@ namespace LetheAISharp.API
                     var clientCap = replyLimit > 0 && toolRound >= 1 && currentRequest.Tools != null;
                     await foreach (var partialResponse in API.ChatEndpoint.StreamCompletionEnumerableAsync(currentRequest, cancellationToken: cancellationToken))
                     {
-                        if (partialResponse.FirstChoice?.Delta?.ToolCalls != null)
+                        // Chunks without a first choice (usage reports, content filter notices) carry nothing for us.
+                        if (partialResponse.FirstChoice == null)
+                            continue;
+
+                        if (partialResponse.FirstChoice.Delta?.ToolCalls != null)
                             sawToolCallDelta = true;
 
-                        // Flush any reasoning content that arrived in the final assistant Message
-                        // (typically seen together with tool_calls) so the engine can capture it
-                        // in the thinking channel before we mutate the request and re-issue.
+                        // Flush any reasoning content that arrived in an assistant Message but was not streamed as deltas,
+                        // so the engine can capture it in the thinking channel before we mutate the request and re-issue.
+                        // The stream ends with the whole accumulated message (typically seen together with tool_calls):
+                        // its reasoning contains everything already streamed, so only the part beyond that is new.
                         var pendingReasoning = partialResponse.FirstChoice.Message?.ReasoningContent;
-                        if (!string.IsNullOrEmpty(pendingReasoning))
+                        if (!string.IsNullOrEmpty(pendingReasoning) && pendingReasoning.Length > reasoningChars)
                         {
                             RaiseOnStreamingResponse(new OpenTokenResponse
                             {
                                 Token = string.Empty,
-                                ReasoningToken = pendingReasoning
+                                ReasoningToken = pendingReasoning[reasoningChars..]
                             });
+                            reasoningChars = pendingReasoning.Length;
                         }
 
                         // Handle tool_calls
@@ -308,30 +314,35 @@ namespace LetheAISharp.API
                         }
                         else if (partialResponse.FirstChoice.Delta?.Content != null || !string.IsNullOrEmpty(partialResponse.FirstChoice.Delta?.ReasoningContent))
                         {
-                            var delta = partialResponse.FirstChoice.Delta;
-                            var hasFinishReason = !string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason);
-                            var finishReason = partialResponse.FirstChoice.FinishReason;
+                            var delta = partialResponse.FirstChoice.Delta!;
+                            var hasFinishReason = !string.IsNullOrEmpty(partialResponse.FirstChoice.FinishReason) && partialResponse.FirstChoice.FinishReason != "null";
+                            var finishReason = hasFinishReason ? partialResponse.FirstChoice.FinishReason : null;
                             var toolRecords = hasFinishReason && toolCallRecords?.Count > 0 ? toolCallRecords : null;
+                            var hasReasoning = !string.IsNullOrEmpty(delta.ReasoningContent);
+                            var hasContent = !string.IsNullOrEmpty(delta.Content);
 
                             reasoningChars += delta.ReasoningContent?.Length ?? 0;
                             contentChars += delta.Content?.Length ?? 0;
 
+                            // The finish reason (and the tool records riding with it) must reach the engine exactly once,
+                            // on the last event raised for this chunk: each event carrying it is a completion.
+
                             // Reasoning (thinking) content from the separate reasoning_content field.
                             // Routed directly to the engine's thinking channel — does NOT pass through
                             // the inline-tag splitter.
-                            if (!string.IsNullOrEmpty(delta.ReasoningContent))
+                            if (hasReasoning)
                             {
                                 RaiseOnStreamingResponse(new OpenTokenResponse
                                 {
                                     Token = string.Empty,
                                     ReasoningToken = delta.ReasoningContent,
-                                    FinishReason = finishReason,
-                                    ToolCallRecords = toolRecords
+                                    FinishReason = hasContent ? null : finishReason,
+                                    ToolCallRecords = hasContent ? null : toolRecords
                                 });
                             }
 
                             // Visible content from the content field.
-                            if (!string.IsNullOrEmpty(delta.Content))
+                            if (hasContent)
                             {
                                 cumulativeDelta += delta.Content;
                                 RaiseOnStreamingResponse(new OpenTokenResponse
@@ -341,6 +352,22 @@ namespace LetheAISharp.API
                                     ToolCallRecords = toolRecords
                                 });
                             }
+
+                            // Finish chunk with an empty delta content (e.g. {"delta":{"content":""},"finish_reason":"stop"}):
+                            // nothing was raised above, the completion still has to be.
+                            if (hasFinishReason && !hasReasoning && !hasContent && (finishReason != "tool_calls" || toolRecords != null))
+                            {
+                                RaiseOnStreamingResponse(new OpenTokenResponse
+                                {
+                                    Token = string.Empty,
+                                    FinishReason = finishReason,
+                                    ToolCallRecords = toolRecords
+                                });
+                            }
+
+                            // Same as below: records delivered with an intermediate "tool_calls" event are logged by the engine already.
+                            if (finishReason == "tool_calls" && toolRecords != null)
+                                toolCallRecords.Clear();
 
                             if (hasFinishReason && (finishReason == "stop" || finishReason == "length"))
                                 break;

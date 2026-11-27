@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.HighPerformance;
+using LetheAISharp.API;
 using LetheAISharp.LLM;
 using Newtonsoft.Json;
 using OpenAI;
@@ -185,6 +186,26 @@ namespace LetheAISharp.Files
 
         [JsonIgnore] internal bool RealAddNameToPrompt => LLMEngine.NamesInPromptOverride ?? LLMEngine.Settings.AddNamesToPrompt;
         [JsonIgnore] public bool IsThinkFormat => !string.IsNullOrEmpty(ThinkingEnd);
+
+        /// <summary>
+        /// True when <see cref="LLMSettings.RAGMoveToThinkBlock"/> will actually place the data inserts in the bot's think prefill,
+        /// mirroring the conditions of <see cref="GetThinkPrefill"/> and of the prompt builders. When false, the inserts must be
+        /// placed in the chat history as usual, or they would be lost.
+        /// </summary>
+        internal bool InsertsGoToThinkPrefill()
+        {
+            if (!LLMEngine.Settings.RAGMoveToThinkBlock || string.IsNullOrEmpty(ThinkingStart) || !PrefillThinking)
+                return false;
+            // GetThinkPrefill only returns an (optional) empty think block in that case
+            if (IsThinkFormat && LLMEngine.Settings.DisableThinking)
+                return false;
+            if (!(LLMEngine.Settings.BackendChatAllowPrefill ?? LLMEngine.Client?.AllowPrefill == true))
+                return false;
+            // The chat builder never prefills while tool calls are loaded
+            if (LLMEngine.CompletionAPIType == CompletionType.Chat && LLMEngine.ToolCallsLoaded)
+                return false;
+            return true;
+        }
 
         public string GetThinkPrefill(bool? overrideprefill = null)
         {

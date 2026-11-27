@@ -1230,10 +1230,11 @@ namespace LetheAISharp.LLM
                 if (!string.IsNullOrEmpty(e.Token))
                 {
                     StreamingTextProgress.Append(e.Token);
-                    if (_useSeparateFieldRouting)
+                    // Backend signaled channels via separate fields: bypass the inline-tag parser entirely.
+                    // An error report is not model output either: it must reach the visible response even
+                    // when the parser is still inside a thinking block.
+                    if (_useSeparateFieldRouting || e.FinishReason == "error")
                     {
-                        // Backend signaled channels via separate fields; bypass the
-                        // inline-tag parser entirely.
                         textStreamReceiver.FeedToChannel(InferenceChannel.Text, e.Token);
                         _currentChannel = InferenceChannel.Text;
                     }
@@ -1242,7 +1243,8 @@ namespace LetheAISharp.LLM
                         _currentChannel = textStreamReceiver.FeedToken(e.Token);
                     }
                 }
-                var response = textStreamReceiver.GetFormattedText();
+                var (ThinkContent, TalkContent) = textStreamReceiver.GetCurrentBuffers();
+                var response = TalkContent;
                 // We went over the max response length (or reached stop string on some backends) and the backend had to cut the response
                 if (e.FinishReason == "length")
                 {
@@ -1258,8 +1260,8 @@ namespace LetheAISharp.LLM
                     }
                 }
 
-                // if the finish reason is NOT a "tool_calls", we can execute the context plugin replacement.
-                if (e.FinishReason != "tool_calls")
+                // if the finish reason is NOT a "tool_calls" (or an error), we can execute the context plugin replacement.
+                if (e.FinishReason != "tool_calls" && e.FinishReason != "error")
                     foreach (var ctxplug in ContextPlugins)
                     {
                         if (ctxplug.Enabled && ctxplug.ReplaceOutput(Bot.ReplaceMacros(response), History, out var editedresponse))
@@ -1321,11 +1323,9 @@ namespace LetheAISharp.LLM
                 }
                 if (e.FinishReason != "tool_calls")
                 {
-                    var (ThinkContent, TalkContent) = textStreamReceiver.GetCurrentBuffers();
-
                     // Build structured result for new event
                     var thinkingContent = ThinkContent.Length > 0 ? ThinkContent.Trim() : null;
-                    var textResponse = TalkContent.Trim();
+                    var textResponse = response.Trim();
                     var inferenceResult = new InferenceResult
                     {
                         Response = textResponse,
@@ -1400,9 +1400,15 @@ namespace LetheAISharp.LLM
                     && Instruct.IsThinkFormat
                     && Instruct.RequireEmptyThinkBlockWhenThinkingDisabled)
                 {
-                    token = Instruct.GetThinkPrefill() + token;
-                    StreamingTextProgress.Append(token);
-                    return;
+                    // The empty think block is part of the prompt: show it in the progress text, then process the token normally.
+                    var prefill = Instruct.GetThinkPrefill();
+                    if (token.StartsWith(prefill, StringComparison.Ordinal))
+                    {
+                        // This is the prefill itself, emitted by EmitThinkPrefill
+                        StreamingTextProgress.Append(token);
+                        return;
+                    }
+                    StreamingTextProgress.Append(prefill);
                 }
                 StreamingTextProgress.Append(e.Token);
                 _currentChannel = textStreamReceiver.FeedToken(token);
@@ -1620,7 +1626,9 @@ namespace LetheAISharp.LLM
                 availtokens -= PromptBuilder.GetResponseTokenCount(Bot);
 
             // get the full, formated chat history complemented by the data inserts
-            var addinserts = string.IsNullOrEmpty(Instruct.ThinkingStart) || !Settings.RAGMoveToThinkBlock;
+            // Inserts only move to the think block when the prefill will really carry them (the text builder gives no think prefill to an impersonation).
+            var userResponse = string.IsNullOrEmpty(message.Message) && message.Role == AuthorRole.User;
+            var addinserts = !Instruct.InsertsGoToThinkPrefill() || (userResponse && CompletionAPIType == CompletionType.Text);
             var cushion = Client?.CompletionType == CompletionType.Chat ? MaxContextLength / 2 : 0;
             if (cushion > 15240)
                 cushion = 15240;

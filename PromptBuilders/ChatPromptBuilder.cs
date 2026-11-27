@@ -74,9 +74,18 @@ namespace LetheAISharp
 
             if (LLMEngine.SupportsVision)
             {
-                var imgcnt = messages.Where(m => m.HasSendableImage()).ToList().Count;
-                if (LLMEngine.Settings.MaxImageCount > 0 && imgcnt > LLMEngine.Settings.MaxImageCount)
-                    imgcnt = LLMEngine.Settings.MaxImageCount;
+                // Mirrors BuildChatRequest: the newest MaxImageCount messages carrying images send all of their images.
+                var messagesLeft = LLMEngine.Settings.MaxImageCount > 0 ? LLMEngine.Settings.MaxImageCount : int.MaxValue;
+                var imgcnt = 0;
+                for (int i = messages.Count - 1; i >= 0 && messagesLeft > 0; i--)
+                {
+                    var count = messages[i].SendableImageCount();
+                    if (count > 0)
+                    {
+                        imgcnt += count;
+                        messagesLeft--;
+                    }
+                }
                 total += imgcnt * (LLMEngine.Settings.ImageEmbeddingSize + 4);
             }
 
